@@ -38,9 +38,12 @@ const Footer = () => {
                 </div>
 
                 <div className="border-t border-white/5 pt-8 flex flex-col md:flex-row justify-between items-center">
-                    <p className="text-gray-500 text-sm mb-4 md:mb-0">
-                        © 2026 Monkey Clone. All rights reserved.
-                    </p>
+                    <div className="flex flex-col md:flex-row items-center gap-4 text-gray-500 text-sm mb-4 md:mb-0">
+                        <p>© 2026 Monkey Clone. All rights reserved.</p>
+                        <div className="hidden md:block w-1 h-1 bg-gray-700 rounded-full"></div>
+                        <a href="/safety" className="hover:text-white transition-colors">Safety Guidelines</a>
+                        <a href="/" className="hover:text-white transition-colors">Terms of Service</a>
+                    </div>
 
                     <div className="flex space-x-6">
                         {['Instagram', 'Twitter', 'Facebook'].map((social) => (

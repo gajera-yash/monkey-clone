@@ -12,6 +12,7 @@ import LoginModal from './components/auth/LoginModal';
 import PrivateRoute from './components/auth/PrivateRoute';
 import AdminDashboard from './components/admin/AdminDashboard';
 import AgeGate from './components/safety/AgeGate';
+import SafetyGuidelines from './components/safety/SafetyGuidelines';
 
 function App() {
   const [isLoginOpen, setIsLoginOpen] = useState(false);
@@ -53,6 +54,14 @@ function App() {
 
             <Route path="/admin" element={
               <AdminDashboard />
+            } />
+
+            <Route path="/safety" element={
+              <>
+                <Header onStartChat={() => setIsLoginOpen(true)} />
+                <SafetyGuidelines />
+                <Footer />
+              </>
             } />
           </Routes>
         </div>
