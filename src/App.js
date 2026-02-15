@@ -13,30 +13,32 @@ import PrivateRoute from './components/auth/PrivateRoute';
 import AdminDashboard from './components/admin/AdminDashboard';
 import AgeGate from './components/safety/AgeGate';
 import SafetyGuidelines from './components/safety/SafetyGuidelines';
+import GenderModal from './components/auth/GenderModal';
 
 function App() {
   const [isLoginOpen, setIsLoginOpen] = useState(false);
+  const [isGenderModalOpen, setIsGenderModalOpen] = useState(false);
   const { currentUser } = useAuth();
 
-  // Improved start chat handler
+  // Improved start chat handler with Gender Selection
   const handleStartChat = () => {
     if (currentUser) {
-      window.location.href = '/chat'; // Or use navigate if inside Router? 
-      // Wait, App is inside Router now? No, App RENDERs Router.
-      // So App cannot use useNavigate. 
-      // But window.location.href works. 
-      // BETTER: Move Router to index.js too? 
-      // OR: Just use window.location.href for now as it's a hard redirect which is fine, 
-      // BUT even better: Create a "Layout" component or similar.
-      // actually if I just use window.location.href = '/chat', it reloads app.
-      // To use useNavigate, I need to be inside Router.
-      // Let's move Router to index.js as well? 
-      // Or just keep it here and use a dirty trick? 
-      // Let's use window.location.href for simplicity in this file structure, 
-      // OR better: Create a `MainContent` component inside App.
+      window.location.href = '/chat';
     } else {
-      setIsLoginOpen(true);
+      // Check if gender is already selected
+      const savedGender = localStorage.getItem('userGender');
+      if (!savedGender) {
+        setIsGenderModalOpen(true);
+      } else {
+        setIsLoginOpen(true);
+      }
     }
+  };
+
+  const handleGenderSelect = (gender) => {
+    localStorage.setItem('userGender', gender);
+    setIsGenderModalOpen(false);
+    setIsLoginOpen(true);
   };
 
   return (
@@ -51,6 +53,11 @@ function App() {
         }} />
 
         <LoginModal isOpen={isLoginOpen} onClose={() => setIsLoginOpen(false)} />
+        <GenderModal
+          isOpen={isGenderModalOpen}
+          onSelect={handleGenderSelect}
+          onClose={() => setIsGenderModalOpen(false)}
+        />
 
         <Routes>
           <Route path="/" element={
