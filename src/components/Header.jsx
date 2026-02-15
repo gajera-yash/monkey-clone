@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '../context/AuthContext';
 
 const Header = ({ onStartChat }) => {
+    const { currentUser, logout } = useAuth();
     const [isScrolled, setIsScrolled] = useState(false);
+    const [isMenuOpen, setIsMenuOpen] = useState(false);
 
     useEffect(() => {
         const handleScroll = () => {
@@ -22,7 +25,7 @@ const Header = ({ onStartChat }) => {
                 {/* Logo */}
                 <div
                     className="flex items-center space-x-3 cursor-pointer group"
-                    onClick={onStartChat}
+                    onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
                 >
                     <div className="relative">
                         <span className="text-3xl filter drop-shadow-lg group-hover:scale-110 transition-transform duration-200 inline-block">
@@ -38,17 +41,51 @@ const Header = ({ onStartChat }) => {
 
                 {/* Navigation */}
                 <nav className="flex items-center space-x-6">
-                    <button
-                        className="text-gray-300 hover:text-white font-medium transition-colors duration-200 text-sm hidden md:block"
-                    >
-                        About
-                    </button>
-                    <button
-                        onClick={onStartChat}
-                        className="bg-white/10 hover:bg-white/20 text-white border border-white/10 px-6 py-2 rounded-full font-medium transition-all duration-200 hover:scale-105 backdrop-blur-sm"
-                    >
-                        Start Chat
-                    </button>
+                    {currentUser ? (
+                        <div className="relative">
+                            <button
+                                onClick={() => setIsMenuOpen(!isMenuOpen)}
+                                className="flex items-center space-x-3 focus:outline-none"
+                            >
+                                <img
+                                    src={currentUser.photoURL || `https://ui-avatars.com/api/?name=${currentUser.displayName}&background=random`}
+                                    alt="User"
+                                    className="w-10 h-10 rounded-full border-2 border-accent-purple"
+                                />
+                                <span className="text-white font-medium hidden md:block">{currentUser.displayName}</span>
+                            </button>
+
+                            {/* Dropdown */}
+                            {isMenuOpen && (
+                                <div className="absolute right-0 mt-3 w-48 bg-dark-800 border border-white/10 rounded-xl shadow-xl py-2 animate-fade-in">
+                                    <div className="px-4 py-2 border-b border-white/5">
+                                        <p className="text-sm text-gray-400">Signed in as</p>
+                                        <p className="text-white font-medium truncate">{currentUser.email || 'Guest'}</p>
+                                    </div>
+                                    <button
+                                        onClick={logout}
+                                        className="w-full text-left px-4 py-2 text-red-400 hover:bg-white/5 transition-colors"
+                                    >
+                                        Logout
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    ) : (
+                        <>
+                            <button
+                                className="text-gray-300 hover:text-white font-medium transition-colors duration-200 text-sm hidden md:block"
+                            >
+                                About
+                            </button>
+                            <button
+                                onClick={onStartChat}
+                                className="bg-white/10 hover:bg-white/20 text-white border border-white/10 px-6 py-2 rounded-full font-medium transition-all duration-200 hover:scale-105 backdrop-blur-sm"
+                            >
+                                Login
+                            </button>
+                        </>
+                    )}
                 </nav>
             </div>
         </header>
