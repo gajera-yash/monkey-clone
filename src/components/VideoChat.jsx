@@ -55,6 +55,24 @@ const VideoChat = ({ onEndChat, userName }) => {
     requestMedia();
   }, [requestMedia]);
 
+  // Toggle Microphone
+  useEffect(() => {
+    if (stream) {
+      stream.getAudioTracks().forEach(track => {
+        track.enabled = isMicOn;
+      });
+    }
+  }, [isMicOn, stream]);
+
+  // Toggle Camera
+  useEffect(() => {
+    if (stream) {
+      stream.getVideoTracks().forEach(track => {
+        track.enabled = isCamOn;
+      });
+    }
+  }, [isCamOn, stream]);
+
   useEffect(() => {
     performJoin();
   }, [performJoin]);
