@@ -10,6 +10,8 @@ import Footer from './components/Footer';
 import VideoChat from './components/VideoChat';
 import LoginModal from './components/auth/LoginModal';
 import PrivateRoute from './components/auth/PrivateRoute';
+import AdminDashboard from './components/admin/AdminDashboard';
+import AgeGate from './components/safety/AgeGate';
 
 function App() {
   const [isLoginOpen, setIsLoginOpen] = useState(false);
@@ -18,6 +20,7 @@ function App() {
     <AuthProvider>
       <Router>
         <div className="font-sans antialiased text-white bg-dark-900 min-h-screen">
+          <AgeGate />
           <Toaster position="top-center" toastOptions={{
             style: {
               background: '#333',
@@ -46,6 +49,10 @@ function App() {
               <PrivateRoute>
                 <ChatLayout />
               </PrivateRoute>
+            } />
+
+            <Route path="/admin" element={
+              <AdminDashboard />
             } />
           </Routes>
         </div>

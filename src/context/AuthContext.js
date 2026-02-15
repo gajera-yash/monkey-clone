@@ -121,9 +121,31 @@ export const AuthProvider = ({ children }) => {
     };
 
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, (user) => {
-            if (!isGuest) {
-                setCurrentUser(user);
+        const unsubscribe = onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                // Fetch user data from Firestore
+                const userRef = doc(db, "users", user.uid);
+                const userSnap = await getDoc(userRef);
+
+                if (userSnap.exists()) {
+                    const data = userSnap.data();
+
+                    if (data.isBanned) {
+                        await signOut(auth);
+                        toast.error("This account has been banned.");
+                        setCurrentUser(null);
+                        setLoading(false);
+                        return;
+                    }
+
+                    setBlockedUsers(data.blockedUsers || []);
+                    setCurrentUser({ ...user, ...data }); // Merge auth user with firestore data
+                } else {
+                    setCurrentUser(user);
+                }
+            } else if (!isGuest) {
+                setCurrentUser(null);
+                setBlockedUsers([]);
             }
             setLoading(false);
         });
