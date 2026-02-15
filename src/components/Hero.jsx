@@ -31,7 +31,7 @@ const Hero = ({ onStartChat }) => {
 
                 <p className="text-lg md:text-xl text-gray-400 mb-10 max-w-2xl mx-auto leading-relaxed animate-fade-in-up delay-200">
                     Spontaneous video connections with people from around the globe.
-                    <span className="text-gray-300"> No login required.</span> Just start talking.
+                    Just start talking.
                 </p>
 
                 {/* Action Area */}

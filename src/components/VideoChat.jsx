@@ -3,6 +3,7 @@ import socket from '../utils/socket';
 import PermissionModal from './PermissionModal';
 import ReportModal from './safety/ReportModal';
 import { useAuth } from '../context/AuthContext';
+import EmojiPicker from 'emoji-picker-react';
 
 const RTC_CONFIG = {
   iceServers: [
@@ -19,8 +20,10 @@ const VideoChat = ({ onEndChat }) => {
   const peerConnection = useRef(null);
   const roomIdRef = useRef(null);
   const hasEmittedJoin = useRef(false);
-  // Store partner info for reporting
   const partnerIdRef = useRef(null);
+  const scrollRef = useRef(null);
+  const typingTimeoutRef = useRef(null);
+  const notificationSound = useRef(new Audio('https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3'));
 
   const [stream, setStream] = useState(null);
   const [remoteStream, setRemoteStream] = useState(null);
@@ -32,12 +35,38 @@ const VideoChat = ({ onEndChat }) => {
   const [isCamOn, setIsCamOn] = useState(true);
   const [status, setStatus] = useState('Initializing...');
 
+  // Chat & Timer States
+  const [messages, setMessages] = useState([]);
+  const [newMessage, setNewMessage] = useState('');
+  const [isPartnerTyping, setIsPartnerTyping] = useState(false);
+  const [chatTimer, setChatTimer] = useState(0);
+  const [showChat, setShowChat] = useState(true);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+
+  // Timer logic
+  useEffect(() => {
+    let interval;
+    if (status === 'Connected' && roomIdRef.current) {
+      interval = setInterval(() => {
+        setChatTimer(prev => prev + 1);
+      }, 1000);
+    } else {
+      setChatTimer(0);
+    }
+    return () => clearInterval(interval);
+  }, [status]);
+
+  const formatTime = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
   const performJoin = useCallback(() => {
     if (hasEmittedJoin.current) return;
     if (socket.connected && stream && currentUser) {
       hasEmittedJoin.current = true;
       setStatus('Searching for partner...');
-      // Send user info including blocked list
       socket.emit('join-waiting', {
         name: currentUser.displayName || 'Stranger',
         uid: currentUser.uid,
@@ -62,31 +91,6 @@ const VideoChat = ({ onEndChat }) => {
     }
   }, []);
 
-  const handleMatched = useCallback(async ({ roomId, initiator, partnerName, partnerId }) => {
-    roomIdRef.current = roomId;
-    partnerIdRef.current = partnerId;
-    setPartnerName(partnerName || 'Stranger');
-    setStatus('Connected');
-
-    const pc = new RTCPeerConnection(RTC_CONFIG);
-    peerConnection.current = pc;
-
-    if (stream) {
-      stream.getTracks().forEach(track => pc.addTrack(track, stream));
-    }
-
-    pc.ontrack = (e) => setRemoteStream(e.streams[0]);
-    pc.onicecandidate = (e) => {
-      if (e.candidate) socket.emit('ice-candidate', { candidate: e.candidate, roomId });
-    };
-
-    if (initiator) {
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
-      socket.emit('offer', { offer, roomId });
-    }
-  }, [stream]);
-
   const handleNext = () => {
     if (peerConnection.current) {
       peerConnection.current.close();
@@ -94,6 +98,9 @@ const VideoChat = ({ onEndChat }) => {
     }
     setRemoteStream(null);
     setPartnerName(null);
+    setMessages([]);
+    setChatTimer(0);
+    setIsPartnerTyping(false);
     partnerIdRef.current = null;
     if (roomIdRef.current) {
       socket.emit('leave-room', { roomId: roomIdRef.current });
@@ -101,6 +108,39 @@ const VideoChat = ({ onEndChat }) => {
     }
     hasEmittedJoin.current = false;
     performJoin();
+  };
+
+  const handleSendMessage = (e) => {
+    if (e) e.preventDefault();
+    if (!newMessage.trim() || !roomIdRef.current) return;
+
+    const messageData = {
+      id: Date.now(),
+      text: newMessage,
+      senderId: currentUser.uid,
+      senderName: currentUser.displayName || 'Me',
+      timestamp: new Date().toISOString()
+    };
+
+    socket.emit('send-message', { roomId: roomIdRef.current, message: messageData });
+    setMessages(prev => [...prev, messageData]);
+    setNewMessage('');
+    setShowEmojiPicker(false);
+
+    // Stop typing indicator
+    socket.emit('typing', { roomId: roomIdRef.current, isTyping: false });
+  };
+
+  const handleTyping = (e) => {
+    setNewMessage(e.target.value);
+    if (!roomIdRef.current) return;
+
+    socket.emit('typing', { roomId: roomIdRef.current, isTyping: true });
+
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    typingTimeoutRef.current = setTimeout(() => {
+      socket.emit('typing', { roomId: roomIdRef.current, isTyping: false });
+    }, 3000);
   };
 
   const handleReportSubmit = async ({ reason, description }) => {
@@ -137,17 +177,40 @@ const VideoChat = ({ onEndChat }) => {
     performJoin();
   }, [performJoin]);
 
+  // Fix: Listen for socket connection to retry join if it wasn't ready initially
+  useEffect(() => {
+    const handleConnect = () => {
+      console.log("Socket connected, retrying join...");
+      performJoin();
+    };
+
+    socket.on('connect', handleConnect);
+
+    return () => {
+      socket.off('connect', handleConnect);
+    };
+  }, [performJoin]);
+
   useEffect(() => {
     if (remoteStream && remoteVideoRef.current) {
       remoteVideoRef.current.srcObject = remoteStream;
     }
   }, [remoteStream]);
 
+  // Auto-scroll chat
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [messages, isPartnerTyping]);
+
   useEffect(() => {
     const handleMatched = async ({ roomId, initiator, partnerName }) => {
       roomIdRef.current = roomId;
       setPartnerName(partnerName || 'Stranger');
       setStatus('Connected');
+      setMessages([]);
+      setChatTimer(0);
 
       const pc = new RTCPeerConnection(RTC_CONFIG);
       peerConnection.current = pc;
@@ -195,9 +258,21 @@ const VideoChat = ({ onEndChat }) => {
       }
       setRemoteStream(null);
       setPartnerName(null);
+      setMessages([]);
+      setChatTimer(0);
+      setIsPartnerTyping(false);
       partnerIdRef.current = null;
       hasEmittedJoin.current = false;
       performJoin();
+    };
+
+    const handleReceiveMessage = (message) => {
+      setMessages(prev => [...prev, message]);
+      notificationSound.current.play().catch(e => console.log("Sound play failed", e));
+    };
+
+    const handlePartnerTyping = (typing) => {
+      setIsPartnerTyping(typing);
     };
 
     socket.on('matched', handleMatched);
@@ -205,6 +280,8 @@ const VideoChat = ({ onEndChat }) => {
     socket.on('answer', handleAnswer);
     socket.on('ice-candidate', handleIce);
     socket.on('partner-disconnected', handleDisconnect);
+    socket.on('receive-message', handleReceiveMessage);
+    socket.on('partner-typing', handlePartnerTyping);
 
     return () => {
       socket.off('matched');
@@ -212,8 +289,10 @@ const VideoChat = ({ onEndChat }) => {
       socket.off('answer');
       socket.off('ice-candidate');
       socket.off('partner-disconnected');
+      socket.off('receive-message');
+      socket.off('partner-typing');
     };
-  }, [stream, handleMatched]);
+  }, [stream, performJoin]);
 
   const endCall = () => {
     if (peerConnection.current) {
@@ -235,94 +314,233 @@ const VideoChat = ({ onEndChat }) => {
         reportedUserName={partnerName}
       />
 
-      {/* Remote Video (Main) */}
-      <div className="flex-1 relative bg-black flex items-center justify-center">
-        {remoteStream ? (
-          <video ref={remoteVideoRef} autoPlay playsInline className="w-full h-full object-cover" />
-        ) : (
-          <div className="text-center">
-            <div className="inline-block p-4 rounded-full bg-white/5 backdrop-blur-lg mb-4 animate-pulse">
-              <span className="text-4xl">🔍</span>
+      {/* Main Video Area */}
+      <div className={`flex-1 relative bg-black flex flex-col transition-all duration-300 ${showChat ? 'md:mr-0' : ''}`}>
+
+        {/* Remote Video */}
+        <div className="flex-1 relative flex items-center justify-center">
+          {remoteStream ? (
+            <video ref={remoteVideoRef} autoPlay playsInline className="w-full h-full object-cover" />
+          ) : (
+            <div className="text-center">
+              <div className="inline-block p-4 rounded-full bg-white/5 backdrop-blur-lg mb-4 animate-pulse">
+                <span className="text-4xl">🔍</span>
+              </div>
+              <p className="text-gray-400 font-medium tracking-wide animate-pulse">{status}</p>
             </div>
-            <p className="text-gray-400 font-medium tracking-wide animate-pulse">{status}</p>
-          </div>
-        )}
+          )}
 
-        {/* Status Badge */}
-        {partnerName && (
-          <div className="absolute bottom-32 left-1/2 transform -translate-x-1/2 bg-black/40 backdrop-blur-md border border-white/10 px-6 py-2 rounded-full flex items-center gap-2 z-40">
-            <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-            <span className="text-white font-medium text-sm">Chatting with {partnerName}</span>
-          </div>
-        )}
+          {/* Timer Display */}
+          {status === 'Connected' && (
+            <div className="absolute top-6 left-1/2 transform -translate-x-1/2 bg-black/40 backdrop-blur-md border border-white/10 px-4 py-1.5 rounded-full flex items-center gap-2 z-40">
+              <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
+              <span className="text-white font-mono text-sm">{formatTime(chatTimer)}</span>
+            </div>
+          )}
 
-        {/* Report Button */}
-        {partnerName && (
+          {/* Partner Info Badge */}
+          {partnerName && (
+            <div className="absolute bottom-32 left-1/2 transform -translate-x-1/2 bg-black/40 backdrop-blur-md border border-white/10 px-6 py-2 rounded-full flex items-center gap-2 z-40">
+              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+              <span className="text-white font-medium text-sm">Chatting with {partnerName}</span>
+            </div>
+          )}
+
+          {/* Report Button */}
+          {partnerName && (
+            <button
+              onClick={() => setShowReportModal(true)}
+              className="absolute top-6 left-6 z-40 bg-black/40 backdrop-blur-md p-3 rounded-full text-red-500 hover:bg-red-500/20 transition-colors border border-red-500/30"
+              title="Report User"
+            >
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9" />
+              </svg>
+            </button>
+          )}
+
+          {/* Local Video Overlay */}
+          <div className="absolute top-6 right-6 w-32 md:w-64 aspect-[3/4] md:aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl border border-white/10 z-20 transition-all hover:scale-105">
+            <video
+              ref={localVideoRef}
+              autoPlay
+              playsInline
+              muted
+              className={`w-full h-full object-cover ${!isCamOn ? 'hidden' : ''}`}
+            />
+            {!isCamOn && (
+              <div className="absolute inset-0 flex items-center justify-center bg-gray-800">
+                <span className="text-2xl">📷</span>
+              </div>
+            )}
+            <div className="absolute bottom-2 right-2 bg-black/60 backdrop-blur-sm px-2 py-1 rounded text-[10px] text-white font-medium">
+              You
+            </div>
+          </div>
+        </div>
+
+        {/* Controls Bar */}
+        <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 flex items-center gap-4 z-50 bg-black/40 backdrop-blur-xl border border-white/10 p-2 rounded-full shadow-2xl">
           <button
-            onClick={() => setShowReportModal(true)}
-            className="absolute top-6 left-6 z-40 bg-black/40 backdrop-blur-md p-3 rounded-full text-red-500 hover:bg-red-500/20 transition-colors border border-red-500/30"
-            title="Report User"
+            onClick={() => setIsMicOn(!isMicOn)}
+            className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${isMicOn ? 'bg-white/10 hover:bg-white/20 text-white' : 'bg-red-500 text-white'}`}
           >
-            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9" />
-            </svg>
+            {isMicOn ? '🎤' : '🔇'}
           </button>
-        )}
-      </div>
 
-      {/* Local Video (Floating or Sidebar) */}
-      <div className="absolute top-6 right-6 w-32 md:w-64 aspect-[3/4] md:aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl border border-white/10 z-20 transition-all hover:scale-105">
-        <video
-          ref={localVideoRef}
-          autoPlay
-          playsInline
-          muted
-          className={`w-full h-full object-cover ${!isCamOn ? 'hidden' : ''}`}
-        />
-        {!isCamOn && (
-          <div className="absolute inset-0 flex items-center justify-center bg-gray-800">
-            <span className="text-2xl">📷</span>
-          </div>
-        )}
-        <div className="absolute bottom-2 right-2 bg-black/60 backdrop-blur-sm px-2 py-1 rounded text-[10px] text-white font-medium">
-          You
+          <button
+            onClick={() => setIsCamOn(!isCamOn)}
+            className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${isCamOn ? 'bg-white/10 hover:bg-white/20 text-white' : 'bg-red-500 text-white'}`}
+          >
+            {isCamOn ? '📹' : '📷'}
+          </button>
+
+          <button
+            onClick={() => setShowChat(!showChat)}
+            className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${showChat ? 'bg-accent-purple text-white shadow-[0_0_15px_rgba(168,85,247,0.4)]' : 'bg-white/10 hover:bg-white/20 text-white'}`}
+          >
+            💬
+          </button>
+
+          <div className="w-px h-8 bg-white/10 mx-1"></div>
+
+          <button
+            onClick={handleNext}
+            className="px-6 py-3 bg-white text-dark-900 rounded-full font-bold hover:bg-gray-200 transition-all active:scale-95 flex items-center gap-2"
+          >
+            <span>Next</span>
+            <span>⏭️</span>
+          </button>
+
+          <button
+            onClick={endCall}
+            className="w-12 h-12 bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/50 rounded-full flex items-center justify-center transition-all"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
         </div>
       </div>
 
-      {/* Controls Bar */}
-      <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 flex items-center gap-4 z-50 bg-black/40 backdrop-blur-xl border border-white/10 p-2 rounded-full shadow-2xl">
+      {/* Chat Sidebar */}
+      {showChat && (
+        <div className={`w-full md:w-[400px] h-full bg-dark-800 border-l border-white/5 flex flex-col z-[60] absolute md:relative inset-0 transition-transform duration-300 transform ${showChat ? 'translate-x-0' : 'translate-x-full'}`}>
+          {/* Chat Header */}
+          <div className="p-4 border-b border-white/5 flex items-center justify-between bg-dark-900/50 backdrop-blur-md">
+            <h3 className="font-bold text-lg flex items-center gap-2">
+              <span className="text-accent-purple">●</span> Chat
+            </h3>
+            <button
+              onClick={() => setShowChat(false)}
+              className="md:hidden p-2 hover:bg-white/5 rounded-full"
+            >
+              ✕
+            </button>
+          </div>
 
+          {/* Messages List */}
+          <div
+            ref={scrollRef}
+            className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-white/10"
+          >
+            {messages.length === 0 && !isPartnerTyping && (
+              <div className="h-full flex flex-col items-center justify-center text-gray-500 text-center px-8">
+                <div className="text-4xl mb-4">💬</div>
+                <p>Say hi! Start the conversation with emojis or text.</p>
+              </div>
+            )}
+
+            {messages.map((msg) => (
+              <div
+                key={msg.id}
+                className={`flex flex-col ${msg.senderId === currentUser.uid ? 'items-end' : 'items-start'}`}
+              >
+                <div className={`max-w-[85%] px-4 py-2 rounded-2xl text-sm ${msg.senderId === currentUser.uid
+                  ? 'bg-accent-purple text-white rounded-tr-none'
+                  : 'bg-white/5 text-gray-200 border border-white/10 rounded-tl-none'
+                  }`}>
+                  {msg.text}
+                </div>
+                <span className="text-[10px] text-gray-500 mt-1 px-1">
+                  {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              </div>
+            ))}
+
+            {/* Typing Indicator */}
+            {isPartnerTyping && (
+              <div className="flex items-start">
+                <div className="bg-white/5 text-gray-400 px-4 py-2 rounded-2xl rounded-tl-none border border-white/10 italic text-xs flex items-center gap-2">
+                  {partnerName || 'Stranger'} is typing
+                  <span className="flex gap-1">
+                    <span className="w-1 h-1 bg-gray-500 rounded-full animate-bounce"></span>
+                    <span className="w-1 h-1 bg-gray-500 rounded-full animate-bounce [animation-delay:0.2s]"></span>
+                    <span className="w-1 h-1 bg-gray-500 rounded-full animate-bounce [animation-delay:0.4s]"></span>
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Emoji Picker Overlay */}
+          {showEmojiPicker && (
+            <div className="absolute bottom-20 left-4 right-4 z-[70] shadow-2xl">
+              <div className="relative">
+                <button
+                  className="absolute -top-10 right-0 bg-dark-900 border border-white/10 p-2 rounded-full text-white"
+                  onClick={() => setShowEmojiPicker(false)}
+                >✕</button>
+                <EmojiPicker
+                  onEmojiClick={onEmojiClick}
+                  theme="dark"
+                  width="100%"
+                  height={350}
+                  lazyLoadEmojis={true}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Chat Input */}
+          <div className="p-4 bg-dark-900/50 backdrop-blur-md border-t border-white/5">
+            <form onSubmit={handleSendMessage} className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                className={`p-2 rounded-full transition-colors ${showEmojiPicker ? 'bg-accent-purple text-white' : 'hover:bg-white/5 text-gray-400'}`}
+              >
+                😊
+              </button>
+              <input
+                type="text"
+                value={newMessage}
+                onChange={handleTyping}
+                placeholder="Type a message..."
+                disabled={status !== 'Connected'}
+                className="flex-1 bg-white/5 border border-white/10 rounded-full px-4 py-2 text-sm focus:outline-none focus:border-accent-purple transition-colors disabled:opacity-50"
+              />
+              <button
+                type="submit"
+                disabled={!newMessage.trim() || status !== 'Connected'}
+                className="p-2 bg-accent-purple text-white rounded-full hover:bg-accent-purple/80 transition-all disabled:opacity-50 disabled:grayscale"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                </svg>
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Mobile Chat Toggle Badge */}
+      {!showChat && (
         <button
-          onClick={() => setIsMicOn(!isMicOn)}
-          className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${isMicOn ? 'bg-white/10 hover:bg-white/20 text-white' : 'bg-red-500 text-white'}`}
+          onClick={() => setShowChat(true)}
+          className="md:hidden absolute top-20 right-6 z-40 bg-accent-purple text-white p-3 rounded-full shadow-lg animate-bounce"
         >
-          {isMicOn ? '🎤' : '🔇'}
+          💬
         </button>
-
-        <button
-          onClick={() => setIsCamOn(!isCamOn)}
-          className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${isCamOn ? 'bg-white/10 hover:bg-white/20 text-white' : 'bg-red-500 text-white'}`}
-        >
-          {isCamOn ? '📹' : '📷'}
-        </button>
-
-        <div className="w-px h-8 bg-white/10 mx-2"></div>
-
-        <button
-          onClick={handleNext}
-          className="px-6 py-3 bg-white text-dark-900 rounded-full font-bold hover:bg-gray-200 transition-all active:scale-95 flex items-center gap-2"
-        >
-          <span>Next</span>
-          <span>⏭️</span>
-        </button>
-
-        <button
-          onClick={endCall}
-          className="w-12 h-12 bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/50 rounded-full flex items-center justify-center transition-all"
-        >
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-        </button>
-      </div>
+      )}
     </div>
   );
 };

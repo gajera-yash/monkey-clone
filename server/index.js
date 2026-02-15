@@ -164,6 +164,17 @@ io.on('connection', (socket) => {
         socket.leave(roomId);
         socket.to(roomId).emit('partner-disconnected');
     });
+
+    // Text Chat: Send message to room
+    socket.on('send-message', ({ roomId, message }) => {
+        // Send to everyone else in the room
+        socket.to(roomId).emit('receive-message', message);
+    });
+
+    // Text Chat: Typing indicator
+    socket.on('typing', ({ roomId, isTyping }) => {
+        socket.to(roomId).emit('partner-typing', isTyping);
+    });
 });
 
 // The "catchall" handler: for any request that doesn't
