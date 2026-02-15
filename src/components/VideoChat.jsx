@@ -40,7 +40,8 @@ const VideoChat = ({ onEndChat }) => {
   const [newMessage, setNewMessage] = useState('');
   const [isPartnerTyping, setIsPartnerTyping] = useState(false);
   const [chatTimer, setChatTimer] = useState(0);
-  const [showChat, setShowChat] = useState(true);
+  const [showChat, setShowChat] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 
   // Timer logic
@@ -272,6 +273,8 @@ const VideoChat = ({ onEndChat }) => {
 
     const handleReceiveMessage = (message) => {
       setMessages(prev => [...prev, message]);
+      // Increment unread count if chat is hidden
+      setUnreadCount(prevCount => showChat ? 0 : prevCount + 1);
       notificationSound.current.play().catch(e => console.log("Sound play failed", e));
     };
 
@@ -344,27 +347,46 @@ const VideoChat = ({ onEndChat }) => {
 
           {/* Partner Info Badge */}
           {partnerName && (
-            <div className="absolute bottom-32 left-1/2 transform -translate-x-1/2 bg-black/40 backdrop-blur-md border border-white/10 px-6 py-2 rounded-full flex items-center gap-2 z-40">
+            <div className="absolute bottom-32 left-1/2 transform -translate-x-1/2 bg-black/40 backdrop-blur-md border border-white/10 px-6 py-2 rounded-full flex items-center gap-2 z-40 max-w-[80%]">
               <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-              <span className="text-white font-medium text-sm">Chatting with {partnerName}</span>
+              <span className="text-white font-medium text-sm truncate">Chatting with {partnerName}</span>
             </div>
           )}
 
           {/* Report Button */}
           {partnerName && (
-            <button
-              onClick={() => setShowReportModal(true)}
-              className="absolute top-6 left-6 z-40 bg-black/40 backdrop-blur-md p-3 rounded-full text-red-500 hover:bg-red-500/20 transition-colors border border-red-500/30"
-              title="Report User"
-            >
-              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9" />
-              </svg>
-            </button>
+            <>
+              <button
+                onClick={() => setShowReportModal(true)}
+                className="absolute top-6 left-6 z-40 bg-black/40 backdrop-blur-md p-3 rounded-full text-red-500 hover:bg-red-500/20 transition-colors border border-red-500/30"
+                title="Report User"
+              >
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9" />
+                </svg>
+              </button>
+
+              {/* Chat Button - Moved from bottom controls */}
+              <button
+                onClick={() => {
+                  setShowChat(!showChat);
+                  if (!showChat) setUnreadCount(0);
+                }}
+                className="absolute top-20 left-6 z-40 bg-black/40 backdrop-blur-md p-3 rounded-full hover:bg-white/10 transition-colors border border-white/10 relative"
+                title="Toggle Chat"
+              >
+                <span className="text-2xl">💬</span>
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
+                )}
+              </button>
+            </>
           )}
 
           {/* Local Video Overlay */}
-          <div className="absolute top-6 right-6 w-32 md:w-64 aspect-[3/4] md:aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl border border-white/10 z-20 transition-all hover:scale-105">
+          <div className="absolute top-6 right-6 w-24 md:w-48 aspect-[3/4] md:aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl border border-white/10 z-20 transition-all hover:scale-105">
             <video
               ref={localVideoRef}
               autoPlay
@@ -399,14 +421,9 @@ const VideoChat = ({ onEndChat }) => {
             {isCamOn ? '📹' : '📷'}
           </button>
 
-          <button
-            onClick={() => setShowChat(!showChat)}
-            className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${showChat ? 'bg-accent-purple text-white shadow-[0_0_15px_rgba(168,85,247,0.4)]' : 'bg-white/10 hover:bg-white/20 text-white'}`}
-          >
-            💬
-          </button>
 
           <div className="w-px h-8 bg-white/10 mx-1"></div>
+
 
           <button
             onClick={handleNext}
