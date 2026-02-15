@@ -1,15 +1,6 @@
-import React, { useState } from 'react';
+import React from 'react';
 
 const Hero = ({ onStartChat }) => {
-    const [name, setName] = useState('');
-
-    const handleStart = () => {
-        if (name.trim()) onStartChat(name);
-        else {
-            // Shake animation or toast could go here
-            document.getElementById('name-input').focus();
-        }
-    };
 
     return (
         <div className="relative w-full h-screen flex items-center justify-center overflow-hidden bg-dark-900">
@@ -43,24 +34,18 @@ const Hero = ({ onStartChat }) => {
                     <span className="text-gray-300"> No login required.</span> Just start talking.
                 </p>
 
-                {/* Input Area */}
-                <div className="flex flex-col sm:flex-row items-center justify-center gap-4 max-w-md mx-auto animate-fade-in-up delay-300">
-                    <input
-                        id="name-input"
-                        type="text"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        placeholder="What's your name?"
-                        className="w-full sm:w-auto flex-1 px-6 py-4 bg-white/5 border border-white/10 rounded-full text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-accent-purple/50 focus:border-accent-purple/50 transition-all backdrop-blur-sm"
-                        onKeyDown={(e) => e.key === 'Enter' && handleStart()}
-                    />
-
+                {/* Action Area */}
+                <div className="flex flex-col items-center justify-center gap-4 max-w-md mx-auto animate-fade-in-up delay-300">
                     <button
-                        onClick={handleStart}
-                        className="w-full sm:w-auto btn-primary whitespace-nowrap"
+                        onClick={() => onStartChat()}
+                        className="w-full sm:w-auto px-8 py-4 bg-white text-dark-900 rounded-full font-bold text-lg hover:scale-105 hover:shadow-[0_0_20px_rgba(255,255,255,0.3)] transition-all duration-300 flex items-center justify-center gap-2 group"
                     >
-                        Start Chatting
+                        <span>Start Chatting</span>
+                        <span className="group-hover:translate-x-1 transition-transform">→</span>
                     </button>
+                    <p className="text-sm text-gray-500">
+                        Login with Google required
+                    </p>
                 </div>
 
                 {/* Features / Social Proof */}
