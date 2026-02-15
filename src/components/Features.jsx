@@ -29,15 +29,13 @@ const Features = () => {
     ];
 
     return (
-        <section className="py-20 bg-gray-50 relative overflow-hidden">
-            {/* Decorative blobs */}
-            <div className="absolute top-0 left-0 w-64 h-64 bg-purple-200 rounded-full mix-blend-multiply filter blur-3xl opacity-30 -translate-x-1/2 -translate-y-1/2"></div>
-            <div className="absolute bottom-0 right-0 w-64 h-64 bg-pink-200 rounded-full mix-blend-multiply filter blur-3xl opacity-30 translate-x-1/2 translate-y-1/2"></div>
-
+        <section className="py-24 bg-dark-900 relative overflow-hidden">
             <div className="container mx-auto px-6 relative z-10">
                 <div className="text-center mb-16">
-                    <h2 className="text-4xl font-bold text-gray-900 mb-4">Meet New People</h2>
-                    <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+                    <h2 className="text-4xl font-bold text-white mb-4">
+                        Meet New <span className="text-gradient">People</span>
+                    </h2>
+                    <p className="text-xl text-gray-400 max-w-2xl mx-auto">
                         Discover a world of possibilities with features designed to make connection easy.
                     </p>
                 </div>
@@ -46,13 +44,13 @@ const Features = () => {
                     {features.map((feature, index) => (
                         <div
                             key={index}
-                            className="group bg-white rounded-2xl p-8 shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 border border-gray-100"
+                            className="glass-card p-8 group hover:-translate-y-2"
                         >
-                            <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${feature.gradient} flex items-center justify-center text-3xl mb-6 shadow-md group-hover:scale-110 transition-transform duration-300`}>
+                            <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${feature.gradient} flex items-center justify-center text-3xl mb-6 shadow-lg group-hover:scale-110 transition-transform duration-300`}>
                                 {feature.icon}
                             </div>
-                            <h3 className="text-2xl font-bold text-gray-900 mb-3">{feature.title}</h3>
-                            <p className="text-gray-600 leading-relaxed">
+                            <h3 className="text-2xl font-bold text-white mb-3">{feature.title}</h3>
+                            <p className="text-gray-400 leading-relaxed">
                                 {feature.description}
                             </p>
                         </div>

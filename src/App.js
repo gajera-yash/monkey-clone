@@ -17,7 +17,7 @@ function App() {
   const endChat = () => setIsChatting(false);
 
   return (
-    <div className="font-sans antialiased">
+    <div className="font-sans antialiased text-white bg-dark-900 min-h-screen">
       {isChatting ? (
         <VideoChat onEndChat={endChat} userName={userName} />
       ) : (

@@ -6,16 +6,6 @@ const RTC_CONFIG = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
-    { urls: 'stun:stun2.l.google.com:19302' },
-    { urls: 'stun:stun3.l.google.com:19302' },
-    { urls: 'stun:stun4.l.google.com:19302' },
-    { urls: 'stun:stun.ekiga.net' },
-    { urls: 'stun:stun.ideasip.com' },
-    { urls: 'stun:stun.schlund.de' },
-    { urls: 'stun:stun.voiparound.com' },
-    { urls: 'stun:stun.voipbuster.com' },
-    { urls: 'stun:stun.voipstunt.com' },
-    { urls: 'stun:stun.voxgratia.org' }
   ]
 };
 
@@ -30,112 +20,53 @@ const VideoChat = ({ onEndChat, userName }) => {
   const [remoteStream, setRemoteStream] = useState(null);
   const [partnerName, setPartnerName] = useState(null);
   const [error, setError] = useState(null);
-  const [showPermissionModal, setShowPermissionModal] = useState(false); // Default to false, trigger on need
+  const [showPermissionModal, setShowPermissionModal] = useState(false);
   const [isMicOn, setIsMicOn] = useState(true);
   const [isCamOn, setIsCamOn] = useState(true);
-  const [timer, setTimer] = useState(0);
   const [status, setStatus] = useState('Initializing...');
-  const [debugInfo, setDebugInfo] = useState({ socketId: '', waitingCount: 0 });
 
-  // 1. Join Logic - The "Source of Truth" for entering the pool
   const performJoin = useCallback(() => {
     if (hasEmittedJoin.current) return;
-
     if (socket.connected && stream) {
-      console.log("--- JOINING WAITING POOL NOW ---");
       hasEmittedJoin.current = true;
       setStatus('Searching for partner...');
       socket.emit('join-waiting', userName);
     } else {
-      console.log("Join deferred: ", { socket: socket.connected, stream: !!stream });
       if (!stream) setStatus('Waiting for camera...');
       else if (!socket.connected) setStatus('Connecting to server...');
     }
   }, [stream, userName]);
 
-  // 2. Timer Effect
-  useEffect(() => {
-    let interval;
-    if (status === 'Connected') {
-      interval = setInterval(() => setTimer(prev => prev + 1), 1000);
-    } else {
-      setTimer(0);
-    }
-    return () => clearInterval(interval);
-  }, [status]);
-
-  // 3. Media & Socket Init
   const requestMedia = useCallback(async () => {
     setError(null);
     try {
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error("navigator.mediaDevices is undefined. Are you on HTTPS or localhost?");
-      }
-
       const mediaStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
       setStream(mediaStream);
       if (localVideoRef.current) localVideoRef.current.srcObject = mediaStream;
-      setShowPermissionModal(false); // Close modal on success
+      setShowPermissionModal(false);
     } catch (err) {
-      console.error("Media error:", err);
-      let errorMessage = `Camera Error: ${err.name}`;
-      if (err.message.includes("navigator.mediaDevices is undefined")) {
-        errorMessage = "Browser denied camera access. (Insecure Context?)";
-      } else if (err.name === 'NotAllowedError') {
-        errorMessage = "Permission denied. Please allow camera access.";
-      } else if (err.name === 'NotFoundError') {
-        errorMessage = "No camera or microphone found.";
-      }
-
-      setError(errorMessage);
-      setShowPermissionModal(true); // Show modal on error to allow retry
+      setError("Please allow camera and microphone access.");
+      setShowPermissionModal(true);
     }
   }, []);
 
   useEffect(() => {
     if (!socket.connected) socket.connect();
-
-    // Check if we already have permissions or need to ask
-    navigator.permissions?.query({ name: 'camera' }).then(permissionStatus => {
-      if (permissionStatus.state === 'granted') {
-        requestMedia();
-      } else {
-        setShowPermissionModal(true); // Ask nicely first
-      }
-    }).catch(() => {
-      // Fallback for browsers that don't support permission query (like Firefox sometimes)
-      // or just try to get media
-      requestMedia();
-    });
-
-    return () => {
-      // Cleanup stream on unmount
-    };
+    requestMedia();
   }, [requestMedia]);
 
-  // 4. Trigger Join whenever readiness changes
   useEffect(() => {
     performJoin();
   }, [performJoin]);
 
-  // 6. Attach Remote Stream to Video Element (Fix for black screen)
   useEffect(() => {
     if (remoteStream && remoteVideoRef.current) {
-      console.log("Attaching remote stream to video element");
       remoteVideoRef.current.srcObject = remoteStream;
     }
   }, [remoteStream]);
 
-  // 5. Signaling & Connection Logic
   useEffect(() => {
-    const handleConnect = () => {
-      console.log("Socket connected event received");
-      setDebugInfo(prev => ({ ...prev, socketId: socket.id }));
-      performJoin();
-    };
-
     const handleMatched = async ({ roomId, initiator, partnerName }) => {
-      console.log("MATCHED! Partner:", partnerName);
       roomIdRef.current = roomId;
       setPartnerName(partnerName || 'Stranger');
       setStatus('Connected');
@@ -147,13 +78,7 @@ const VideoChat = ({ onEndChat, userName }) => {
         stream.getTracks().forEach(track => pc.addTrack(track, stream));
       }
 
-      pc.ontrack = (e) => {
-        setRemoteStream(e.streams[0]);
-        // Ref is likely null here because video isn't rendered yet (it waits for remoteStream state)
-      };
-
-
-
+      pc.ontrack = (e) => setRemoteStream(e.streams[0]);
       pc.onicecandidate = (e) => {
         if (e.candidate) socket.emit('ice-candidate', { candidate: e.candidate, roomId });
       };
@@ -186,7 +111,6 @@ const VideoChat = ({ onEndChat, userName }) => {
     };
 
     const handleDisconnect = () => {
-      console.log("Partner disconnected");
       if (peerConnection.current) {
         peerConnection.current.close();
         peerConnection.current = null;
@@ -197,39 +121,20 @@ const VideoChat = ({ onEndChat, userName }) => {
       performJoin();
     };
 
-    socket.on('connect', handleConnect);
     socket.on('matched', handleMatched);
     socket.on('offer', handleOffer);
     socket.on('answer', handleAnswer);
     socket.on('ice-candidate', handleIce);
     socket.on('partner-disconnected', handleDisconnect);
-    socket.on('waiting-count', (count) => setDebugInfo(prev => ({ ...prev, waitingCount: count })));
-
-    if (socket.connected) {
-      setDebugInfo(prev => ({ ...prev, socketId: socket.id }));
-      performJoin();
-    }
 
     return () => {
-      socket.off('connect', handleConnect);
-      socket.off('matched', handleMatched);
-      socket.off('offer', handleOffer);
-      socket.off('answer', handleAnswer);
-      socket.off('ice-candidate', handleIce);
-      socket.off('partner-disconnected', handleDisconnect);
-      socket.off('waiting-count');
+      socket.off('matched');
+      socket.off('offer');
+      socket.off('answer');
+      socket.off('ice-candidate');
+      socket.off('partner-disconnected');
     };
-  }, [stream, performJoin]);
-
-  const endCall = useCallback(() => {
-    if (peerConnection.current) {
-      peerConnection.current.close();
-      peerConnection.current = null;
-    }
-    if (stream) stream.getTracks().forEach(t => t.stop());
-    socket.emit('leave-room', { roomId: roomIdRef.current });
-    onEndChat();
-  }, [stream, onEndChat]);
+  }, [stream]);
 
   const handleNext = () => {
     if (peerConnection.current) {
@@ -244,60 +149,94 @@ const VideoChat = ({ onEndChat, userName }) => {
     performJoin();
   };
 
-  const formatTime = (s) => {
-    const m = Math.floor(s / 60);
-    const sec = s % 60;
-    return `${m.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
+  const endCall = () => {
+    if (peerConnection.current) {
+      peerConnection.current.close();
+      peerConnection.current = null;
+    }
+    if (stream) stream.getTracks().forEach(t => t.stop());
+    socket.emit('leave-room', { roomId: roomIdRef.current });
+    onEndChat();
   };
 
   return (
-    <div className="relative w-full h-screen bg-gray-900 overflow-hidden flex flex-col">
-      <PermissionModal
-        isOpen={showPermissionModal}
-        onGrant={requestMedia}
-        error={error}
-      />
+    <div className="relative w-full h-[100dvh] bg-dark-900 overflow-hidden flex flex-col md:flex-row">
+      <PermissionModal isOpen={showPermissionModal} onGrant={requestMedia} error={error} />
 
-      <div className="absolute inset-0 flex items-center justify-center bg-black">
+      {/* Remote Video (Main) */}
+      <div className="flex-1 relative bg-black flex items-center justify-center">
         {remoteStream ? (
           <video ref={remoteVideoRef} autoPlay playsInline className="w-full h-full object-cover" />
         ) : (
-          <div className="text-center text-white/50">
-            <div className="text-6xl mb-4 animate-pulse">👤</div>
-            <p className="text-xl font-light tracking-wide">{status}</p>
+          <div className="text-center">
+            <div className="inline-block p-4 rounded-full bg-white/5 backdrop-blur-lg mb-4 animate-pulse">
+              <span className="text-4xl">🔍</span>
+            </div>
+            <p className="text-gray-400 font-medium tracking-wide animate-pulse">{status}</p>
           </div>
         )}
+
+        {/* Status Badge */}
         {partnerName && (
-          <div className="absolute top-20 left-1/2 transform -translate-x-1/2 bg-black/60 px-4 py-1 rounded-full text-white font-bold text-lg backdrop-blur-sm z-30">
-            Talking to: {partnerName}
+          <div className="absolute top-6 left-1/2 transform -translate-x-1/2 bg-black/40 backdrop-blur-md border border-white/10 px-6 py-2 rounded-full flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+            <span className="text-white font-medium text-sm">Chatting with {partnerName}</span>
           </div>
         )}
       </div>
 
-      <div className="absolute top-0 left-0 w-full p-4 flex justify-center z-10 bg-gradient-to-b from-black/50 to-transparent">
-        <div className="bg-black/40 backdrop-blur-md px-6 py-2 rounded-full border border-white/10 text-white flex items-center space-x-4">
-          <span className={`w-2 h-2 rounded-full ${status === 'Connected' ? 'bg-green-500 animate-pulse' : 'bg-yellow-500'}`}></span>
-          <span className="font-mono">{formatTime(timer)}</span>
-          <span className="text-white/30">|</span>
-          <span className="text-sm text-purple-200">{debugInfo.waitingCount} waiting</span>
-          <span className="text-white/30">|</span>
-          <span className="text-xs text-gray-400">{debugInfo.socketId ? `ID: ${debugInfo.socketId.slice(0, 4)}` : 'No ID'}</span>
+      {/* Local Video (Floating or Sidebar) */}
+      <div className="absolute top-6 right-6 w-32 md:w-64 aspect-[3/4] md:aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl border border-white/10 z-20 transition-all hover:scale-105">
+        <video
+          ref={localVideoRef}
+          autoPlay
+          playsInline
+          muted
+          className={`w-full h-full object-cover ${!isCamOn ? 'hidden' : ''}`}
+        />
+        {!isCamOn && (
+          <div className="absolute inset-0 flex items-center justify-center bg-gray-800">
+            <span className="text-2xl">📷</span>
+          </div>
+        )}
+        <div className="absolute bottom-2 right-2 bg-black/60 backdrop-blur-sm px-2 py-1 rounded text-[10px] text-white font-medium">
+          You
         </div>
       </div>
 
-      {error && !showPermissionModal && <div className="absolute top-20 left-1/2 transform -translate-x-1/2 bg-red-500/90 text-white px-6 py-3 rounded-lg shadow-xl z-50 text-center"><p>{error}</p></div>}
+      {/* Controls Bar */}
+      <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 flex items-center gap-4 z-50 bg-black/40 backdrop-blur-xl border border-white/10 p-2 rounded-full shadow-2xl">
 
-      <div className="absolute bottom-24 right-6 w-32 md:w-48 aspect-[3/4] bg-black rounded-xl overflow-hidden shadow-2xl border-2 border-white/20 z-20">
-        <video ref={localVideoRef} autoPlay playsInline muted className={`w-full h-full object-cover ${!isCamOn ? 'hidden' : ''}`} />
-        {!isCamOn && <div className="absolute inset-0 flex items-center justify-center bg-gray-800 text-white"><span className="text-2xl">Option 📵</span></div>}
-        <div className="absolute bottom-2 right-2 bg-black/60 px-2 py-0.5 rounded text-xs text-white font-medium">You ({userName || 'You'})</div>
-      </div>
+        <button
+          onClick={() => setIsMicOn(!isMicOn)}
+          className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${isMicOn ? 'bg-white/10 hover:bg-white/20 text-white' : 'bg-red-500 text-white'}`}
+        >
+          {isMicOn ? '🎤' : '🔇'}
+        </button>
 
-      <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 flex items-center space-x-4 z-30">
-        <button onClick={endCall} className="w-14 h-14 bg-red-600 rounded-full flex items-center justify-center text-white shadow-lg"><svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M12 9c-1.6 0-3.15.25-4.6.72v3.1c0 .39-.23.74-.56.9-.98.49-1.87 1.12-2.66 1.85-.18.18-.43.28-.7.28-.28 0-.53-.11-.71-.29L.29 13.08c-.18-.17-.29-.42-.29-.7 0-.28.11-.53.29-.71C3.34 8.78 7.46 7 12 7s8.66 1.78 11.71 4.67c.18.18.29.43.29.71 0 .28-.11.53-.29.71l-2.48 2.48c-.18.18-.43.29-.71.29-.27 0-.52-.11-.7-.28-.79-.74-1.69-1.36-2.67-1.85-.33-.16-.56-.5-.56-.9v-3.1C15.15 9.25 13.6 9 12 9z" /></svg></button>
-        <button onClick={() => setIsMicOn(!isMicOn)} className={`w-12 h-12 rounded-full flex items-center justify-center text-white ${isMicOn ? 'bg-gray-700' : 'bg-red-500'}`}>{isMicOn ? '🎤' : '🔇'}</button>
-        <button onClick={() => setIsCamOn(!isCamOn)} className={`w-12 h-12 rounded-full flex items-center justify-center text-white ${isCamOn ? 'bg-gray-700' : 'bg-red-500'}`}>{isCamOn ? '📷' : '📵'}</button>
-        <button onClick={handleNext} className="px-8 py-3 bg-white text-gray-900 rounded-full font-bold shadow-lg hover:bg-gray-100 transition-all active:scale-95">Next ⏭️</button>
+        <button
+          onClick={() => setIsCamOn(!isCamOn)}
+          className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${isCamOn ? 'bg-white/10 hover:bg-white/20 text-white' : 'bg-red-500 text-white'}`}
+        >
+          {isCamOn ? '📹' : '📷'}
+        </button>
+
+        <div className="w-px h-8 bg-white/10 mx-2"></div>
+
+        <button
+          onClick={handleNext}
+          className="px-6 py-3 bg-white text-dark-900 rounded-full font-bold hover:bg-gray-200 transition-all active:scale-95 flex items-center gap-2"
+        >
+          <span>Next</span>
+          <span>⏭️</span>
+        </button>
+
+        <button
+          onClick={endCall}
+          className="w-12 h-12 bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/50 rounded-full flex items-center justify-center transition-all"
+        >
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+        </button>
       </div>
     </div>
   );
