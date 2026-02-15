@@ -349,7 +349,7 @@ const VideoChat = ({ onEndChat }) => {
           {partnerName && (
             <div className="absolute bottom-32 left-1/2 transform -translate-x-1/2 bg-black/40 backdrop-blur-md border border-white/10 px-6 py-2 rounded-full flex items-center gap-2 z-40 max-w-[80%]">
               <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-              <span className="text-white font-medium text-sm truncate">Chatting with {partnerName}</span>
+              <span className="text-white font-medium text-sm inline-block truncate">Chatting with {partnerName}</span>
             </div>
           )}
 
@@ -553,15 +553,8 @@ const VideoChat = ({ onEndChat }) => {
         </div>
       )}
 
-      {/* Mobile Chat Toggle Badge */}
-      {!showChat && (
-        <button
-          onClick={() => setShowChat(true)}
-          className="md:hidden absolute top-20 right-6 z-40 bg-accent-purple text-white p-3 rounded-full shadow-lg animate-bounce"
-        >
-          💬
-        </button>
-      )}
+
+      {/* Mobile Chat Toggle - REMOVED (now unified at top-left) */}
     </div>
   );
 };
