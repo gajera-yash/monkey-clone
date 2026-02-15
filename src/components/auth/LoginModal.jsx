@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { toast } from 'react-hot-toast';
+import { useNavigate } from 'react-router-dom';
 
 const LoginModal = ({ isOpen, onClose }) => {
     const { loginWithGoogle, loginWithEmail, signupWithEmail, continueAsGuest } = useAuth();
+    const navigate = useNavigate();
     const [isLogin, setIsLogin] = useState(true);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -22,6 +24,7 @@ const LoginModal = ({ isOpen, onClose }) => {
                 await signupWithEmail(email, password, name);
             }
             onClose();
+            navigate('/chat');
         } catch (error) {
             console.error(error);
         } finally {
@@ -34,6 +37,7 @@ const LoginModal = ({ isOpen, onClose }) => {
         try {
             await loginWithGoogle();
             onClose();
+            navigate('/chat');
         } catch (error) {
             console.error(error);
         } finally {
@@ -44,6 +48,7 @@ const LoginModal = ({ isOpen, onClose }) => {
     const handleGuest = () => {
         continueAsGuest();
         onClose();
+        navigate('/chat');
     };
 
     return (
