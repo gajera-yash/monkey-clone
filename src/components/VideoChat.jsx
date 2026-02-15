@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import socket from '../utils/socket';
 import PermissionModal from './PermissionModal';
+import ReportModal from './safety/ReportModal';
+import { useAuth } from '../context/AuthContext';
 
 const RTC_CONFIG = {
   iceServers: [
@@ -9,33 +11,43 @@ const RTC_CONFIG = {
   ]
 };
 
-const VideoChat = ({ onEndChat, userName }) => {
+const VideoChat = ({ onEndChat }) => {
+  const { currentUser, blockedUsers, reportUser } = useAuth();
+
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
   const peerConnection = useRef(null);
   const roomIdRef = useRef(null);
   const hasEmittedJoin = useRef(false);
+  // Store partner info for reporting
+  const partnerIdRef = useRef(null);
 
   const [stream, setStream] = useState(null);
   const [remoteStream, setRemoteStream] = useState(null);
   const [partnerName, setPartnerName] = useState(null);
   const [error, setError] = useState(null);
   const [showPermissionModal, setShowPermissionModal] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
   const [isMicOn, setIsMicOn] = useState(true);
   const [isCamOn, setIsCamOn] = useState(true);
   const [status, setStatus] = useState('Initializing...');
 
   const performJoin = useCallback(() => {
     if (hasEmittedJoin.current) return;
-    if (socket.connected && stream) {
+    if (socket.connected && stream && currentUser) {
       hasEmittedJoin.current = true;
       setStatus('Searching for partner...');
-      socket.emit('join-waiting', userName);
+      // Send user info including blocked list
+      socket.emit('join-waiting', {
+        name: currentUser.displayName || 'Stranger',
+        uid: currentUser.uid,
+        blockedUsers: blockedUsers || []
+      });
     } else {
       if (!stream) setStatus('Waiting for camera...');
       else if (!socket.connected) setStatus('Connecting to server...');
     }
-  }, [stream, userName]);
+  }, [stream, currentUser, blockedUsers]);
 
   const requestMedia = useCallback(async () => {
     setError(null);
@@ -49,6 +61,54 @@ const VideoChat = ({ onEndChat, userName }) => {
       setShowPermissionModal(true);
     }
   }, []);
+
+  const handleMatched = useCallback(async ({ roomId, initiator, partnerName, partnerId }) => {
+    roomIdRef.current = roomId;
+    partnerIdRef.current = partnerId;
+    setPartnerName(partnerName || 'Stranger');
+    setStatus('Connected');
+
+    const pc = new RTCPeerConnection(RTC_CONFIG);
+    peerConnection.current = pc;
+
+    if (stream) {
+      stream.getTracks().forEach(track => pc.addTrack(track, stream));
+    }
+
+    pc.ontrack = (e) => setRemoteStream(e.streams[0]);
+    pc.onicecandidate = (e) => {
+      if (e.candidate) socket.emit('ice-candidate', { candidate: e.candidate, roomId });
+    };
+
+    if (initiator) {
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      socket.emit('offer', { offer, roomId });
+    }
+  }, [stream]);
+
+  const handleNext = () => {
+    if (peerConnection.current) {
+      peerConnection.current.close();
+      peerConnection.current = null;
+    }
+    setRemoteStream(null);
+    setPartnerName(null);
+    partnerIdRef.current = null;
+    if (roomIdRef.current) {
+      socket.emit('leave-room', { roomId: roomIdRef.current });
+      roomIdRef.current = null;
+    }
+    hasEmittedJoin.current = false;
+    performJoin();
+  };
+
+  const handleReportSubmit = async ({ reason, description }) => {
+    if (partnerIdRef.current) {
+      await reportUser(partnerIdRef.current, reason, description);
+      handleNext(); // Skip after reporting
+    }
+  };
 
   useEffect(() => {
     if (!socket.connected) socket.connect();
@@ -135,6 +195,7 @@ const VideoChat = ({ onEndChat, userName }) => {
       }
       setRemoteStream(null);
       setPartnerName(null);
+      partnerIdRef.current = null;
       hasEmittedJoin.current = false;
       performJoin();
     };
@@ -152,20 +213,7 @@ const VideoChat = ({ onEndChat, userName }) => {
       socket.off('ice-candidate');
       socket.off('partner-disconnected');
     };
-  }, [stream]);
-
-  const handleNext = () => {
-    if (peerConnection.current) {
-      peerConnection.current.close();
-      peerConnection.current = null;
-    }
-    setRemoteStream(null);
-    setPartnerName(null);
-    socket.emit('leave-room', { roomId: roomIdRef.current });
-    roomIdRef.current = null;
-    hasEmittedJoin.current = false;
-    performJoin();
-  };
+  }, [stream, handleMatched]);
 
   const endCall = () => {
     if (peerConnection.current) {
@@ -173,13 +221,19 @@ const VideoChat = ({ onEndChat, userName }) => {
       peerConnection.current = null;
     }
     if (stream) stream.getTracks().forEach(t => t.stop());
-    socket.emit('leave-room', { roomId: roomIdRef.current });
+    if (roomIdRef.current) socket.emit('leave-room', { roomId: roomIdRef.current });
     onEndChat();
   };
 
   return (
     <div className="relative w-full h-[100dvh] bg-dark-900 overflow-hidden flex flex-col md:flex-row">
       <PermissionModal isOpen={showPermissionModal} onGrant={requestMedia} error={error} />
+      <ReportModal
+        isOpen={showReportModal}
+        onClose={() => setShowReportModal(false)}
+        onSubmit={handleReportSubmit}
+        reportedUserName={partnerName}
+      />
 
       {/* Remote Video (Main) */}
       <div className="flex-1 relative bg-black flex items-center justify-center">
@@ -200,6 +254,19 @@ const VideoChat = ({ onEndChat, userName }) => {
             <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
             <span className="text-white font-medium text-sm">Chatting with {partnerName}</span>
           </div>
+        )}
+
+        {/* Report Button */}
+        {partnerName && (
+          <button
+            onClick={() => setShowReportModal(true)}
+            className="absolute top-6 left-6 z-40 bg-black/40 backdrop-blur-md p-3 rounded-full text-red-500 hover:bg-red-500/20 transition-colors border border-red-500/30"
+            title="Report User"
+          >
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9" />
+            </svg>
+          </button>
         )}
       </div>
 

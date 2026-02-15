@@ -26,8 +26,26 @@ io.on('connection', (socket) => {
     console.log(`User connected: ${socket.id}`);
 
     // User wants to find a match
-    socket.on('join-waiting', (userName) => {
-        const user = { id: socket.id, name: userName || 'Stranger' };
+    socket.on('join-waiting', (userData) => {
+        // Handle both simple string (legacy) and object (new)
+        let name = 'Stranger';
+        let uid = null;
+        let blockedUsers = [];
+
+        if (typeof userData === 'string') {
+            name = userData;
+        } else if (typeof userData === 'object') {
+            name = userData.name || 'Stranger';
+            uid = userData.uid;
+            blockedUsers = userData.blockedUsers || [];
+        }
+
+        const user = {
+            id: socket.id,
+            name,
+            uid,
+            blockedUsers
+        };
 
         // Avoid duplicates
         if (!waitingUsers.find(u => u.id === socket.id)) {
@@ -40,22 +58,72 @@ io.on('connection', (socket) => {
 
         // Check if we can match
         if (waitingUsers.length >= 2) {
-            const user1 = waitingUsers.shift();
-            const user2 = waitingUsers.shift();
+            // Try to find a match for the first user
+            // We iterate to find a compatible pair that doesn't block each other
 
-            // Create a unique room ID
-            const roomId = `${user1.id}-${user2.id}`;
+            // Loop through waitingUsers to find a pair
+            let matchFound = false;
+            let user1Index = 0;
+            let user2Index = -1;
 
-            // Join both users to the room
-            io.to(user1.id).socketsJoin(roomId);
-            io.to(user2.id).socketsJoin(roomId);
+            // Simple greedy match with blocking check
+            // We take the first user and try to find the first compatible partner
+            // If user1 has no compatible partners, we move to user2 and try to match them, etc.
 
-            // Notify users they are matched
-            // user1 is 'initiator' (will send offer), user2 is 'receiver'
-            io.to(user1.id).emit('matched', { roomId, initiator: true, partnerId: user2.id, partnerName: user2.name });
-            io.to(user2.id).emit('matched', { roomId, initiator: false, partnerId: user1.id, partnerName: user1.name });
+            // Note: This is an O(n) scan for the head of queue. 
+            // Better scalable approach needed for production, but fine for <100 users.
 
-            console.log(`Matched ${user1.name} and ${user2.name} in room ${roomId}`);
+            // We can't just shift user1 because they might find a match deeper in queue if user2 was blocked.
+            // But for simplicity/fairness FIFO:
+            // We try to match waitingUsers[0] with anyone. 
+            // If they match waitingUsers[1], great. If blocked, try waitingUsers[2].
+
+            const user1 = waitingUsers[0];
+
+            for (let i = 1; i < waitingUsers.length; i++) {
+                const potentialPartner = waitingUsers[i];
+
+                // Check blocks
+                const user1BlockedPartner = user1.blockedUsers.includes(potentialPartner.uid) || (user1.uid && potentialPartner.blockedUsers.includes(user1.uid));
+                const partnerBlockedUser1 = potentialPartner.blockedUsers.includes(user1.uid) || (potentialPartner.uid && user1.blockedUsers.includes(potentialPartner.uid));
+
+                if (!user1BlockedPartner && !partnerBlockedUser1) {
+                    user2Index = i;
+                    matchFound = true;
+                    break;
+                }
+            }
+
+            if (matchFound) {
+                // Remove both from queue
+                // Be careful with indices since spliced
+                const user2 = waitingUsers[user2Index];
+                waitingUsers.splice(user2Index, 1); // Remove user2 first (higher index)
+                waitingUsers.splice(0, 1); // Remove user1 (index 0)
+
+                // Create a unique room ID
+                const roomId = `${user1.id}-${user2.id}`;
+
+                // Join both users to the room
+                io.to(user1.id).socketsJoin(roomId);
+                io.to(user2.id).socketsJoin(roomId);
+
+                // Notify users they are matched
+                io.to(user1.id).emit('matched', {
+                    roomId,
+                    initiator: true,
+                    partnerId: user2.uid, // Send firebase UID for reporting
+                    partnerName: user2.name
+                });
+                io.to(user2.id).emit('matched', {
+                    roomId,
+                    initiator: false,
+                    partnerId: user1.uid,
+                    partnerName: user1.name
+                });
+
+                console.log(`Matched ${user1.name} and ${user2.name} in room ${roomId}`);
+            }
         }
     });
 

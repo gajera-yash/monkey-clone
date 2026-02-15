@@ -19,6 +19,7 @@ export const AuthProvider = ({ children }) => {
     const [currentUser, setCurrentUser] = useState(null);
     const [loading, setLoading] = useState(true);
     const [isGuest, setIsGuest] = useState(false);
+    const [blockedUsers, setBlockedUsers] = useState([]);
 
     // Save user to Firestore
     const saveUserToDb = async (user) => {
@@ -33,9 +34,12 @@ export const AuthProvider = ({ children }) => {
                 photoURL: user.photoURL,
                 createdAt: serverTimestamp(),
                 lastLogin: serverTimestamp(),
-                totalChats: 0
+                totalChats: 0,
+                blockedUsers: []
             });
         } else {
+            const data = userSnap.data();
+            setBlockedUsers(data.blockedUsers || []);
             await setDoc(userRef, {
                 lastLogin: serverTimestamp()
             }, { merge: true });
@@ -91,6 +95,7 @@ export const AuthProvider = ({ children }) => {
     // Guest Login
     const continueAsGuest = () => {
         setIsGuest(true);
+        setBlockedUsers([]); // Reset blocked users
         const guestUser = {
             uid: `guest_${Date.now()}`,
             displayName: 'Guest User',
@@ -125,15 +130,47 @@ export const AuthProvider = ({ children }) => {
         return unsubscribe;
     }, [isGuest]);
 
+    // Report User
+    const reportUser = async (reportedUserId, reason, description) => {
+        try {
+            // 1. Create Report
+            const reportsRef = doc(db, "reports", `${Date.now()}_${currentUser?.uid || 'guest'}`);
+            await setDoc(reportsRef, {
+                reporterId: currentUser?.uid || 'guest',
+                reportedUserId,
+                reason,
+                description,
+                timestamp: serverTimestamp(),
+                status: 'pending'
+            });
+
+            // 2. Block User locally and in DB
+            const newBlocked = [...blockedUsers, reportedUserId];
+            setBlockedUsers(newBlocked);
+
+            if (!isGuest && currentUser) {
+                const userRef = doc(db, "users", currentUser.uid);
+                await setDoc(userRef, { blockedUsers: newBlocked }, { merge: true });
+            }
+
+            toast.success("User reported and blocked.");
+        } catch (error) {
+            console.error("Error reporting user:", error);
+            toast.error("Failed to report user.");
+        }
+    };
+
     const value = {
         currentUser,
         isGuest,
         loading,
+        blockedUsers,
         loginWithGoogle,
         loginWithEmail,
         signupWithEmail,
         continueAsGuest,
-        logout
+        logout,
+        reportUser
     };
 
     return (
