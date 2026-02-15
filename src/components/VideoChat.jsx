@@ -143,6 +143,10 @@ const VideoChat = ({ onEndChat }) => {
     }, 3000);
   };
 
+  const onEmojiClick = (emojiData) => {
+    setNewMessage(prev => prev + emojiData.emoji);
+  };
+
   const handleReportSubmit = async ({ reason, description }) => {
     if (partnerIdRef.current) {
       await reportUser(partnerIdRef.current, reason, description);
