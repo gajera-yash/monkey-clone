@@ -322,7 +322,7 @@ const VideoChat = ({ onEndChat }) => {
       />
 
       {/* Main Video Area */}
-      <div className={`flex-1 relative bg-black flex flex-col transition-all duration-300 ${showChat ? 'md:mr-0' : ''}`}>
+      <div className="flex-1 relative bg-black flex flex-col transition-all duration-300">
 
         {/* Remote Video */}
         <div className="flex-1 relative flex items-center justify-center">
@@ -353,12 +353,13 @@ const VideoChat = ({ onEndChat }) => {
             </div>
           )}
 
-          {/* Report Button */}
+          {/* Top-Left Controls (Report & Chat) */}
           {partnerName && (
-            <>
+            <div className="absolute top-6 left-6 z-50 flex flex-col gap-4">
+              {/* Report Button */}
               <button
                 onClick={() => setShowReportModal(true)}
-                className="absolute top-6 left-6 z-40 bg-black/40 backdrop-blur-md p-3 rounded-full text-red-500 hover:bg-red-500/20 transition-colors border border-red-500/30"
+                className="bg-black/40 backdrop-blur-md p-3 rounded-full text-red-500 hover:bg-red-500/20 transition-colors border border-red-500/30"
                 title="Report User"
               >
                 <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -366,23 +367,23 @@ const VideoChat = ({ onEndChat }) => {
                 </svg>
               </button>
 
-              {/* Chat Button - Moved from bottom controls */}
+              {/* Chat Button */}
               <button
                 onClick={() => {
                   setShowChat(!showChat);
                   if (!showChat) setUnreadCount(0);
                 }}
-                className="absolute top-20 left-6 z-40 bg-black/40 backdrop-blur-md p-3 rounded-full hover:bg-white/10 transition-colors border border-white/10 relative"
+                className={`bg-black/40 backdrop-blur-md p-3 rounded-full border border-white/10 relative transition-all ${showChat ? 'bg-accent-purple border-accent-purple/50' : 'hover:bg-white/10'}`}
                 title="Toggle Chat"
               >
                 <span className="text-2xl">💬</span>
                 {unreadCount > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center border-2 border-dark-900">
                     {unreadCount > 9 ? '9+' : unreadCount}
                   </span>
                 )}
               </button>
-            </>
+            </div>
           )}
 
           {/* Local Video Overlay */}
