@@ -1,3 +1,4 @@
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useCoins } from '../context/CoinsContext';
 import { usePremium } from '../context/PremiumContext';
