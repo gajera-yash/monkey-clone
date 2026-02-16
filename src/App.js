@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { useAuth } from './context/AuthContext';
+import { CoinsProvider } from './context/CoinsContext';
+import { PremiumProvider } from './context/PremiumContext';
 import Header from './components/Header';
 import Hero from './components/Hero';
 import Features from './components/Features';
@@ -43,52 +45,56 @@ function App() {
 
   return (
     <Router>
-      <div className="font-sans antialiased text-white bg-dark-900 min-h-screen">
-        <AgeGate />
-        <Toaster position="top-center" toastOptions={{
-          style: {
-            background: '#333',
-            color: '#fff',
-          },
-        }} />
+      <CoinsProvider>
+        <PremiumProvider>
+          <div className="font-sans antialiased text-white bg-dark-900 min-h-screen">
+            <AgeGate />
+            <Toaster position="top-center" toastOptions={{
+              style: {
+                background: '#333',
+                color: '#fff',
+              },
+            }} />
 
-        <LoginModal isOpen={isLoginOpen} onClose={() => setIsLoginOpen(false)} />
-        <GenderModal
-          isOpen={isGenderModalOpen}
-          onSelect={handleGenderSelect}
-          onClose={() => setIsGenderModalOpen(false)}
-        />
+            <LoginModal isOpen={isLoginOpen} onClose={() => setIsLoginOpen(false)} />
+            <GenderModal
+              isOpen={isGenderModalOpen}
+              onSelect={handleGenderSelect}
+              onClose={() => setIsGenderModalOpen(false)}
+            />
 
-        <Routes>
-          <Route path="/" element={
-            <>
-              <Header onStartChat={handleStartChat} />
-              <Hero onStartChat={handleStartChat} />
-              <Features />
-              <FAQ />
-              <Footer />
-            </>
-          } />
+            <Routes>
+              <Route path="/" element={
+                <>
+                  <Header onStartChat={handleStartChat} />
+                  <Hero onStartChat={handleStartChat} />
+                  <Features />
+                  <FAQ />
+                  <Footer />
+                </>
+              } />
 
-          <Route path="/chat" element={
-            <PrivateRoute>
-              <ChatLayout />
-            </PrivateRoute>
-          } />
+              <Route path="/chat" element={
+                <PrivateRoute>
+                  <ChatLayout />
+                </PrivateRoute>
+              } />
 
-          <Route path="/admin" element={
-            <AdminDashboard />
-          } />
+              <Route path="/admin" element={
+                <AdminDashboard />
+              } />
 
-          <Route path="/safety" element={
-            <>
-              <Header onStartChat={handleStartChat} />
-              <SafetyGuidelines />
-              <Footer />
-            </>
-          } />
-        </Routes>
-      </div>
+              <Route path="/safety" element={
+                <>
+                  <Header onStartChat={handleStartChat} />
+                  <SafetyGuidelines />
+                  <Footer />
+                </>
+              } />
+            </Routes>
+          </div>
+        </PremiumProvider>
+      </CoinsProvider>
     </Router>
   );
 }

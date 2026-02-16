@@ -31,6 +31,8 @@ io.on('connection', (socket) => {
         let name = 'Stranger';
         let uid = null;
         let blockedUsers = [];
+        let location = null;
+        let isPremium = false;
 
         if (typeof userData === 'string') {
             name = userData;
@@ -38,13 +40,17 @@ io.on('connection', (socket) => {
             name = userData.name || 'Stranger';
             uid = userData.uid;
             blockedUsers = userData.blockedUsers || [];
+            location = userData.location || null;
+            isPremium = userData.isPremium || false;
         }
 
         const user = {
             id: socket.id,
             name,
             uid,
-            blockedUsers
+            blockedUsers,
+            location,
+            isPremium
         };
 
         // Avoid duplicates
@@ -109,17 +115,22 @@ io.on('connection', (socket) => {
                 io.to(user2.id).socketsJoin(roomId);
 
                 // Notify users they are matched
+                // Match found!
                 io.to(user1.id).emit('matched', {
                     roomId,
                     initiator: true,
-                    partnerId: user2.uid, // Send firebase UID for reporting
-                    partnerName: user2.name
+                    partnerId: user2.uid,
+                    partnerName: user2.name,
+                    partnerLocation: user2.location,
+                    partnerIsPremium: user2.isPremium
                 });
                 io.to(user2.id).emit('matched', {
                     roomId,
                     initiator: false,
                     partnerId: user1.uid,
-                    partnerName: user1.name
+                    partnerName: user1.name,
+                    partnerLocation: user1.location,
+                    partnerIsPremium: user1.isPremium
                 });
 
                 console.log(`Matched ${user1.name} and ${user2.name} in room ${roomId}`);

@@ -10,6 +10,7 @@ import {
 import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, googleProvider, db } from '../firebase';
 import toast from 'react-hot-toast';
+import { getUserLocation } from '../utils/geolocation';
 
 const AuthContext = createContext();
 
@@ -20,6 +21,7 @@ export const AuthProvider = ({ children }) => {
     const [loading, setLoading] = useState(true);
     const [isGuest, setIsGuest] = useState(false);
     const [blockedUsers, setBlockedUsers] = useState([]);
+    const [userLocation, setUserLocation] = useState(null);
 
     // Save user to Firestore
     const saveUserToDb = async (user) => {
@@ -152,6 +154,15 @@ export const AuthProvider = ({ children }) => {
         return unsubscribe;
     }, [isGuest]);
 
+    // Fetch user location on mount
+    useEffect(() => {
+        const fetchLocation = async () => {
+            const location = await getUserLocation();
+            setUserLocation(location);
+        };
+        fetchLocation();
+    }, []);
+
     // Report User
     const reportUser = async (reportedUserId, reason, description) => {
         try {
@@ -187,6 +198,7 @@ export const AuthProvider = ({ children }) => {
         isGuest,
         loading,
         blockedUsers,
+        userLocation,
         loginWithGoogle,
         loginWithEmail,
         signupWithEmail,

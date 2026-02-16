@@ -3,7 +3,12 @@ import socket from '../utils/socket';
 import PermissionModal from './PermissionModal';
 import ReportModal from './safety/ReportModal';
 import { useAuth } from '../context/AuthContext';
+import { useCoins } from '../context/CoinsContext';
+import { usePremium } from '../context/PremiumContext';
 import EmojiPicker from 'emoji-picker-react';
+import { getLocationDisplay, getDistanceBetween } from '../utils/geolocation';
+import toast from 'react-hot-toast';
+import PremiumBadge from './premium/PremiumBadge';
 
 const RTC_CONFIG = {
   iceServers: [
@@ -13,7 +18,9 @@ const RTC_CONFIG = {
 };
 
 const VideoChat = ({ onEndChat }) => {
-  const { currentUser, blockedUsers, reportUser } = useAuth();
+  const { currentUser, blockedUsers, reportUser, userLocation } = useAuth();
+  const { spendCoins } = useCoins();
+  const { isPremium } = usePremium();
 
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
@@ -44,6 +51,11 @@ const VideoChat = ({ onEndChat }) => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 
+  // Location States
+  const [partnerLocation, setPartnerLocation] = useState(null);
+  const [showCityName, setShowCityName] = useState(true);
+  const [partnerIsPremium, setPartnerIsPremium] = useState(false);
+
   // Timer logic
   useEffect(() => {
     let interval;
@@ -71,13 +83,15 @@ const VideoChat = ({ onEndChat }) => {
       socket.emit('join-waiting', {
         name: currentUser.displayName || 'Stranger',
         uid: currentUser.uid,
-        blockedUsers: blockedUsers || []
+        blockedUsers: blockedUsers || [],
+        location: userLocation,
+        isPremium
       });
     } else {
       if (!stream) setStatus('Waiting for camera...');
       else if (!socket.connected) setStatus('Connecting to server...');
     }
-  }, [stream, currentUser, blockedUsers]);
+  }, [stream, currentUser, blockedUsers, userLocation]);
 
   const requestMedia = useCallback(async () => {
     setError(null);
@@ -99,6 +113,8 @@ const VideoChat = ({ onEndChat }) => {
     }
     setRemoteStream(null);
     setPartnerName(null);
+    setPartnerLocation(null);
+    setPartnerIsPremium(false);
     setMessages([]);
     setChatTimer(0);
     setIsPartnerTyping(false);
@@ -111,25 +127,45 @@ const VideoChat = ({ onEndChat }) => {
     performJoin();
   };
 
-  const handleSendMessage = (e) => {
-    if (e) e.preventDefault();
-    if (!newMessage.trim() || !roomIdRef.current) return;
+  const sendMessage = (text, type = 'text') => {
+    if (!roomIdRef.current) return;
 
     const messageData = {
       id: Date.now(),
-      text: newMessage,
+      text,
       senderId: currentUser.uid,
       senderName: currentUser.displayName || 'Me',
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      type
     };
 
     socket.emit('send-message', { roomId: roomIdRef.current, message: messageData });
     setMessages(prev => [...prev, messageData]);
+  };
+
+  const handleSendMessage = (e) => {
+    if (e) e.preventDefault();
+    if (!newMessage.trim()) return;
+
+    sendMessage(newMessage);
     setNewMessage('');
     setShowEmojiPicker(false);
 
     // Stop typing indicator
     socket.emit('typing', { roomId: roomIdRef.current, isTyping: false });
+  };
+
+  const sendGift = async (emoji, cost, name) => {
+    if (status !== 'Connected') {
+      toast.error("Find a partner first!");
+      return;
+    }
+
+    const success = await spendCoins(cost, `Sent ${name} gift`);
+    if (success) {
+      sendMessage(`Sent a ${name} ${emoji}`, 'gift');
+      toast.success(`Sent ${name}! -${cost} coins`);
+    }
   };
 
   const handleTyping = (e) => {
@@ -210,9 +246,11 @@ const VideoChat = ({ onEndChat }) => {
   }, [messages, isPartnerTyping]);
 
   useEffect(() => {
-    const handleMatched = async ({ roomId, initiator, partnerName }) => {
+    const handleMatched = async ({ roomId, initiator, partnerName, partnerLocation, partnerIsPremium }) => {
       roomIdRef.current = roomId;
       setPartnerName(partnerName || 'Stranger');
+      setPartnerLocation(partnerLocation || null);
+      setPartnerIsPremium(partnerIsPremium || false);
       setStatus('Connected');
       setMessages([]);
       setChatTimer(0);
@@ -347,9 +385,30 @@ const VideoChat = ({ onEndChat }) => {
 
           {/* Partner Info Badge */}
           {partnerName && (
-            <div className="absolute bottom-32 left-1/2 transform -translate-x-1/2 bg-black/40 backdrop-blur-md border border-white/10 px-6 py-2 rounded-full flex items-center gap-2 z-40 max-w-[80%]">
-              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-              <span className="text-white font-medium text-sm inline-block truncate">Chatting with {partnerName}</span>
+            <div className="absolute bottom-32 left-1/2 transform -translate-x-1/2 bg-black/40 backdrop-blur-md border border-white/10 px-6 py-2 rounded-full z-40 max-w-[90%]">
+              <div className="flex flex-col items-center gap-1">
+                {/* Partner Name */}
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                  <span className="text-white font-medium text-sm inline-block truncate">
+                    Chatting with {partnerName}
+                  </span>
+                  {partnerIsPremium && <PremiumBadge size="sm" />}
+                </div>
+
+                {/* Partner Location */}
+                {partnerLocation && (
+                  <div className="flex items-center gap-2 text-xs text-gray-300">
+                    <span>{getLocationDisplay(partnerLocation, showCityName)}</span>
+                    {userLocation && getDistanceBetween(userLocation, partnerLocation) && (
+                      <>
+                        <span className="text-gray-500">•</span>
+                        <span>{getDistanceBetween(userLocation, partnerLocation)}</span>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
@@ -400,8 +459,9 @@ const VideoChat = ({ onEndChat }) => {
                 <span className="text-2xl">📷</span>
               </div>
             )}
-            <div className="absolute bottom-2 right-2 bg-black/60 backdrop-blur-sm px-2 py-1 rounded text-[10px] text-white font-medium">
-              You
+            <div className="absolute bottom-2 right-2 bg-black/60 backdrop-blur-sm px-2 py-1 rounded text-[10px] text-white font-medium flex items-center gap-1">
+              <span>You</span>
+              {isPremium && <PremiumBadge size="sm" />}
             </div>
           </div>
         </div>
@@ -532,6 +592,43 @@ const VideoChat = ({ onEndChat }) => {
               >
                 😊
               </button>
+
+              {/* Gift Button */}
+              <div className="relative group">
+                <button
+                  type="button"
+                  className="p-2 rounded-full hover:bg-white/5 text-pink-500 transition-colors"
+                >
+                  🎁
+                </button>
+
+                {/* Gift Popover */}
+                <div className="absolute bottom-full left-0 mb-2 w-64 bg-dark-800 border border-white/10 rounded-xl shadow-xl p-3 hidden group-hover:block transition-all duration-200 z-[80]">
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { emoji: '🌹', cost: 10, name: 'Rose' },
+                      { emoji: '🍫', cost: 50, name: 'Chocolate' },
+                      { emoji: '💎', cost: 100, name: 'Diamond' },
+                      { emoji: '🏎️', cost: 500, name: 'Car' },
+                      { emoji: '🏰', cost: 1000, name: 'Castle' },
+                      { emoji: '🚀', cost: 5000, name: 'Rocket' },
+                    ].map((gift) => (
+                      <button
+                        key={gift.name}
+                        type="button"
+                        onClick={() => sendGift(gift.emoji, gift.cost, gift.name)}
+                        className="flex flex-col items-center p-2 hover:bg-white/5 rounded-lg transition-colors border border-transparent hover:border-white/5"
+                        title={`Send ${gift.name} (${gift.cost} coins)`}
+                      >
+                        <span className="text-2xl mb-1">{gift.emoji}</span>
+                        <div className="flex items-center gap-1 bg-black/20 px-2 py-0.5 rounded-full">
+                          <span className="text-[10px] text-yellow-400 font-bold">{gift.cost}</span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
               <input
                 type="text"
                 value={newMessage}
