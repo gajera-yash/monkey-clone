@@ -29,6 +29,7 @@ const VideoChat = ({ onEndChat }) => {
   const peerConnection = useRef(null);
   const roomIdRef = useRef(null);
   const hasEmittedJoin = useRef(false);
+  const userInitiatedJoin = useRef(false);
   const partnerIdRef = useRef(null);
   const scrollRef = useRef(null);
   const typingTimeoutRef = useRef(null);
@@ -81,6 +82,7 @@ const VideoChat = ({ onEndChat }) => {
 
   const performJoin = useCallback(() => {
     if (hasEmittedJoin.current) return;
+    if (!userInitiatedJoin.current) return; // Only join if user clicked Start
     if (socket.connected && stream && currentUser) {
       hasEmittedJoin.current = true;
       setStatus('Searching for partner...');
@@ -96,6 +98,11 @@ const VideoChat = ({ onEndChat }) => {
       else if (!socket.connected) setStatus('Connecting to server...');
     }
   }, [stream, currentUser, blockedUsers, userLocation]);
+
+  const handleStartChat = useCallback(() => {
+    userInitiatedJoin.current = true;
+    performJoin();
+  }, [performJoin]);
 
   const requestMedia = useCallback(async () => {
     setError(null);
@@ -496,7 +503,7 @@ const VideoChat = ({ onEndChat }) => {
 
                 {/* Start Video Chat */}
                 <button
-                  onClick={performJoin}
+                  onClick={handleStartChat}
                   className="w-full bg-yellow-400 hover:bg-yellow-300 text-black font-bold py-4 rounded-full text-lg shadow-xl shadow-yellow-400/30 transform hover:-translate-y-0.5 transition-all active:scale-95 flex items-center justify-center gap-2"
                 >
                   Start Video Chat
@@ -557,7 +564,7 @@ const VideoChat = ({ onEndChat }) => {
 
                 {/* Start Button */}
                 <button
-                  onClick={performJoin}
+                  onClick={handleStartChat}
                   className="w-full bg-yellow-400 hover:bg-yellow-300 text-black font-bold py-4 rounded-full text-lg shadow-xl shadow-yellow-400/20 transform hover:-translate-y-1 transition-all active:scale-95 flex items-center justify-center gap-2"
                 >
                   <span>Start Video Chat</span>
@@ -571,21 +578,59 @@ const VideoChat = ({ onEndChat }) => {
           </>
         ) : (
           /* Remote Video / Status */
-          <div className="flex-1 relative flex items-center justify-center">
+          <div className="flex-1 relative flex flex-col">
             {remoteStream ? (
-              <video ref={remoteVideoRef} autoPlay playsInline className="w-full h-full object-cover" />
-            ) : (
-              <div className="text-center">
-                <div className="inline-block p-4 rounded-full bg-white/5 backdrop-blur-lg mb-4 animate-pulse">
-                  <span className="text-4xl">🔍</span>
+              /* === CONNECTED: Split screen on mobile === */
+              <>
+                {/* Remote Video - Top half on mobile, full on desktop */}
+                <div className="flex-1 md:flex-auto md:absolute md:inset-0 relative bg-black">
+                  <video ref={remoteVideoRef} autoPlay playsInline className="w-full h-full object-cover" />
+                  {/* Monkey.app watermark */}
+                  <div className="absolute bottom-3 left-3 flex items-center gap-1.5 md:hidden">
+                    <span className="text-xl">🐵</span>
+                    <span className="text-white/60 text-sm font-medium">monkey.app</span>
+                  </div>
                 </div>
-                <p className="text-gray-400 font-medium tracking-wide animate-pulse">{status}</p>
-                <button
-                  onClick={() => setStatus('Idle')}
-                  className="mt-6 px-6 py-2 border border-white/20 rounded-full text-sm hover:bg-white/10 transition-colors"
-                >
-                  Cancel
-                </button>
+                {/* Local Video - Bottom half on mobile, small overlay on desktop */}
+                <div className="h-[45%] md:hidden relative bg-black border-t border-white/10">
+                  <video
+                    ref={localVideoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    className={`w-full h-full object-cover ${!isCamOn ? 'hidden' : ''}`}
+                  />
+                  {!isCamOn && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-gray-800">
+                      <span className="text-4xl">📷</span>
+                    </div>
+                  )}
+                </div>
+              </>
+            ) : (
+              /* === SEARCHING: Centered loader === */
+              <div className="flex-1 flex items-center justify-center">
+                <div className="text-center">
+                  {/* Spinning loader */}
+                  <div className="relative w-20 h-20 mx-auto mb-6">
+                    <div className="absolute inset-0 rounded-full border-4 border-white/10"></div>
+                    <div className="absolute inset-0 rounded-full border-4 border-t-yellow-400 border-r-transparent border-b-transparent border-l-transparent animate-spin"></div>
+                    <div className="absolute inset-3 rounded-full border-4 border-white/5"></div>
+                    <div className="absolute inset-3 rounded-full border-4 border-t-accent-purple border-r-transparent border-b-transparent border-l-transparent animate-spin" style={{ animationDirection: 'reverse', animationDuration: '1.5s' }}></div>
+                  </div>
+                  <p className="text-white font-bold text-lg mb-1">Finding a partner...</p>
+                  <p className="text-gray-500 text-sm mb-6">Please wait while we connect you</p>
+                  <button
+                    onClick={() => {
+                      setStatus('Idle');
+                      userInitiatedJoin.current = false;
+                      hasEmittedJoin.current = false;
+                    }}
+                    className="px-8 py-2.5 border border-white/20 rounded-full text-sm hover:bg-white/10 transition-colors text-gray-300"
+                  >
+                    Cancel
+                  </button>
+                </div>
               </div>
             )}
           </div>
@@ -705,9 +750,9 @@ const VideoChat = ({ onEndChat }) => {
           </div>
         )}
 
-        {/* Local Video Overlay - Only when connected (not idle on mobile) */}
+        {/* Local Video Overlay - Desktop only (mobile uses split-screen) */}
         {status !== 'Idle' && (
-          <div className="absolute top-6 right-6 w-24 md:w-48 aspect-[3/4] md:aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl border border-white/10 z-20 transition-all hover:scale-105 md:top-6 top-14">
+          <div className="absolute top-6 right-6 w-48 aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl border border-white/10 z-20 transition-all hover:scale-105 hidden md:block">
             <video
               ref={localVideoRef}
               autoPlay
