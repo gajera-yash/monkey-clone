@@ -25,6 +25,7 @@ const VideoChat = ({ onEndChat }) => {
   const { isPremium } = usePremium();
 
   const localVideoRef = useRef(null);
+  const localVideoMobileRef = useRef(null);
   const remoteVideoRef = useRef(null);
   const peerConnection = useRef(null);
   const roomIdRef = useRef(null);
@@ -206,6 +207,32 @@ const VideoChat = ({ onEndChat }) => {
     if (!socket.connected) socket.connect();
     requestMedia();
   }, [requestMedia]);
+
+  // Sync local stream to mobile video element
+  useEffect(() => {
+    if (localVideoMobileRef.current && stream) {
+      localVideoMobileRef.current.srcObject = stream;
+    }
+  }, [stream, remoteStream]);
+
+  // Cleanup on unmount (back button, navigation away)
+  useEffect(() => {
+    return () => {
+      if (peerConnection.current) {
+        peerConnection.current.close();
+        peerConnection.current = null;
+      }
+      if (roomIdRef.current) {
+        socket.emit('leave-room', { roomId: roomIdRef.current });
+        roomIdRef.current = null;
+      }
+      if (stream) {
+        stream.getTracks().forEach(t => t.stop());
+      }
+      hasEmittedJoin.current = false;
+      userInitiatedJoin.current = false;
+    };
+  }, [stream]);
 
   // Toggle Microphone
   useEffect(() => {
@@ -591,10 +618,10 @@ const VideoChat = ({ onEndChat }) => {
                     <span className="text-white/60 text-sm font-medium">monkey.app</span>
                   </div>
                 </div>
-                {/* Local Video - Bottom half on mobile, small overlay on desktop */}
-                <div className="h-[45%] md:hidden relative bg-black border-t border-white/10">
+                {/* Local Video - Bottom half on mobile */}
+                <div className="h-[50%] md:hidden relative bg-black border-t border-white/10">
                   <video
-                    ref={localVideoRef}
+                    ref={localVideoMobileRef}
                     autoPlay
                     playsInline
                     muted
