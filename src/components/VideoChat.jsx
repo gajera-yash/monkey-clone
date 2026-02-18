@@ -610,7 +610,7 @@ const VideoChat = ({ onEndChat }) => {
               /* === CONNECTED: Split screen on mobile === */
               <>
                 {/* Remote Video - Top half on mobile, full on desktop */}
-                <div className="h-[50%] md:h-auto md:absolute md:inset-0 relative bg-black">
+                <div className="flex-1 min-h-0 overflow-hidden md:flex-none md:absolute md:inset-0 relative bg-black">
                   <video ref={remoteVideoRef} autoPlay playsInline className="w-full h-full object-cover" />
                   {/* Monkey.app watermark */}
                   <div className="absolute bottom-3 left-3 flex items-center gap-1.5 md:hidden">
@@ -619,7 +619,7 @@ const VideoChat = ({ onEndChat }) => {
                   </div>
                 </div>
                 {/* Local Video - Bottom half on mobile */}
-                <div className="h-[50%] md:hidden relative bg-black border-t border-white/10">
+                <div className="flex-1 min-h-0 overflow-hidden md:hidden relative bg-black border-t border-white/10">
                   <video
                     ref={localVideoMobileRef}
                     autoPlay
