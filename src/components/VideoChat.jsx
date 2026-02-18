@@ -610,7 +610,7 @@ const VideoChat = ({ onEndChat }) => {
               /* === CONNECTED: Split screen on mobile === */
               <>
                 {/* Remote Video - Top half on mobile, full on desktop */}
-                <div className="flex-1 md:flex-auto md:absolute md:inset-0 relative bg-black">
+                <div className="h-[50%] md:h-auto md:absolute md:inset-0 relative bg-black">
                   <video ref={remoteVideoRef} autoPlay playsInline className="w-full h-full object-cover" />
                   {/* Monkey.app watermark */}
                   <div className="absolute bottom-3 left-3 flex items-center gap-1.5 md:hidden">
@@ -632,6 +632,26 @@ const VideoChat = ({ onEndChat }) => {
                       <span className="text-4xl">📷</span>
                     </div>
                   )}
+                  {/* Chat & Gift buttons overlaid on local video */}
+                  <div className="absolute bottom-3 left-0 right-0 flex items-center justify-between px-4 z-10">
+                    <button
+                      onClick={() => {
+                        setShowChat(!showChat);
+                        if (!showChat) setUnreadCount(0);
+                      }}
+                      className="w-11 h-11 rounded-full bg-black/50 backdrop-blur-md border border-white/10 flex items-center justify-center relative"
+                    >
+                      <span className="text-xl">💬</span>
+                      {unreadCount > 0 && (
+                        <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center border-2 border-black">
+                          {unreadCount > 9 ? '9+' : unreadCount}
+                        </span>
+                      )}
+                    </button>
+                    <button className="w-11 h-11 rounded-full bg-yellow-400/20 border border-yellow-400/40 flex items-center justify-center">
+                      <span className="text-2xl">🎁</span>
+                    </button>
+                  </div>
                 </div>
               </>
             ) : (
@@ -749,33 +769,6 @@ const VideoChat = ({ onEndChat }) => {
           </div>
         )}
 
-        {/* ===== MOBILE CONNECTED BOTTOM BAR ===== */}
-        {status === 'Connected' && (
-          <div className="absolute bottom-4 left-0 right-0 z-50 md:hidden flex items-center justify-between px-4">
-            {/* Chat Toggle */}
-            <button
-              onClick={() => {
-                setShowChat(!showChat);
-                if (!showChat) setUnreadCount(0);
-              }}
-              className="w-12 h-12 rounded-full bg-black/50 backdrop-blur-md border border-white/10 flex items-center justify-center relative"
-            >
-              <span className="text-xl">💬</span>
-              {unreadCount > 0 && (
-                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center border-2 border-black">
-                  {unreadCount > 9 ? '9+' : unreadCount}
-                </span>
-              )}
-            </button>
-
-            {/* Gift Button */}
-            <button
-              className="w-12 h-12 rounded-full bg-yellow-400/20 border border-yellow-400/40 flex items-center justify-center"
-            >
-              <span className="text-2xl">🎁</span>
-            </button>
-          </div>
-        )}
 
         {/* Local Video Overlay - Desktop only (mobile uses split-screen) */}
         {status !== 'Idle' && (
