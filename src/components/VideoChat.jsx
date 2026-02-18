@@ -9,6 +9,8 @@ import EmojiPicker from 'emoji-picker-react';
 import { getLocationDisplay, getDistanceBetween } from '../utils/geolocation';
 import toast from 'react-hot-toast';
 import PremiumBadge from './premium/PremiumBadge';
+import UserProfileMobile from './profile/UserProfileMobile';
+import MatchHistoryMobile from './history/MatchHistoryMobile';
 
 const RTC_CONFIG = {
   iceServers: [
@@ -40,7 +42,7 @@ const VideoChat = ({ onEndChat }) => {
   const [showReportModal, setShowReportModal] = useState(false);
   const [isMicOn, setIsMicOn] = useState(true);
   const [isCamOn, setIsCamOn] = useState(true);
-  const [status, setStatus] = useState('Initializing...');
+  const [status, setStatus] = useState('Idle');
 
   // Chat & Timer States
   const [messages, setMessages] = useState([]);
@@ -50,6 +52,8 @@ const VideoChat = ({ onEndChat }) => {
   const [showChat, setShowChat] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
+  const [showMatchHistory, setShowMatchHistory] = useState(false);
 
   // Location States
   const [partnerLocation, setPartnerLocation] = useState(null);
@@ -214,9 +218,10 @@ const VideoChat = ({ onEndChat }) => {
     }
   }, [isCamOn, stream]);
 
-  useEffect(() => {
-    performJoin();
-  }, [performJoin]);
+  // REMOVED: Auto-join on mount
+  // useEffect(() => {
+  //   performJoin();
+  // }, [performJoin]);
 
   // Fix: Listen for socket connection to retry join if it wasn't ready initially
   useEffect(() => {
@@ -350,7 +355,7 @@ const VideoChat = ({ onEndChat }) => {
   };
 
   return (
-    <div className="relative w-full h-[100dvh] bg-dark-900 overflow-hidden flex flex-col md:flex-row">
+    <div className="relative w-full h-[100dvh] bg-dark-900 overflow-hidden flex flex-col md:grid md:grid-cols-[300px_1fr_360px]">
       <PermissionModal isOpen={showPermissionModal} onGrant={requestMedia} error={error} />
       <ReportModal
         isOpen={showReportModal}
@@ -359,94 +364,350 @@ const VideoChat = ({ onEndChat }) => {
         reportedUserName={partnerName}
       />
 
-      {/* Main Video Area */}
-      <div className="flex-1 relative bg-black flex flex-col transition-all duration-300">
+      {/* Left Panel - Branding & Promo (Desktop Only) */}
+      <div className="hidden md:flex flex-col bg-black border-r border-white/5 relative overflow-hidden">
+        <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1616004664558-f93246944e82?q=80&w=1000&auto=format&fit=crop')] bg-cover bg-center opacity-40"></div>
+        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/80 to-transparent"></div>
 
-        {/* Remote Video */}
-        <div className="flex-1 relative flex items-center justify-center">
-          {remoteStream ? (
-            <video ref={remoteVideoRef} autoPlay playsInline className="w-full h-full object-cover" />
-          ) : (
-            <div className="text-center">
-              <div className="inline-block p-4 rounded-full bg-white/5 backdrop-blur-lg mb-4 animate-pulse">
-                <span className="text-4xl">🔍</span>
-              </div>
-              <p className="text-gray-400 font-medium tracking-wide animate-pulse">{status}</p>
+        <div className="relative z-10 flex-1 flex flex-col justify-end p-8 pb-12">
+          <div className="mb-6">
+            <span className="text-5xl">👑</span>
+            <div className="flex -space-x-4 mt-4">
+              {[1, 2, 3].map(i => (
+                <div key={i} className="w-10 h-10 rounded-full border-2 border-black bg-gray-600"></div>
+              ))}
             </div>
-          )}
+            <p className="text-gray-400 text-sm mt-2 ml-1">+1.2M Online</p>
+          </div>
 
-          {/* Timer Display */}
-          {status === 'Connected' && (
-            <div className="absolute top-6 left-1/2 transform -translate-x-1/2 bg-black/40 backdrop-blur-md border border-white/10 px-4 py-1.5 rounded-full flex items-center gap-2 z-40">
-              <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
-              <span className="text-white font-mono text-sm">{formatTime(chatTimer)}</span>
-            </div>
-          )}
+          <h2 className="text-3xl font-bold font-display leading-tight mb-4">
+            With you on <br />
+            <span className="text-yellow-400">camera</span>, it's <br />
+            easier to meet.
+          </h2>
+          <p className="text-gray-400 leading-relaxed">
+            Join the fastest growing video chat community. Connect instantly with people worldwide.
+          </p>
+        </div>
+      </div>
 
-          {/* Partner Info Badge */}
-          {partnerName && (
-            <div className="absolute bottom-32 left-1/2 transform -translate-x-1/2 bg-black/40 backdrop-blur-md border border-white/10 px-6 py-2 rounded-full z-40 max-w-[90%]">
-              <div className="flex flex-col items-center gap-1">
-                {/* Partner Name */}
-                <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-                  <span className="text-white font-medium text-sm inline-block truncate">
-                    Chatting with {partnerName}
-                  </span>
-                  {partnerIsPremium && <PremiumBadge size="sm" />}
-                </div>
+      {/* Center Panel - Main Video Area */}
+      <div className="flex-1 md:col-start-2 relative bg-black flex flex-col transition-all duration-300 border-r border-white/5">
 
-                {/* Partner Location */}
-                {partnerLocation && (
-                  <div className="flex items-center gap-2 text-xs text-gray-300">
-                    <span>{getLocationDisplay(partnerLocation, showCityName)}</span>
-                    {userLocation && getDistanceBetween(userLocation, partnerLocation) && (
-                      <>
-                        <span className="text-gray-500">•</span>
-                        <span>{getDistanceBetween(userLocation, partnerLocation)}</span>
-                      </>
-                    )}
+        {/* Center Panel Content */}
+        {status === 'Idle' ? (
+          <>
+            {/* ===== MOBILE IDLE SCREEN ===== */}
+            <div className="flex-1 flex flex-col md:hidden relative overflow-hidden">
+              {/* Camera Preview Background */}
+              <div className="absolute inset-0 z-0">
+                <video
+                  ref={localVideoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  className={`w-full h-full object-cover ${!isCamOn ? 'hidden' : ''}`}
+                />
+                {!isCamOn && (
+                  <div className="absolute inset-0 bg-dark-900 flex items-center justify-center">
+                    <span className="text-6xl">📷</span>
                   </div>
                 )}
+                {/* Dark overlay for readability */}
+                <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-transparent to-black/60"></div>
+              </div>
+
+              {/* Top Bar */}
+              <div className="relative z-10 flex items-center justify-between px-4 pt-4 pb-2">
+                {/* Verified badge */}
+                <div className="w-9 h-9 rounded-full bg-green-500/20 border border-green-500/40 flex items-center justify-center">
+                  <span className="text-green-400 text-sm">✅</span>
+                </div>
+
+                {/* SOLO / SQUAD Toggle */}
+                <div className="bg-white/10 p-1 rounded-full flex items-center backdrop-blur-md border border-white/10">
+                  <button className="px-5 py-1.5 rounded-full bg-yellow-400 text-black font-bold text-xs shadow-lg shadow-yellow-400/20">
+                    SOLO
+                  </button>
+                  <button className="px-5 py-1.5 rounded-full text-gray-400 font-bold text-xs hover:text-white transition-colors">
+                    SQUAD
+                  </button>
+                </div>
+
+                {/* Profile Avatar */}
+                <button
+                  onClick={() => setShowProfile(true)}
+                  className="relative"
+                >
+                  {currentUser?.photoURL ? (
+                    <img src={currentUser.photoURL} alt="" className="w-9 h-9 rounded-full border-2 border-accent-pink object-cover" />
+                  ) : (
+                    <div className="w-9 h-9 rounded-full bg-accent-pink flex items-center justify-center text-sm font-bold">
+                      {currentUser?.displayName?.charAt(0)?.toUpperCase() || 'U'}
+                    </div>
+                  )}
+                </button>
+              </div>
+
+              {/* Left Sidebar Icons */}
+              <div className="relative z-10 flex flex-col items-start gap-3 px-3 mt-4">
+                {/* Search */}
+                <button className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-md border border-white/10 flex items-center justify-center hover:bg-white/10 transition-colors">
+                  <span className="text-lg">🔍</span>
+                </button>
+
+                {/* Crown / Premium */}
+                <button className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-md border border-white/10 flex items-center justify-center hover:bg-white/10 transition-colors">
+                  <span className="text-lg">👑</span>
+                </button>
+
+                {/* Match History */}
+                <button
+                  onClick={() => setShowMatchHistory(true)}
+                  className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-md border border-white/10 flex items-center justify-center hover:bg-white/10 transition-colors"
+                >
+                  <span className="text-lg">🕐</span>
+                </button>
+
+                {/* Heart / Likes */}
+                <button className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-md border border-white/10 flex items-center justify-center hover:bg-white/10 transition-colors">
+                  <span className="text-lg">💚</span>
+                </button>
+
+                {/* Coin Store */}
+                <button className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-md border border-yellow-400/30 flex items-center justify-center hover:bg-yellow-400/10 transition-colors relative">
+                  <span className="text-lg">🪙</span>
+                  <span className="absolute -bottom-1 text-[8px] bg-green-500 text-white px-1 rounded-full font-bold">FREE</span>
+                </button>
+              </div>
+
+              {/* Spacer */}
+              <div className="flex-1"></div>
+
+              {/* Bottom Section */}
+              <div className="relative z-10 px-5 pb-6 space-y-3">
+                {/* Gender Filter */}
+                <button
+                  className="w-full bg-white/90 backdrop-blur-sm text-black font-bold py-3.5 rounded-full hover:bg-white transition-all flex items-center justify-center gap-2 shadow-lg"
+                  onClick={() => toast('Gender filter coming soon!', { icon: '🚻' })}
+                >
+                  <span>👫</span> Both
+                </button>
+
+                {/* Start Video Chat */}
+                <button
+                  onClick={performJoin}
+                  className="w-full bg-yellow-400 hover:bg-yellow-300 text-black font-bold py-4 rounded-full text-lg shadow-xl shadow-yellow-400/30 transform hover:-translate-y-0.5 transition-all active:scale-95 flex items-center justify-center gap-2"
+                >
+                  Start Video Chat
+                </button>
+              </div>
+
+              {/* Bottom Promo Banner */}
+              <div className="relative z-10 bg-gradient-to-r from-yellow-400/10 via-yellow-400/20 to-yellow-400/10 border-t border-yellow-400/20 px-4 py-3 flex items-center justify-center gap-2">
+                <span className="text-xl">🐵</span>
+                <div className="text-center">
+                  <span className="text-yellow-400 font-bold text-sm">Enjoy with Monkey Plus</span>
+                  <p className="text-[10px] text-gray-400">Select your preference to meet people you like</p>
+                </div>
+                <span className="text-xl">🐵</span>
+              </div>
+
+              {/* Profile Overlay */}
+              {showProfile && <UserProfileMobile onClose={() => setShowProfile(false)} />}
+
+              {/* Match History Overlay */}
+              {showMatchHistory && <MatchHistoryMobile onClose={() => setShowMatchHistory(false)} />}
+            </div>
+
+            {/* ===== DESKTOP IDLE SCREEN (unchanged) ===== */}
+            <div className="flex-1 hidden md:flex flex-col items-center justify-center p-8 relative overflow-hidden">
+              <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-5"></div>
+
+              {/* Mode Toggle */}
+              <div className="bg-white/10 p-1 rounded-full flex items-center mb-12 relative z-10 backdrop-blur-md border border-white/5">
+                <button className="px-6 py-2 rounded-full bg-yellow-400 text-black font-bold text-sm shadow-lg shadow-yellow-400/20">
+                  SOLO
+                </button>
+                <button className="px-6 py-2 rounded-full text-gray-400 font-bold text-sm hover:text-white transition-colors">
+                  SQUAD
+                </button>
+              </div>
+
+              {/* Logo/Icon */}
+              <div className="w-32 h-32 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-3xl flex items-center justify-center shadow-2xl mb-8 transform hover:scale-105 transition-transform duration-300">
+                <span className="text-7xl filter drop-shadow-md">🐵</span>
+              </div>
+
+              <h1 className="text-4xl font-bold mb-2 text-center">Monkey Clone</h1>
+              <p className="text-gray-400 mb-12 text-center max-w-md">
+                Make new friends face-to-face.
+                <br />
+                <span className="text-yellow-400 font-medium">100% Free & Secure.</span>
+              </p>
+
+              <div className="flex flex-col gap-4 w-full max-w-xs relative z-10">
+                {/* Gender Filter Button */}
+                <button
+                  className="w-full bg-white text-black font-bold py-3 rounded-full hover:bg-gray-100 transition-all flex items-center justify-center gap-2"
+                  onClick={() => toast('Gender filter coming soon!', { icon: '🚻' })}
+                >
+                  <span>👫</span> Both
+                </button>
+
+                {/* Start Button */}
+                <button
+                  onClick={performJoin}
+                  className="w-full bg-yellow-400 hover:bg-yellow-300 text-black font-bold py-4 rounded-full text-lg shadow-xl shadow-yellow-400/20 transform hover:-translate-y-1 transition-all active:scale-95 flex items-center justify-center gap-2"
+                >
+                  <span>Start Video Chat</span>
+                </button>
+              </div>
+
+              <div className="mt-8 text-xs text-gray-500">
+                By clicking Start, you agree to our <a href="/terms" className="underline hover:text-gray-400">Terms</a> & <a href="/privacy" className="underline hover:text-gray-400">Privacy Policy</a>
               </div>
             </div>
-          )}
+          </>
+        ) : (
+          /* Remote Video / Status */
+          <div className="flex-1 relative flex items-center justify-center">
+            {remoteStream ? (
+              <video ref={remoteVideoRef} autoPlay playsInline className="w-full h-full object-cover" />
+            ) : (
+              <div className="text-center">
+                <div className="inline-block p-4 rounded-full bg-white/5 backdrop-blur-lg mb-4 animate-pulse">
+                  <span className="text-4xl">🔍</span>
+                </div>
+                <p className="text-gray-400 font-medium tracking-wide animate-pulse">{status}</p>
+                <button
+                  onClick={() => setStatus('Idle')}
+                  className="mt-6 px-6 py-2 border border-white/20 rounded-full text-sm hover:bg-white/10 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
-          {/* Top-Left Controls (Report & Chat) */}
-          {partnerName && (
-            <div className="absolute top-6 left-6 z-50 flex flex-col gap-4">
-              {/* Report Button */}
-              <button
-                onClick={() => setShowReportModal(true)}
-                className="bg-black/40 backdrop-blur-md p-3 rounded-full text-red-500 hover:bg-red-500/20 transition-colors border border-red-500/30"
-                title="Report User"
-              >
-                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9" />
-                </svg>
-              </button>
+        {/* Timer Display - Desktop only */}
+        {status === 'Connected' && (
+          <div className="absolute top-6 left-1/2 transform -translate-x-1/2 bg-black/40 backdrop-blur-md border border-white/10 px-4 py-1.5 rounded-full flex items-center gap-2 z-40 hidden md:flex">
+            <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
+            <span className="text-white font-mono text-sm">{formatTime(chatTimer)}</span>
+          </div>
+        )}
 
-              {/* Chat Button */}
+        {/* Partner Info Badge - Desktop only */}
+        {partnerName && (
+          <div className="absolute bottom-32 left-1/2 transform -translate-x-1/2 bg-black/40 backdrop-blur-md border border-white/10 px-6 py-2 rounded-full z-40 max-w-[90%] hidden md:block">
+            <div className="flex flex-col items-center gap-1">
+              {/* Partner Name */}
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                <span className="text-white font-medium text-sm inline-block truncate">
+                  Chatting with {partnerName}
+                </span>
+                {partnerIsPremium && <PremiumBadge size="sm" />}
+              </div>
+
+              {/* Partner Location */}
+              {partnerLocation && (
+                <div className="flex items-center gap-2 text-xs text-gray-300">
+                  <span>{getLocationDisplay(partnerLocation, showCityName)}</span>
+                  {userLocation && getDistanceBetween(userLocation, partnerLocation) && (
+                    <>
+                      <span className="text-gray-500">•</span>
+                      <span>{getDistanceBetween(userLocation, partnerLocation)}</span>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Top-Left Controls - Desktop (Report & Chat) */}
+        {partnerName && (
+          <div className="absolute top-6 left-6 z-50 hidden md:flex flex-col gap-4">
+            {/* Report Button */}
+            <button
+              onClick={() => setShowReportModal(true)}
+              className="bg-black/40 backdrop-blur-md p-3 rounded-full text-red-500 hover:bg-red-500/20 transition-colors border border-red-500/30"
+              title="Report User"
+            >
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9" />
+              </svg>
+            </button>
+          </div>
+        )}
+
+        {/* ===== MOBILE CONNECTED TOP BAR ===== */}
+        {partnerName && (
+          <div className="absolute top-0 left-0 right-0 z-50 md:hidden">
+            <div className="flex items-center justify-between px-3 py-2 bg-black/70 backdrop-blur-md">
+              <div className="flex items-center gap-2 min-w-0">
+                {/* Partner Avatar */}
+                <div className="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center text-sm font-bold text-white flex-shrink-0">
+                  {partnerName?.charAt(0)?.toUpperCase() || 'S'}
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-white font-semibold text-sm truncate max-w-[120px]">{partnerName}</span>
+                    <span className="text-lg">💛</span>
+                    <span className="text-lg">🐵</span>
+                  </div>
+                  {partnerLocation && (
+                    <p className="text-[11px] text-gray-400 truncate">
+                      {getLocationDisplay(partnerLocation, showCityName)}
+                    </p>
+                  )}
+                </div>
+              </div>
+              {/* Skip / Next */}
               <button
-                onClick={() => {
-                  setShowChat(!showChat);
-                  if (!showChat) setUnreadCount(0);
-                }}
-                className={`bg-black/40 backdrop-blur-md p-3 rounded-full border border-white/10 relative transition-all ${showChat ? 'bg-accent-purple border-accent-purple/50' : 'hover:bg-white/10'}`}
-                title="Toggle Chat"
+                onClick={handleNext}
+                className="bg-white/10 backdrop-blur-sm p-2 rounded-lg hover:bg-white/20 transition-colors flex-shrink-0"
               >
-                <span className="text-2xl">💬</span>
-                {unreadCount > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center border-2 border-dark-900">
-                    {unreadCount > 9 ? '9+' : unreadCount}
-                  </span>
-                )}
+                <span className="text-xl">⏭</span>
               </button>
             </div>
-          )}
+          </div>
+        )}
 
-          {/* Local Video Overlay */}
-          <div className="absolute top-6 right-6 w-24 md:w-48 aspect-[3/4] md:aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl border border-white/10 z-20 transition-all hover:scale-105">
+        {/* ===== MOBILE CONNECTED BOTTOM BAR ===== */}
+        {status === 'Connected' && (
+          <div className="absolute bottom-4 left-0 right-0 z-50 md:hidden flex items-center justify-between px-4">
+            {/* Chat Toggle */}
+            <button
+              onClick={() => {
+                setShowChat(!showChat);
+                if (!showChat) setUnreadCount(0);
+              }}
+              className="w-12 h-12 rounded-full bg-black/50 backdrop-blur-md border border-white/10 flex items-center justify-center relative"
+            >
+              <span className="text-xl">💬</span>
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center border-2 border-black">
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
+            </button>
+
+            {/* Gift Button */}
+            <button
+              className="w-12 h-12 rounded-full bg-yellow-400/20 border border-yellow-400/40 flex items-center justify-center"
+            >
+              <span className="text-2xl">🎁</span>
+            </button>
+          </div>
+        )}
+
+        {/* Local Video Overlay - Only when connected (not idle on mobile) */}
+        {status !== 'Idle' && (
+          <div className="absolute top-6 right-6 w-24 md:w-48 aspect-[3/4] md:aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl border border-white/10 z-20 transition-all hover:scale-105 md:top-6 top-14">
             <video
               ref={localVideoRef}
               autoPlay
@@ -464,10 +725,11 @@ const VideoChat = ({ onEndChat }) => {
               {isPremium && <PremiumBadge size="sm" />}
             </div>
           </div>
-        </div>
+        )}
 
-        {/* Controls Bar */}
-        <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 flex items-center gap-4 z-50 bg-black/40 backdrop-blur-xl border border-white/10 p-2 rounded-full shadow-2xl">
+
+        {/* Controls Bar - Desktop Only */}
+        <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 hidden md:flex items-center gap-4 z-50 bg-black/40 backdrop-blur-xl border border-white/10 p-2 rounded-full shadow-2xl">
           <button
             onClick={() => setIsMicOn(!isMicOn)}
             className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${isMicOn ? 'bg-white/10 hover:bg-white/20 text-white' : 'bg-red-500 text-white'}`}
@@ -498,162 +760,159 @@ const VideoChat = ({ onEndChat }) => {
             onClick={endCall}
             className="w-12 h-12 bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/50 rounded-full flex items-center justify-center transition-all"
           >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
         </div>
       </div>
 
-      {/* Chat Sidebar */}
-      {showChat && (
-        <div className={`w-full md:w-[400px] h-full bg-dark-800 border-l border-white/5 flex flex-col z-[60] absolute md:relative inset-0 transition-transform duration-300 transform ${showChat ? 'translate-x-0' : 'translate-x-full'}`}>
-          {/* Chat Header */}
-          <div className="p-4 border-b border-white/5 flex items-center justify-between bg-dark-900/50 backdrop-blur-md">
-            <h3 className="font-bold text-lg flex items-center gap-2">
-              <span className="text-accent-purple">●</span> Chat
-            </h3>
-            <button
-              onClick={() => setShowChat(false)}
-              className="md:hidden p-2 hover:bg-white/5 rounded-full"
-            >
-              ✕
-            </button>
-          </div>
-
-          {/* Messages List */}
-          <div
-            ref={scrollRef}
-            className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-white/10"
+      {/* Right Panel - Chat Interface */}
+      <div className={`w-full md:w-auto h-full bg-dark-800 border-l border-white/5 flex flex-col z-[60] absolute md:relative inset-0 transition-transform duration-300 transform ${showChat ? 'translate-x-0' : 'translate-x-full'} md:translate-x-0 md:col-start-3`}>
+        {/* Chat Header */}
+        <div className="p-4 border-b border-white/5 flex items-center justify-between bg-dark-900/50 backdrop-blur-md">
+          <h3 className="font-bold text-lg flex items-center gap-2">
+            <span className="text-accent-purple">●</span> Chat
+          </h3>
+          <button
+            onClick={() => setShowChat(false)}
+            className="md:hidden p-2 hover:bg-white/5 rounded-full"
           >
-            {messages.length === 0 && !isPartnerTyping && (
-              <div className="h-full flex flex-col items-center justify-center text-gray-500 text-center px-8">
-                <div className="text-4xl mb-4">💬</div>
-                <p>Say hi! Start the conversation with emojis or text.</p>
-              </div>
-            )}
+            ✕
+          </button>
+        </div>
 
-            {messages.map((msg) => (
-              <div
-                key={msg.id}
-                className={`flex flex-col ${msg.senderId === currentUser.uid ? 'items-end' : 'items-start'}`}
-              >
-                <div className={`max-w-[85%] px-4 py-2 rounded-2xl text-sm ${msg.senderId === currentUser.uid
-                  ? 'bg-accent-purple text-white rounded-tr-none'
-                  : 'bg-white/5 text-gray-200 border border-white/10 rounded-tl-none'
-                  }`}>
-                  {msg.text}
-                </div>
-                <span className="text-[10px] text-gray-500 mt-1 px-1">
-                  {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </span>
-              </div>
-            ))}
-
-            {/* Typing Indicator */}
-            {isPartnerTyping && (
-              <div className="flex items-start">
-                <div className="bg-white/5 text-gray-400 px-4 py-2 rounded-2xl rounded-tl-none border border-white/10 italic text-xs flex items-center gap-2">
-                  {partnerName || 'Stranger'} is typing
-                  <span className="flex gap-1">
-                    <span className="w-1 h-1 bg-gray-500 rounded-full animate-bounce"></span>
-                    <span className="w-1 h-1 bg-gray-500 rounded-full animate-bounce [animation-delay:0.2s]"></span>
-                    <span className="w-1 h-1 bg-gray-500 rounded-full animate-bounce [animation-delay:0.4s]"></span>
-                  </span>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Emoji Picker Overlay */}
-          {showEmojiPicker && (
-            <div className="absolute bottom-20 left-4 right-4 z-[70] shadow-2xl">
-              <div className="relative">
-                <button
-                  className="absolute -top-10 right-0 bg-dark-900 border border-white/10 p-2 rounded-full text-white"
-                  onClick={() => setShowEmojiPicker(false)}
-                >✕</button>
-                <EmojiPicker
-                  onEmojiClick={onEmojiClick}
-                  theme="dark"
-                  width="100%"
-                  height={350}
-                  lazyLoadEmojis={true}
-                />
-              </div>
+        {/* Messages List */}
+        <div
+          ref={scrollRef}
+          className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-white/10"
+        >
+          {messages.length === 0 && !isPartnerTyping && (
+            <div className="h-full flex flex-col items-center justify-center text-gray-500 text-center px-8">
+              <div className="text-4xl mb-4">💬</div>
+              <p>Say hi! Start the conversation with emojis or text.</p>
             </div>
           )}
 
-          {/* Chat Input */}
-          <div className="p-4 bg-dark-900/50 backdrop-blur-md border-t border-white/5">
-            <form onSubmit={handleSendMessage} className="flex items-center gap-2">
+          {messages.map((msg) => (
+            <div
+              key={msg.id}
+              className={`flex flex-col ${msg.senderId === currentUser.uid ? 'items-end' : 'items-start'}`}
+            >
+              <div className={`max-w-[85%] px-4 py-2 rounded-2xl text-sm ${msg.senderId === currentUser.uid
+                ? 'bg-accent-purple text-white rounded-tr-none'
+                : 'bg-white/5 text-gray-200 border border-white/10 rounded-tl-none'
+                }`}>
+                {msg.text}
+              </div>
+              <span className="text-[10px] text-gray-500 mt-1 px-1">
+                {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </span>
+            </div>
+          ))}
+
+          {/* Typing Indicator */}
+          {isPartnerTyping && (
+            <div className="flex items-start">
+              <div className="bg-white/5 text-gray-400 px-4 py-2 rounded-2xl rounded-tl-none border border-white/10 italic text-xs flex items-center gap-2">
+                {partnerName || 'Stranger'} is typing
+                <span className="flex gap-1">
+                  <span className="w-1 h-1 bg-gray-500 rounded-full animate-bounce"></span>
+                  <span className="w-1 h-1 bg-gray-500 rounded-full animate-bounce [animation-delay:0.2s]"></span>
+                  <span className="w-1 h-1 bg-gray-500 rounded-full animate-bounce [animation-delay:0.4s]"></span>
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Emoji Picker Overlay */}
+        {showEmojiPicker && (
+          <div className="absolute bottom-20 left-4 right-4 z-[70] shadow-2xl">
+            <div className="relative">
+              <button
+                className="absolute -top-10 right-0 bg-dark-900 border border-white/10 p-2 rounded-full text-white"
+                onClick={() => setShowEmojiPicker(false)}
+              >✕</button>
+              <EmojiPicker
+                onEmojiClick={onEmojiClick}
+                theme="dark"
+                width="100%"
+                height={350}
+                lazyLoadEmojis={true}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Chat Input */}
+        <div className="p-4 bg-dark-900/50 backdrop-blur-md border-t border-white/5">
+          <form onSubmit={handleSendMessage} className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+              className={`p-2 rounded-full transition-colors ${showEmojiPicker ? 'bg-accent-purple text-white' : 'hover:bg-white/5 text-gray-400'}`}
+            >
+              😊
+            </button>
+
+            {/* Gift Button */}
+            <div className="relative group">
               <button
                 type="button"
-                onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                className={`p-2 rounded-full transition-colors ${showEmojiPicker ? 'bg-accent-purple text-white' : 'hover:bg-white/5 text-gray-400'}`}
+                className="p-2 rounded-full hover:bg-white/5 text-pink-500 transition-colors"
               >
-                😊
+                🎁
               </button>
 
-              {/* Gift Button */}
-              <div className="relative group">
-                <button
-                  type="button"
-                  className="p-2 rounded-full hover:bg-white/5 text-pink-500 transition-colors"
-                >
-                  🎁
-                </button>
-
-                {/* Gift Popover */}
-                <div className="absolute bottom-full left-0 mb-2 w-64 bg-dark-800 border border-white/10 rounded-xl shadow-xl p-3 hidden group-hover:block transition-all duration-200 z-[80]">
-                  <div className="grid grid-cols-3 gap-2">
-                    {[
-                      { emoji: '🌹', cost: 10, name: 'Rose' },
-                      { emoji: '🍫', cost: 50, name: 'Chocolate' },
-                      { emoji: '💎', cost: 100, name: 'Diamond' },
-                      { emoji: '🏎️', cost: 500, name: 'Car' },
-                      { emoji: '🏰', cost: 1000, name: 'Castle' },
-                      { emoji: '🚀', cost: 5000, name: 'Rocket' },
-                    ].map((gift) => (
-                      <button
-                        key={gift.name}
-                        type="button"
-                        onClick={() => sendGift(gift.emoji, gift.cost, gift.name)}
-                        className="flex flex-col items-center p-2 hover:bg-white/5 rounded-lg transition-colors border border-transparent hover:border-white/5"
-                        title={`Send ${gift.name} (${gift.cost} coins)`}
-                      >
-                        <span className="text-2xl mb-1">{gift.emoji}</span>
-                        <div className="flex items-center gap-1 bg-black/20 px-2 py-0.5 rounded-full">
-                          <span className="text-[10px] text-yellow-400 font-bold">{gift.cost}</span>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
+              {/* Gift Popover */}
+              <div className="absolute bottom-full left-0 mb-2 w-64 bg-dark-800 border border-white/10 rounded-xl shadow-xl p-3 hidden group-hover:block transition-all duration-200 z-[80]">
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { emoji: '🌹', cost: 10, name: 'Rose' },
+                    { emoji: '🍫', cost: 50, name: 'Chocolate' },
+                    { emoji: '💎', cost: 100, name: 'Diamond' },
+                    { emoji: '🏎️', cost: 500, name: 'Car' },
+                    { emoji: '🏰', cost: 1000, name: 'Castle' },
+                    { emoji: '🚀', cost: 5000, name: 'Rocket' },
+                  ].map((gift) => (
+                    <button
+                      key={gift.name}
+                      type="button"
+                      onClick={() => sendGift(gift.emoji, gift.cost, gift.name)}
+                      className="flex flex-col items-center p-2 hover:bg-white/5 rounded-lg transition-colors border border-transparent hover:border-white/5"
+                      title={`Send ${gift.name} (${gift.cost} coins)`}
+                    >
+                      <span className="text-2xl mb-1">{gift.emoji}</span>
+                      <div className="flex items-center gap-1 bg-black/20 px-2 py-0.5 rounded-full">
+                        <span className="text-[10px] text-yellow-400 font-bold">{gift.cost}</span>
+                      </div>
+                    </button>
+                  ))}
                 </div>
               </div>
-              <input
-                type="text"
-                value={newMessage}
-                onChange={handleTyping}
-                placeholder="Type a message..."
-                disabled={status !== 'Connected'}
-                className="flex-1 bg-white/5 border border-white/10 rounded-full px-4 py-2 text-sm focus:outline-none focus:border-accent-purple transition-colors disabled:opacity-50"
-              />
-              <button
-                type="submit"
-                disabled={!newMessage.trim() || status !== 'Connected'}
-                className="p-2 bg-accent-purple text-white rounded-full hover:bg-accent-purple/80 transition-all disabled:opacity-50 disabled:grayscale"
-              >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                </svg>
-              </button>
-            </form>
-          </div>
+            </div>
+            <input
+              type="text"
+              value={newMessage}
+              onChange={handleTyping}
+              placeholder="Type a message..."
+              disabled={status !== 'Connected'}
+              className="flex-1 bg-white/5 border border-white/10 rounded-full px-4 py-2 text-sm focus:outline-none focus:border-accent-purple transition-colors disabled:opacity-50"
+            />
+            <button
+              type="submit"
+              disabled={!newMessage.trim() || status !== 'Connected'}
+              className="p-2 bg-accent-purple text-white rounded-full hover:bg-accent-purple/80 transition-all disabled:opacity-50 disabled:grayscale"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+              </svg>
+            </button>
+          </form>
         </div>
-      )}
+      </div>
 
 
       {/* Mobile Chat Toggle - REMOVED (now unified at top-left) */}
-    </div>
+    </div >
   );
 };
 

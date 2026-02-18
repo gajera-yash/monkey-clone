@@ -65,13 +65,15 @@ function App() {
 
             <Routes>
               <Route path="/" element={
-                <>
-                  <Header onStartChat={handleStartChat} />
-                  <Hero onStartChat={handleStartChat} />
-                  <Features />
-                  <FAQ />
-                  <Footer />
-                </>
+                currentUser ? <Navigate to="/chat" /> : (
+                  <>
+                    <Header onStartChat={handleStartChat} />
+                    <Hero onStartChat={handleStartChat} />
+                    <Features />
+                    <FAQ />
+                    <Footer />
+                  </>
+                )
               } />
 
               <Route path="/chat" element={
