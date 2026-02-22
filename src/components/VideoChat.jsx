@@ -581,21 +581,24 @@ const VideoChat = ({ onEndChat }) => {
           </>
         ) : (
           /* Remote Video / Status */
-          <div className="flex-1 relative flex flex-col">
+          <div className="flex-1 relative flex flex-col overflow-hidden">
             {remoteStream ? (
-              /* === CONNECTED: Split screen on mobile === */
+              /* === CONNECTED: 50/50 Split screen on mobile === */
               <>
-                {/* Remote Video - Top half on mobile, full on desktop */}
-                <div className="flex-1 min-h-0 overflow-hidden md:flex-none md:absolute md:inset-0 relative bg-black">
+                {/* Remote Video - Top 50% on mobile, full on desktop */}
+                <div className="h-[50dvh] md:h-auto md:flex-none md:absolute md:inset-0 overflow-hidden relative bg-black flex-shrink-0">
                   <video ref={remoteVideoRef} autoPlay playsInline className="w-full h-full object-cover" />
-                  {/* Monkey.app watermark */}
-                  <div className="absolute bottom-3 left-3 flex items-center gap-1.5 md:hidden">
-                    <span className="text-xl">🐵</span>
-                    <span className="text-white/60 text-sm font-medium">monkey.app</span>
+                  {/* monkey.app watermark */}
+                  <div className="absolute bottom-3 left-3 flex items-center gap-2 md:hidden">
+                    <div className="w-7 h-7 rounded-lg bg-indigo-600 flex items-center justify-center shadow-lg">
+                      <span className="text-[14px]">🐵</span>
+                    </div>
+                    <span className="text-white/90 text-[13px] font-bold tracking-tight">monkey.app</span>
                   </div>
                 </div>
-                {/* Local Video - Bottom half on mobile */}
-                <div className="flex-1 min-h-0 overflow-hidden md:hidden relative bg-black border-t border-white/10">
+
+                {/* Local Video - Bottom 50% on mobile */}
+                <div className="h-[50dvh] overflow-hidden md:hidden relative bg-black border-t-2 border-white/5 flex-shrink-0">
                   <video
                     ref={localVideoMobileRef}
                     autoPlay
@@ -604,32 +607,40 @@ const VideoChat = ({ onEndChat }) => {
                     className={`w-full h-full object-cover ${!isCamOn ? 'hidden' : ''}`}
                   />
                   {!isCamOn && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-gray-800">
+                    <div className="absolute inset-0 flex items-center justify-center bg-gray-900">
                       <span className="text-4xl">📷</span>
                     </div>
                   )}
-                  {/* Chat & Gift buttons overlaid on local video */}
-                  <div className="absolute bottom-3 left-0 right-0 flex items-center justify-between px-4 z-10">
+                  {/* Chat & Gift buttons bottom bar */}
+                  <div className="absolute bottom-6 left-0 right-0 flex items-center justify-between px-6 z-10">
+                    {/* Chat Button - matches reference style */}
                     <button
                       onClick={() => {
                         setShowChat(!showChat);
                         if (!showChat) setUnreadCount(0);
                       }}
-                      className="w-11 h-11 rounded-full bg-black/50 backdrop-blur-md border border-white/10 flex items-center justify-center relative"
+                      className="w-12 h-12 rounded-full bg-[#1a1c1e]/80 backdrop-blur-md border border-white/10 flex items-center justify-center relative shadow-xl active:scale-90 transition-transform"
                     >
-                      <span className="text-xl">💬</span>
+                      <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                      </svg>
                       {unreadCount > 0 && (
-                        <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center border-2 border-black">
+                        <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center border-2 border-[#1a1c1e]">
                           {unreadCount > 9 ? '9+' : unreadCount}
                         </span>
                       )}
                     </button>
-                    <button className="w-11 h-11 rounded-full bg-yellow-400/20 border border-yellow-400/40 flex items-center justify-center">
-                      <span className="text-2xl">🎁</span>
+                    {/* Gift Button - matches reference style */}
+                    <button className="w-12 h-12 rounded-full bg-[#ffea00] flex items-center justify-center shadow-lg shadow-yellow-400/40 active:scale-95 transition-transform">
+                      <svg className="w-7 h-7 text-[#d32f2f]" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M20 6h-2.18c.11-.31.18-.65.18-1a2.5 2.5 0 00-5-0c0 .35.07.69.18 1H11c.11-.31.18-.65.18-1a2.5 2.5 0 00-5-0c0 .35.07.69.18 1H4a2 2 0 00-2 2v2c0 .55.45 1 1 1h1v10a2 2 0 002 2h12a2 2 0 002-2V10h1c.55 0 1-.45 1-1V8a2 2 0 00-2-2M15.5 5c0-.83.67-1.5 1.5-1.5s1.5.67 1.5 1.5-0.67 1.5-1.5 1.5h-1.5V5M7 5c0-.83.67-1.5 1.5-1.5S10 4.17 10 5v1.5H8.5C7.67 6.5 7 5.83 7 5m11 15H6V10h12v10m1-11H5V8h14v1" />
+                      </svg>
                     </button>
                   </div>
+
                 </div>
               </>
+
             ) : (
               /* === SEARCHING: Centered loader === */
               <div className="flex-1 flex items-center justify-center">
@@ -726,23 +737,35 @@ const VideoChat = ({ onEndChat }) => {
         {/* ===== MOBILE CONNECTED TOP BAR ===== */}
         {partnerName && (
           <div className="absolute top-0 left-0 right-0 z-50 md:hidden">
-            <div className="flex items-center justify-between px-3 py-2 bg-black/70 backdrop-blur-md">
-              <div className="flex items-center gap-2 min-w-0">
-                <div className="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center text-sm font-bold text-white flex-shrink-0">
-                  {partnerName?.charAt(0)?.toUpperCase() || 'S'}
+            <div className="flex items-center justify-between px-4 py-3 bg-black/40 backdrop-blur-sm">
+              <div className="flex items-center gap-3 min-w-0">
+                {/* Partner Avatar Circle with Initial */}
+                <div className="w-10 h-10 rounded-full bg-orange-600 border border-white/20 flex items-center justify-center text-white font-bold text-lg flex-shrink-0 shadow-lg">
+                  {partnerName?.charAt(0)?.toUpperCase() || 'P'}
                 </div>
-                <div className="min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-white font-semibold text-sm truncate max-w-[120px]">{partnerName}</span>
-                    <span className="text-lg">💛</span>
+                <div className="min-w-0 flex flex-col">
+                  <span className="text-white font-bold text-[15px] truncate leading-tight">{partnerName}</span>
+                  <div className="flex items-center gap-1.5 overflow-hidden">
+                    <p className="text-[12px] text-white/70 truncate flex-shrink">
+                      {getLocationDisplay(partnerLocation, showCityName) || 'Somewhere'}
+                    </p>
+                    <span className="text-[14px] flex-shrink-0">💜</span>
+                    <button
+                      onClick={() => setShowReportModal(true)}
+                      className="text-[14px] flex-shrink-0 hover:scale-110 active:scale-90 transition-transform"
+                    >👮</button>
                   </div>
-                  {partnerLocation && (
-                    <p className="text-[11px] text-gray-400 truncate">{getLocationDisplay(partnerLocation, showCityName)}</p>
-                  )}
                 </div>
               </div>
-              <button onClick={handleNext} className="bg-white/10 backdrop-blur-sm p-2 rounded-lg hover:bg-white/20 transition-colors flex-shrink-0">
-                <span className="text-xl">⏭</span>
+              {/* Next Button - Square icon to match reference */}
+              <button
+                onClick={handleNext}
+                className="w-10 h-10 bg-[#3a4959]/90 backdrop-blur-md rounded-lg flex items-center justify-center text-white shadow-lg active:scale-95 transition-all"
+              >
+                <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M4.555 13.904l1.39-1.39a1 1 0 011.414 0l.293.293V10a1 1 0 112 0v2.807l.293-.293a1 1 0 011.414 0l1.39 1.39a1 1 0 01-1.414 1.414l-1.39-1.39L8 15.414l-1.39 1.39-1.39-1.39z" />
+                  <path fillRule="evenodd" d="M12.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-2.293-2.293a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
               </button>
             </div>
           </div>
