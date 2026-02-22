@@ -11,6 +11,8 @@ import toast from 'react-hot-toast';
 import PremiumBadge from './premium/PremiumBadge';
 import UserProfileMobile from './profile/UserProfileMobile';
 import MatchHistoryMobile from './history/MatchHistoryMobile';
+import DesktopHeader from './desktop/DesktopHeader';
+import IdleDesktop from './desktop/IdleDesktop';
 
 const RTC_CONFIG = {
   iceServers: [
@@ -389,7 +391,33 @@ const VideoChat = ({ onEndChat }) => {
   };
 
   return (
-    <div className="relative w-full h-[100dvh] bg-dark-900 overflow-hidden flex flex-col md:grid md:grid-cols-[300px_1fr_360px]">
+    <div className={`relative w-full h-[100dvh] overflow-hidden flex flex-col ${status === 'Connected' ? 'md:grid md:grid-cols-[300px_1fr_360px]' : ''} ${status === 'Idle' ? 'bg-[#5143d9]' : 'bg-dark-900'}`}>
+      {/* Background Patterns for Idle Desktop */}
+      {status === 'Idle' && (
+        <div className="absolute inset-0 hidden md:block opacity-20 pointer-events-none overflow-hidden">
+          <div className="absolute top-1/4 left-1/4 transform -translate-x-1/2 -translate-y-1/2 rotate-12">
+            <span className="text-[200px]">🐵</span>
+          </div>
+          <div className="absolute bottom-1/4 right-1/4 transform translate-x-1/2 translate-y-1/2 -rotate-12">
+            <span className="text-[200px]">🐵</span>
+          </div>
+          <div className="absolute top-1/2 left-3/4 transform -translate-x-1/2 -translate-y-1/2 flex items-center gap-8">
+            <span className="text-[120px]">🐵</span>
+            <span className="text-[120px]">🐵</span>
+          </div>
+        </div>
+      )}
+
+      {/* Desktop Header for Idle State */}
+      {status === 'Idle' && (
+        <div className="hidden md:block">
+          <DesktopHeader
+            onShowProfile={() => setShowProfile(true)}
+            onShowHistory={() => setShowMatchHistory(true)}
+          />
+        </div>
+      )}
+
       <PermissionModal isOpen={showPermissionModal} onGrant={requestMedia} error={error} />
       <ReportModal
         isOpen={showReportModal}
@@ -554,54 +582,33 @@ const VideoChat = ({ onEndChat }) => {
               {showMatchHistory && <MatchHistoryMobile onClose={() => setShowMatchHistory(false)} />}
             </div>
 
-            {/* ===== DESKTOP IDLE SCREEN (unchanged) ===== */}
-            <div className="flex-1 hidden md:flex flex-col items-center justify-center p-8 relative overflow-hidden">
-              <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-5"></div>
-
-              {/* Mode Toggle */}
-              <div className="bg-white/10 p-1 rounded-full flex items-center mb-12 relative z-10 backdrop-blur-md border border-white/5">
-                <button className="px-6 py-2 rounded-full bg-yellow-400 text-black font-bold text-sm shadow-lg shadow-yellow-400/20">
-                  SOLO
-                </button>
-                <button className="px-6 py-2 rounded-full text-gray-400 font-bold text-sm hover:text-white transition-colors">
-                  SQUAD
-                </button>
-              </div>
-
-              {/* Logo/Icon */}
-              <div className="w-32 h-32 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-3xl flex items-center justify-center shadow-2xl mb-8 transform hover:scale-105 transition-transform duration-300">
-                <span className="text-7xl filter drop-shadow-md">🐵</span>
-              </div>
-
-              <h1 className="text-4xl font-bold mb-2 text-center">Monkey Clone</h1>
-              <p className="text-gray-400 mb-12 text-center max-w-md">
-                Make new friends face-to-face.
-                <br />
-                <span className="text-yellow-400 font-medium">100% Free & Secure.</span>
-              </p>
-
-              <div className="flex flex-col gap-4 w-full max-w-xs relative z-10">
-                {/* Gender Filter Button */}
-                <button
-                  className="w-full bg-white text-black font-bold py-3 rounded-full hover:bg-gray-100 transition-all flex items-center justify-center gap-2"
-                  onClick={() => toast('Gender filter coming soon!', { icon: '🚻' })}
-                >
-                  <span>👫</span> Both
-                </button>
-
-                {/* Start Button */}
-                <button
-                  onClick={handleStartChat}
-                  className="w-full bg-yellow-400 hover:bg-yellow-300 text-black font-bold py-4 rounded-full text-lg shadow-xl shadow-yellow-400/20 transform hover:-translate-y-1 transition-all active:scale-95 flex items-center justify-center gap-2"
-                >
-                  <span>Start Video Chat</span>
-                </button>
-              </div>
-
-              <div className="mt-8 text-xs text-gray-500">
-                By clicking Start, you agree to our <a href="/terms" className="underline hover:text-gray-400">Terms</a> & <a href="/privacy" className="underline hover:text-gray-400">Privacy Policy</a>
-              </div>
+            {/* ===== DESKTOP IDLE SCREEN ===== */}
+            <div className="hidden md:flex flex-1">
+              <IdleDesktop
+                localVideoRef={localVideoRef}
+                isCamOn={isCamOn}
+                onStartChat={handleStartChat}
+              />
             </div>
+
+            {/* Profile Overlays (Unified) */}
+            {showProfile && (
+              <div className="md:fixed md:inset-0 md:z-[110] md:flex md:items-center md:justify-center">
+                <div className="md:absolute md:inset-0 md:bg-black/60 md:backdrop-blur-sm" onClick={() => setShowProfile(false)}></div>
+                <div className="relative w-full h-full md:w-[400px] md:h-[600px] md:rounded-3xl md:overflow-hidden md:shadow-2xl">
+                  <UserProfileMobile onClose={() => setShowProfile(false)} />
+                </div>
+              </div>
+            )}
+
+            {showMatchHistory && (
+              <div className="md:fixed md:inset-0 md:z-[110] md:flex md:items-center md:justify-center">
+                <div className="md:absolute md:inset-0 md:bg-black/60 md:backdrop-blur-sm" onClick={() => setShowMatchHistory(false)}></div>
+                <div className="relative w-full h-full md:w-[400px] md:h-[600px] md:rounded-3xl md:overflow-hidden md:shadow-2xl">
+                  <MatchHistoryMobile onClose={() => setShowMatchHistory(false)} />
+                </div>
+              </div>
+            )}
           </>
         ) : (
           /* Remote Video / Status */
@@ -794,186 +801,191 @@ const VideoChat = ({ onEndChat }) => {
 
 
         {/* Controls Bar - Desktop Only */}
-        <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 hidden md:flex items-center gap-4 z-50 bg-black/40 backdrop-blur-xl border border-white/10 p-2 rounded-full shadow-2xl">
-          <button
-            onClick={() => setIsMicOn(!isMicOn)}
-            className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${isMicOn ? 'bg-white/10 hover:bg-white/20 text-white' : 'bg-red-500 text-white'}`}
-          >
-            {isMicOn ? '🎤' : '🔇'}
-          </button>
+        {status === 'Connected' && (
+          <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 hidden md:flex items-center gap-4 z-50 bg-black/40 backdrop-blur-xl border border-white/10 p-2 rounded-full shadow-2xl">
+            <button
+              onClick={() => setIsMicOn(!isMicOn)}
+              className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${isMicOn ? 'bg-white/10 hover:bg-white/20 text-white' : 'bg-red-500 text-white'}`}
+            >
+              {isMicOn ? '🎤' : '🔇'}
+            </button>
 
-          <button
-            onClick={() => setIsCamOn(!isCamOn)}
-            className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${isCamOn ? 'bg-white/10 hover:bg-white/20 text-white' : 'bg-red-500 text-white'}`}
-          >
-            {isCamOn ? '📹' : '📷'}
-          </button>
-
-
-          <div className="w-px h-8 bg-white/10 mx-1"></div>
+            <button
+              onClick={() => setIsCamOn(!isCamOn)}
+              className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${isCamOn ? 'bg-white/10 hover:bg-white/20 text-white' : 'bg-red-500 text-white'}`}
+            >
+              {isCamOn ? '📹' : '📷'}
+            </button>
 
 
-          <button
-            onClick={handleNext}
-            className="px-6 py-3 bg-white text-dark-900 rounded-full font-bold hover:bg-gray-200 transition-all active:scale-95 flex items-center gap-2"
-          >
-            <span>Next</span>
-            <span>⏭️</span>
-          </button>
+            <div className="w-px h-8 bg-white/10 mx-1"></div>
 
-          <button
-            onClick={endCall}
-            className="w-12 h-12 bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/50 rounded-full flex items-center justify-center transition-all"
-          >
-          </button>
-        </div>
+
+            <button
+              onClick={handleNext}
+              className="px-6 py-3 bg-white text-dark-900 rounded-full font-bold hover:bg-gray-200 transition-all active:scale-95 flex items-center gap-2"
+            >
+              <span>Next</span>
+              <span>⏭️</span>
+            </button>
+
+            <button
+              onClick={endCall}
+              className="w-12 h-12 bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/50 rounded-full flex items-center justify-center transition-all"
+            >
+              ✕
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Right Panel - Chat Interface */}
-      <div className={`w-full md:w-auto h-full bg-dark-800 border-l border-white/5 flex flex-col z-[60] absolute md:relative inset-0 transition-transform duration-300 transform ${showChat ? 'translate-x-0' : 'translate-x-full'} md:translate-x-0 md:col-start-3`}>
-        {/* Chat Header */}
-        <div className="p-4 border-b border-white/5 flex items-center justify-between bg-dark-900/50 backdrop-blur-md">
-          <h3 className="font-bold text-lg flex items-center gap-2">
-            <span className="text-accent-purple">●</span> Chat
-          </h3>
-          <button
-            onClick={() => setShowChat(false)}
-            className="md:hidden p-2 hover:bg-white/5 rounded-full"
-          >
-            ✕
-          </button>
-        </div>
-
-        {/* Messages List */}
-        <div
-          ref={scrollRef}
-          className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-white/10"
-        >
-          {messages.length === 0 && !isPartnerTyping && (
-            <div className="h-full flex flex-col items-center justify-center text-gray-500 text-center px-8">
-              <div className="text-4xl mb-4">💬</div>
-              <p>Say hi! Start the conversation with emojis or text.</p>
-            </div>
-          )}
-
-          {messages.map((msg) => (
-            <div
-              key={msg.id}
-              className={`flex flex-col ${msg.senderId === currentUser.uid ? 'items-end' : 'items-start'}`}
+      {status === 'Connected' && (
+        <div className={`w-full md:w-auto h-full bg-dark-800 border-l border-white/5 flex flex-col z-[60] absolute md:relative inset-0 transition-transform duration-300 transform ${showChat ? 'translate-x-0' : 'translate-x-full'} md:translate-x-0 md:col-start-3`}>
+          {/* Chat Header */}
+          <div className="p-4 border-b border-white/5 flex items-center justify-between bg-dark-900/50 backdrop-blur-md">
+            <h3 className="font-bold text-lg flex items-center gap-2">
+              <span className="text-accent-purple">●</span> Chat
+            </h3>
+            <button
+              onClick={() => setShowChat(false)}
+              className="md:hidden p-2 hover:bg-white/5 rounded-full"
             >
-              <div className={`max-w-[85%] px-4 py-2 rounded-2xl text-sm ${msg.senderId === currentUser.uid
-                ? 'bg-accent-purple text-white rounded-tr-none'
-                : 'bg-white/5 text-gray-200 border border-white/10 rounded-tl-none'
-                }`}>
-                {msg.text}
-              </div>
-              <span className="text-[10px] text-gray-500 mt-1 px-1">
-                {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-              </span>
-            </div>
-          ))}
+              ✕
+            </button>
+          </div>
 
-          {/* Typing Indicator */}
-          {isPartnerTyping && (
-            <div className="flex items-start">
-              <div className="bg-white/5 text-gray-400 px-4 py-2 rounded-2xl rounded-tl-none border border-white/10 italic text-xs flex items-center gap-2">
-                {partnerName || 'Stranger'} is typing
-                <span className="flex gap-1">
-                  <span className="w-1 h-1 bg-gray-500 rounded-full animate-bounce"></span>
-                  <span className="w-1 h-1 bg-gray-500 rounded-full animate-bounce [animation-delay:0.2s]"></span>
-                  <span className="w-1 h-1 bg-gray-500 rounded-full animate-bounce [animation-delay:0.4s]"></span>
+          {/* Messages List */}
+          <div
+            ref={scrollRef}
+            className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-white/10"
+          >
+            {messages.length === 0 && !isPartnerTyping && (
+              <div className="h-full flex flex-col items-center justify-center text-gray-500 text-center px-8">
+                <div className="text-4xl mb-4">💬</div>
+                <p>Say hi! Start the conversation with emojis or text.</p>
+              </div>
+            )}
+
+            {messages.map((msg) => (
+              <div
+                key={msg.id}
+                className={`flex flex-col ${msg.senderId === currentUser.uid ? 'items-end' : 'items-start'}`}
+              >
+                <div className={`max-w-[85%] px-4 py-2 rounded-2xl text-sm ${msg.senderId === currentUser.uid
+                  ? 'bg-accent-purple text-white rounded-tr-none'
+                  : 'bg-white/5 text-gray-200 border border-white/10 rounded-tl-none'
+                  }`}>
+                  {msg.text}
+                </div>
+                <span className="text-[10px] text-gray-500 mt-1 px-1">
+                  {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </span>
               </div>
-            </div>
-          )}
-        </div>
+            ))}
 
-        {/* Emoji Picker Overlay */}
-        {showEmojiPicker && (
-          <div className="absolute bottom-20 left-4 right-4 z-[70] shadow-2xl">
-            <div className="relative">
-              <button
-                className="absolute -top-10 right-0 bg-dark-900 border border-white/10 p-2 rounded-full text-white"
-                onClick={() => setShowEmojiPicker(false)}
-              >✕</button>
-              <EmojiPicker
-                onEmojiClick={onEmojiClick}
-                theme="dark"
-                width="100%"
-                height={350}
-                lazyLoadEmojis={true}
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Chat Input */}
-        <div className="p-4 bg-dark-900/50 backdrop-blur-md border-t border-white/5">
-          <form onSubmit={handleSendMessage} className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-              className={`p-2 rounded-full transition-colors ${showEmojiPicker ? 'bg-accent-purple text-white' : 'hover:bg-white/5 text-gray-400'}`}
-            >
-              😊
-            </button>
-
-            {/* Gift Button */}
-            <div className="relative group">
-              <button
-                type="button"
-                className="p-2 rounded-full hover:bg-white/5 text-pink-500 transition-colors"
-              >
-                🎁
-              </button>
-
-              {/* Gift Popover */}
-              <div className="absolute bottom-full left-0 mb-2 w-64 bg-dark-800 border border-white/10 rounded-xl shadow-xl p-3 hidden group-hover:block transition-all duration-200 z-[80]">
-                <div className="grid grid-cols-3 gap-2">
-                  {[
-                    { emoji: '🌹', cost: 10, name: 'Rose' },
-                    { emoji: '🍫', cost: 50, name: 'Chocolate' },
-                    { emoji: '💎', cost: 100, name: 'Diamond' },
-                    { emoji: '🏎️', cost: 500, name: 'Car' },
-                    { emoji: '🏰', cost: 1000, name: 'Castle' },
-                    { emoji: '🚀', cost: 5000, name: 'Rocket' },
-                  ].map((gift) => (
-                    <button
-                      key={gift.name}
-                      type="button"
-                      onClick={() => sendGift(gift.emoji, gift.cost, gift.name)}
-                      className="flex flex-col items-center p-2 hover:bg-white/5 rounded-lg transition-colors border border-transparent hover:border-white/5"
-                      title={`Send ${gift.name} (${gift.cost} coins)`}
-                    >
-                      <span className="text-2xl mb-1">{gift.emoji}</span>
-                      <div className="flex items-center gap-1 bg-black/20 px-2 py-0.5 rounded-full">
-                        <span className="text-[10px] text-yellow-400 font-bold">{gift.cost}</span>
-                      </div>
-                    </button>
-                  ))}
+            {/* Typing Indicator */}
+            {isPartnerTyping && (
+              <div className="flex items-start">
+                <div className="bg-white/5 text-gray-400 px-4 py-2 rounded-2xl rounded-tl-none border border-white/10 italic text-xs flex items-center gap-2">
+                  {partnerName || 'Stranger'} is typing
+                  <span className="flex gap-1">
+                    <span className="w-1 h-1 bg-gray-500 rounded-full animate-bounce"></span>
+                    <span className="w-1 h-1 bg-gray-500 rounded-full animate-bounce [animation-delay:0.2s]"></span>
+                    <span className="w-1 h-1 bg-gray-500 rounded-full animate-bounce [animation-delay:0.4s]"></span>
+                  </span>
                 </div>
               </div>
+            )}
+          </div>
+
+          {/* Emoji Picker Overlay */}
+          {showEmojiPicker && (
+            <div className="absolute bottom-20 left-4 right-4 z-[70] shadow-2xl">
+              <div className="relative">
+                <button
+                  className="absolute -top-10 right-0 bg-dark-900 border border-white/10 p-2 rounded-full text-white"
+                  onClick={() => setShowEmojiPicker(false)}
+                >✕</button>
+                <EmojiPicker
+                  onEmojiClick={onEmojiClick}
+                  theme="dark"
+                  width="100%"
+                  height={350}
+                  lazyLoadEmojis={true}
+                />
+              </div>
             </div>
-            <input
-              type="text"
-              value={newMessage}
-              onChange={handleTyping}
-              placeholder="Type a message..."
-              disabled={status !== 'Connected'}
-              className="flex-1 bg-white/5 border border-white/10 rounded-full px-4 py-2 text-sm focus:outline-none focus:border-accent-purple transition-colors disabled:opacity-50"
-            />
-            <button
-              type="submit"
-              disabled={!newMessage.trim() || status !== 'Connected'}
-              className="p-2 bg-accent-purple text-white rounded-full hover:bg-accent-purple/80 transition-all disabled:opacity-50 disabled:grayscale"
-            >
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-              </svg>
-            </button>
-          </form>
+          )}
+
+          {/* Chat Input */}
+          <div className="p-4 bg-dark-900/50 backdrop-blur-md border-t border-white/5">
+            <form onSubmit={handleSendMessage} className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                className={`p-2 rounded-full transition-colors ${showEmojiPicker ? 'bg-accent-purple text-white' : 'hover:bg-white/5 text-gray-400'}`}
+              >
+                😊
+              </button>
+
+              {/* Gift Button */}
+              <div className="relative group">
+                <button
+                  type="button"
+                  className="p-2 rounded-full hover:bg-white/5 text-pink-500 transition-colors"
+                >
+                  🎁
+                </button>
+
+                {/* Gift Popover */}
+                <div className="absolute bottom-full left-0 mb-2 w-64 bg-dark-800 border border-white/10 rounded-xl shadow-xl p-3 hidden group-hover:block transition-all duration-200 z-[80]">
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { emoji: '🌹', cost: 10, name: 'Rose' },
+                      { emoji: '🍫', cost: 50, name: 'Chocolate' },
+                      { emoji: '💎', cost: 100, name: 'Diamond' },
+                      { emoji: '🏎️', cost: 500, name: 'Car' },
+                      { emoji: '🏰', cost: 1000, name: 'Castle' },
+                      { emoji: '🚀', cost: 5000, name: 'Rocket' },
+                    ].map((gift) => (
+                      <button
+                        key={gift.name}
+                        type="button"
+                        onClick={() => sendGift(gift.emoji, gift.cost, gift.name)}
+                        className="flex flex-col items-center p-2 hover:bg-white/5 rounded-lg transition-colors border border-transparent hover:border-white/5"
+                        title={`Send ${gift.name} (${gift.cost} coins)`}
+                      >
+                        <span className="text-2xl mb-1">{gift.emoji}</span>
+                        <div className="flex items-center gap-1 bg-black/20 px-2 py-0.5 rounded-full">
+                          <span className="text-[10px] text-yellow-400 font-bold">{gift.cost}</span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <input
+                type="text"
+                value={newMessage}
+                onChange={handleTyping}
+                placeholder="Type a message..."
+                disabled={status !== 'Connected'}
+                className="flex-1 bg-white/5 border border-white/10 rounded-full px-4 py-2 text-sm focus:outline-none focus:border-accent-purple transition-colors disabled:opacity-50"
+              />
+              <button
+                type="submit"
+                disabled={!newMessage.trim() || status !== 'Connected'}
+                className="p-2 bg-accent-purple text-white rounded-full hover:bg-accent-purple/80 transition-all disabled:opacity-50 disabled:grayscale"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                </svg>
+              </button>
+            </form>
+          </div>
         </div>
-      </div>
+      )}
 
 
       {/* Mobile Chat Toggle - REMOVED (now unified at top-left) */}

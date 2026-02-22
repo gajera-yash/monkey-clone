@@ -116,11 +116,64 @@ export const AuthProvider = ({ children }) => {
             }
             setIsGuest(false);
             setCurrentUser(null);
+            localStorage.removeItem('lastActivity'); // Clear activity on logout
             toast.success("Logged out");
         } catch (error) {
             toast.error("Error logging out");
         }
     };
+
+    // Auto-Logout Logic (24 hours of inactivity)
+    useEffect(() => {
+        if (!currentUser) return;
+
+        const INACTIVITY_TIMEOUT = 24 * 60 * 60 * 1000; // 24 hours
+        const CHECK_INTERVAL = 60 * 1000; // 1 minute
+
+        const updateActivity = () => {
+            localStorage.setItem('lastActivity', Date.now().toString());
+        };
+
+        const checkInactivity = () => {
+            const lastActivity = localStorage.getItem('lastActivity');
+            if (lastActivity) {
+                const inactiveDuration = Date.now() - parseInt(lastActivity);
+                if (inactiveDuration > INACTIVITY_TIMEOUT) {
+                    logout();
+                    toast("Logged out due to inactivity", { icon: '⏰' });
+                }
+            } else {
+                // If no activity record, initialize it
+                updateActivity();
+            }
+        };
+
+        // Events to track activity
+        const activityEvents = [
+            'mousedown', 'mousemove', 'keypress',
+            'scroll', 'touchstart', 'click'
+        ];
+
+        // Register event listeners
+        activityEvents.forEach(event => {
+            window.addEventListener(event, updateActivity);
+        });
+
+        // Initialize activity if not present
+        if (!localStorage.getItem('lastActivity')) {
+            updateActivity();
+        }
+
+        // Periodic check
+        const interval = setInterval(checkInactivity, CHECK_INTERVAL);
+
+        return () => {
+            activityEvents.forEach(event => {
+                window.removeEventListener(event, updateActivity);
+            });
+            clearInterval(interval);
+        };
+    }, [currentUser]);
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (user) => {
