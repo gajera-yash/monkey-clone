@@ -25,3 +25,13 @@
     @apply bg-clip-text text-transparent bg-gradient-to-r from-accent-purple via-accent-pink to-accent-blue;
   }
 }
+
+/* Desktop purple gradient background */
+.desktop-purple-bg {
+  background: #0d0d0d;
+}
+@media (min-width: 768px) {
+  .desktop-purple-bg {
+    background: linear-gradient(135deg, #6c3fcf 0%, #5a30b5 50%, #4a25a0 100%) !important;
+  }
+}

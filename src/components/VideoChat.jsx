@@ -391,7 +391,7 @@ const VideoChat = ({ onEndChat }) => {
   };
 
   return (
-    <div className={`relative w-full h-[100dvh] overflow-hidden flex flex-col ${status === 'Connected' ? 'md:grid md:grid-cols-[300px_1fr_360px]' : ''} ${status === 'Idle' ? 'bg-[#5143d9]' : 'bg-dark-900'}`}>
+    <div className={`relative w-full h-[100dvh] overflow-hidden flex flex-col desktop-purple-bg ${status === 'Connected' ? 'md:grid md:grid-cols-[1fr_360px]' : ''}`}>
       {/* Background Patterns for Idle Desktop */}
       {status === 'Idle' && (
         <div className="absolute inset-0 hidden md:block opacity-20 pointer-events-none overflow-hidden">
@@ -411,47 +411,17 @@ const VideoChat = ({ onEndChat }) => {
       {/* Desktop Header for Idle State */}
       {status === 'Idle' && (
         <div className="hidden md:block">
-          <DesktopHeader
-            onShowProfile={() => setShowProfile(true)}
-            onShowHistory={() => setShowMatchHistory(true)}
-          />
+          <DesktopHeader />
         </div>
       )}
 
-      <PermissionModal isOpen={showPermissionModal} onGrant={requestMedia} error={error} />
+      <PermissionModal isOpen={false} onGrant={requestMedia} error={error} />
       <ReportModal
         isOpen={showReportModal}
         onClose={() => setShowReportModal(false)}
         onSubmit={handleReportSubmit}
         reportedUserName={partnerName}
       />
-
-      {/* Left Panel - Branding & Promo (Desktop Only) */}
-      <div className="hidden md:flex flex-col bg-black border-r border-white/5 relative overflow-hidden">
-        <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1616004664558-f93246944e82?q=80&w=1000&auto=format&fit=crop')] bg-cover bg-center opacity-40"></div>
-        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/80 to-transparent"></div>
-
-        <div className="relative z-10 flex-1 flex flex-col justify-end p-8 pb-12">
-          <div className="mb-6">
-            <span className="text-5xl">👑</span>
-            <div className="flex -space-x-4 mt-4">
-              {[1, 2, 3].map(i => (
-                <div key={i} className="w-10 h-10 rounded-full border-2 border-black bg-gray-600"></div>
-              ))}
-            </div>
-            <p className="text-gray-400 text-sm mt-2 ml-1">+1.2M Online</p>
-          </div>
-
-          <h2 className="text-3xl font-bold font-display leading-tight mb-4">
-            With you on <br />
-            <span className="text-yellow-400">camera</span>, it's <br />
-            easier to meet.
-          </h2>
-          <p className="text-gray-400 leading-relaxed">
-            Join the fastest growing video chat community. Connect instantly with people worldwide.
-          </p>
-        </div>
-      </div>
 
       {/* Center Panel - Main Video Area */}
       <div className="flex-1 md:col-start-2 relative bg-black flex flex-col transition-all duration-300 border-r border-white/5">
@@ -518,10 +488,6 @@ const VideoChat = ({ onEndChat }) => {
                   <span className="text-lg">🔍</span>
                 </button>
 
-                {/* Crown / Premium */}
-                <button className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-md border border-white/10 flex items-center justify-center hover:bg-white/10 transition-colors">
-                  <span className="text-lg">👑</span>
-                </button>
 
                 {/* Match History */}
                 <button
@@ -587,28 +553,31 @@ const VideoChat = ({ onEndChat }) => {
               <IdleDesktop
                 localVideoRef={localVideoRef}
                 isCamOn={isCamOn}
+                isMicOn={isMicOn}
                 onStartChat={handleStartChat}
+                onToggleCam={() => setIsCamOn(!isCamOn)}
+                onToggleMic={() => setIsMicOn(!isMicOn)}
               />
             </div>
 
-            {/* Profile Overlays (Unified) */}
-            {showProfile && (
-              <div className="md:fixed md:inset-0 md:z-[110] md:flex md:items-center md:justify-center">
-                <div className="md:absolute md:inset-0 md:bg-black/60 md:backdrop-blur-sm" onClick={() => setShowProfile(false)}></div>
-                <div className="relative w-full h-full md:w-[400px] md:h-[600px] md:rounded-3xl md:overflow-hidden md:shadow-2xl">
-                  <UserProfileMobile onClose={() => setShowProfile(false)} />
+            {/* Mobile Overlays */}
+            <div className="md:hidden">
+              {showProfile && (
+                <div className="fixed inset-0 z-[110] flex items-center justify-center">
+                  <div className="relative w-full h-full">
+                    <UserProfileMobile onClose={() => setShowProfile(false)} />
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {showMatchHistory && (
-              <div className="md:fixed md:inset-0 md:z-[110] md:flex md:items-center md:justify-center">
-                <div className="md:absolute md:inset-0 md:bg-black/60 md:backdrop-blur-sm" onClick={() => setShowMatchHistory(false)}></div>
-                <div className="relative w-full h-full md:w-[400px] md:h-[600px] md:rounded-3xl md:overflow-hidden md:shadow-2xl">
-                  <MatchHistoryMobile onClose={() => setShowMatchHistory(false)} />
+              {showMatchHistory && (
+                <div className="fixed inset-0 z-[110] flex items-center justify-center">
+                  <div className="relative w-full h-full">
+                    <MatchHistoryMobile onClose={() => setShowMatchHistory(false)} />
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </>
         ) : (
           /* Remote Video / Status */
@@ -690,56 +659,67 @@ const VideoChat = ({ onEndChat }) => {
           </div>
         )}
 
-        {/* Timer Display - Desktop only */}
+        {/* ===== DESKTOP CONNECTED OVERLAYS ===== */}
+
+        {/* Top-Left: Monkey Chat badge + Timer */}
         {status === 'Connected' && (
-          <div className="absolute top-6 left-1/2 transform -translate-x-1/2 bg-black/40 backdrop-blur-md border border-white/10 px-4 py-1.5 rounded-full flex items-center gap-2 z-40 hidden md:flex">
-            <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
-            <span className="text-white font-mono text-sm">{formatTime(chatTimer)}</span>
-          </div>
-        )}
-
-        {/* Partner Info Badge - Desktop only */}
-        {partnerName && (
-          <div className="absolute bottom-32 left-1/2 transform -translate-x-1/2 bg-black/40 backdrop-blur-md border border-white/10 px-6 py-2 rounded-full z-40 max-w-[90%] hidden md:block">
-            <div className="flex flex-col items-center gap-1">
-              {/* Partner Name */}
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-                <span className="text-white font-medium text-sm inline-block truncate">
-                  Chatting with {partnerName}
-                </span>
-                {partnerIsPremium && <PremiumBadge size="sm" />}
-              </div>
-
-              {/* Partner Location */}
-              {partnerLocation && (
-                <div className="flex items-center gap-2 text-xs text-gray-300">
-                  <span>{getLocationDisplay(partnerLocation, showCityName)}</span>
-                  {userLocation && getDistanceBetween(userLocation, partnerLocation) && (
-                    <>
-                      <span className="text-gray-500">•</span>
-                      <span>{getDistanceBetween(userLocation, partnerLocation)}</span>
-                    </>
-                  )}
-                </div>
-              )}
+          <div className="absolute top-5 left-5 z-50 hidden md:flex items-center gap-3">
+            {/* Monkey Chat badge */}
+            <div className="flex items-center gap-2 bg-black/50 backdrop-blur-md border border-white/10 rounded-full px-4 py-2">
+              <span className="text-lg">🐵</span>
+              <span className="text-white font-bold text-sm">Monkey Chat</span>
+            </div>
+            {/* Timer */}
+            <div className="flex items-center gap-2 bg-black/50 backdrop-blur-md border border-white/10 rounded-full px-4 py-2">
+              <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
+              <span className="text-white font-mono text-sm font-semibold">{formatTime(chatTimer)}</span>
             </div>
           </div>
         )}
 
-        {/* Top-Left Controls - Desktop (Report & Chat) */}
-        {partnerName && (
-          <div className="absolute top-6 left-6 z-50 hidden md:flex flex-col gap-4">
-            {/* Report Button */}
-            <button
-              onClick={() => setShowReportModal(true)}
-              className="bg-black/40 backdrop-blur-md p-3 rounded-full text-red-500 hover:bg-red-500/20 transition-colors border border-red-500/30"
-              title="Report User"
-            >
-              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9" />
-              </svg>
-            </button>
+        {/* Top-Right: Partner location */}
+        {partnerName && partnerLocation && (
+          <div className="absolute top-5 right-5 z-50 hidden md:flex items-center gap-3">
+            <div className="flex items-center gap-3 bg-black/50 backdrop-blur-md border border-white/10 rounded-2xl px-4 py-2.5">
+              <div>
+                <div className="flex items-center gap-1.5">
+                  <svg className="w-3.5 h-3.5 text-white/60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                  <span className="text-white font-bold text-sm">{getLocationDisplay(partnerLocation, showCityName)}</span>
+                  {partnerIsPremium && <PremiumBadge size="sm" />}
+                </div>
+                {userLocation && getDistanceBetween(userLocation, partnerLocation) && (
+                  <p className="text-white/50 text-xs mt-0.5">📍 {getDistanceBetween(userLocation, partnerLocation)} away</p>
+                )}
+              </div>
+              {/* Globe icon */}
+              <div className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center text-lg border border-white/10">🌍</div>
+            </div>
+          </div>
+        )}
+
+        {/* Bottom-Left: Local video PIP - Desktop only */}
+        {status !== 'Idle' && (
+          <div className="absolute bottom-24 left-5 z-30 hidden md:block">
+            <div className="relative w-44 h-36 rounded-2xl overflow-hidden shadow-2xl border-2 border-purple-500/60">
+              <video
+                ref={localVideoRef}
+                autoPlay
+                playsInline
+                muted
+                className={`w-full h-full object-cover ${!isCamOn ? 'hidden' : ''}`}
+              />
+              {!isCamOn && (
+                <div className="absolute inset-0 flex items-center justify-center bg-gray-900">
+                  <span className="text-2xl">📷</span>
+                </div>
+              )}
+              {/* YOU (Live) label */}
+              <div className="absolute bottom-2 left-2 bg-black/70 backdrop-blur-sm px-2.5 py-1 rounded-full flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse"></span>
+                <span className="text-white text-[11px] font-semibold">YOU (Live)</span>
+                {isPremium && <PremiumBadge size="sm" />}
+              </div>
+            </div>
           </div>
         )}
 
@@ -748,7 +728,6 @@ const VideoChat = ({ onEndChat }) => {
           <div className="absolute top-0 left-0 right-0 z-50 md:hidden">
             <div className="flex items-center justify-between px-3 py-2 bg-black/70 backdrop-blur-md">
               <div className="flex items-center gap-2 min-w-0">
-                {/* Partner Avatar */}
                 <div className="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center text-sm font-bold text-white flex-shrink-0">
                   {partnerName?.charAt(0)?.toUpperCase() || 'S'}
                 </div>
@@ -756,84 +735,66 @@ const VideoChat = ({ onEndChat }) => {
                   <div className="flex items-center gap-1.5">
                     <span className="text-white font-semibold text-sm truncate max-w-[120px]">{partnerName}</span>
                     <span className="text-lg">💛</span>
-                    <span className="text-lg">🐵</span>
                   </div>
                   {partnerLocation && (
-                    <p className="text-[11px] text-gray-400 truncate">
-                      {getLocationDisplay(partnerLocation, showCityName)}
-                    </p>
+                    <p className="text-[11px] text-gray-400 truncate">{getLocationDisplay(partnerLocation, showCityName)}</p>
                   )}
                 </div>
               </div>
-              {/* Skip / Next */}
-              <button
-                onClick={handleNext}
-                className="bg-white/10 backdrop-blur-sm p-2 rounded-lg hover:bg-white/20 transition-colors flex-shrink-0"
-              >
+              <button onClick={handleNext} className="bg-white/10 backdrop-blur-sm p-2 rounded-lg hover:bg-white/20 transition-colors flex-shrink-0">
                 <span className="text-xl">⏭</span>
               </button>
             </div>
           </div>
         )}
 
-
-        {/* Local Video Overlay - Desktop only (mobile uses split-screen) */}
-        {status !== 'Idle' && (
-          <div className="absolute top-6 right-6 w-48 aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl border border-white/10 z-20 transition-all hover:scale-105 hidden md:block">
-            <video
-              ref={localVideoRef}
-              autoPlay
-              playsInline
-              muted
-              className={`w-full h-full object-cover ${!isCamOn ? 'hidden' : ''}`}
-            />
-            {!isCamOn && (
-              <div className="absolute inset-0 flex items-center justify-center bg-gray-800">
-                <span className="text-2xl">📷</span>
-              </div>
-            )}
-            <div className="absolute bottom-2 right-2 bg-black/60 backdrop-blur-sm px-2 py-1 rounded text-[10px] text-white font-medium flex items-center gap-1">
-              <span>You</span>
-              {isPremium && <PremiumBadge size="sm" />}
-            </div>
-          </div>
-        )}
-
-
         {/* Controls Bar - Desktop Only */}
         {status === 'Connected' && (
-          <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 hidden md:flex items-center gap-4 z-50 bg-black/40 backdrop-blur-xl border border-white/10 p-2 rounded-full shadow-2xl">
+          <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 hidden md:flex items-center gap-3 z-50 bg-black/50 backdrop-blur-xl border border-white/10 px-5 py-3 rounded-full shadow-2xl">
+            {/* Mic */}
             <button
               onClick={() => setIsMicOn(!isMicOn)}
-              className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${isMicOn ? 'bg-white/10 hover:bg-white/20 text-white' : 'bg-red-500 text-white'}`}
+              className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${isMicOn ? 'bg-white/15 hover:bg-white/25 text-white' : 'bg-red-500 text-white'}`}
             >
-              {isMicOn ? '🎤' : '🔇'}
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                {isMicOn
+                  ? <path strokeLinecap="round" strokeLinejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                  : <path strokeLinecap="round" strokeLinejoin="round" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                }
+              </svg>
             </button>
-
+            {/* Cam */}
             <button
               onClick={() => setIsCamOn(!isCamOn)}
-              className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${isCamOn ? 'bg-white/10 hover:bg-white/20 text-white' : 'bg-red-500 text-white'}`}
+              className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${isCamOn ? 'bg-white/15 hover:bg-white/25 text-white' : 'bg-red-500 text-white'}`}
             >
-              {isCamOn ? '📹' : '📷'}
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+              </svg>
             </button>
-
-
-            <div className="w-px h-8 bg-white/10 mx-1"></div>
-
-
-            <button
-              onClick={handleNext}
-              className="px-6 py-3 bg-white text-dark-900 rounded-full font-bold hover:bg-gray-200 transition-all active:scale-95 flex items-center gap-2"
-            >
-              <span>Next</span>
-              <span>⏭️</span>
-            </button>
-
+            {/* End Call */}
             <button
               onClick={endCall}
-              className="w-12 h-12 bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/50 rounded-full flex items-center justify-center transition-all"
+              className="w-14 h-14 bg-red-500 hover:bg-red-600 rounded-full flex items-center justify-center transition-all shadow-lg shadow-red-500/30"
             >
-              ✕
+              <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M16 8l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2M5 3a2 2 0 00-2 2v1c0 8.284 6.716 15 15 15h1a2 2 0 002-2v-3.28a1 1 0 00-.684-.948l-4.493-1.498a1 1 0 00-1.21.502l-1.13 2.257a11.042 11.042 0 01-5.516-5.517l2.257-1.128a1 1 0 00.502-1.21L9.228 3.683A1 1 0 008.279 3H5z" />
+              </svg>
+            </button>
+            {/* Effects */}
+            <button className="w-12 h-12 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center transition-all text-white">
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+              </svg>
+            </button>
+            {/* Next */}
+            <button
+              onClick={handleNext}
+              className="w-12 h-12 rounded-full bg-purple-600 hover:bg-purple-500 flex items-center justify-center transition-all shadow-lg shadow-purple-600/30"
+            >
+              <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+              </svg>
             </button>
           </div>
         )}
@@ -841,18 +802,19 @@ const VideoChat = ({ onEndChat }) => {
 
       {/* Right Panel - Chat Interface */}
       {status === 'Connected' && (
-        <div className={`w-full md:w-auto h-full bg-dark-800 border-l border-white/5 flex flex-col z-[60] absolute md:relative inset-0 transition-transform duration-300 transform ${showChat ? 'translate-x-0' : 'translate-x-full'} md:translate-x-0 md:col-start-3`}>
+        <div className={`w-full md:w-[320px] h-full bg-[#2d2040]/95 backdrop-blur-xl border-l border-white/5 flex flex-col z-[60] absolute md:relative inset-0 transition-transform duration-300 transform ${showChat ? 'translate-x-0' : 'translate-x-full'} md:translate-x-0 md:col-start-2`}>
           {/* Chat Header */}
-          <div className="p-4 border-b border-white/5 flex items-center justify-between bg-dark-900/50 backdrop-blur-md">
-            <h3 className="font-bold text-lg flex items-center gap-2">
-              <span className="text-accent-purple">●</span> Chat
-            </h3>
-            <button
-              onClick={() => setShowChat(false)}
-              className="md:hidden p-2 hover:bg-white/5 rounded-full"
-            >
-              ✕
-            </button>
+          <div className="px-5 py-4 border-b border-white/10 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <h3 className="font-bold text-sm tracking-widest uppercase text-white">Live Chat</h3>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="bg-purple-600/30 text-purple-300 text-xs font-semibold px-2.5 py-1 rounded-full border border-purple-500/30">24 Participants</span>
+              <button
+                onClick={() => setShowChat(false)}
+                className="md:hidden p-2 hover:bg-white/5 rounded-full text-white"
+              >✕</button>
+            </div>
           </div>
 
           {/* Messages List */}
