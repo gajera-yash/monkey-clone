@@ -13,6 +13,7 @@ import UserProfileMobile from './profile/UserProfileMobile';
 import MatchHistoryMobile from './history/MatchHistoryMobile';
 import DesktopHeader from './desktop/DesktopHeader';
 import IdleDesktop from './desktop/IdleDesktop';
+import DesktopSubscriptionModal from './desktop/modals/DesktopSubscriptionModal';
 
 const RTC_CONFIG = {
   iceServers: [
@@ -59,6 +60,7 @@ const VideoChat = ({ onEndChat }) => {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [showMatchHistory, setShowMatchHistory] = useState(false);
+  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
 
   // Location States
   const [partnerLocation, setPartnerLocation] = useState(null);
@@ -435,7 +437,7 @@ const VideoChat = ({ onEndChat }) => {
       {/* Desktop Header for Idle State */}
       {status === 'Idle' && (
         <div className="hidden md:block">
-          <DesktopHeader />
+          <DesktopHeader onShowSubscription={() => setShowSubscriptionModal(true)} />
         </div>
       )}
 
@@ -582,6 +584,7 @@ const VideoChat = ({ onEndChat }) => {
                 onToggleCam={() => setIsCamOn(!isCamOn)}
                 onToggleMic={() => setIsMicOn(!isMicOn)}
                 onFiltersChange={setChatFilters}
+                onSubscriptionRequired={() => setShowSubscriptionModal(true)}
               />
             </div>
 
@@ -999,6 +1002,13 @@ const VideoChat = ({ onEndChat }) => {
 
 
       {/* Mobile Chat Toggle - REMOVED (now unified at top-left) */}
+
+      {/* Root Level Subscription Modal Overlay - Fixed Z-Index Context */}
+      {showSubscriptionModal && (
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/60 backdrop-blur-sm pointer-events-auto">
+          <DesktopSubscriptionModal onClose={() => setShowSubscriptionModal(false)} />
+        </div>
+      )}
     </div >
   );
 };

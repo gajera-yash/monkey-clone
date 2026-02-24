@@ -8,7 +8,7 @@ import DesktopSafetyModal from './modals/DesktopSafetyModal';
 import DesktopMatchPreferenceModal from './modals/DesktopMatchPreferenceModal';
 import { useCoins } from '../../context/CoinsContext';
 
-const DesktopHeader = () => {
+const DesktopHeader = ({ onShowSubscription }) => {
     const { currentUser } = useAuth();
     const { coins } = useCoins();
     const [activeModal, setActiveModal] = useState(null);
@@ -42,7 +42,7 @@ const DesktopHeader = () => {
                         Safety Center
                     </button>
                     <button
-                        onClick={() => toggleModal('subscription')}
+                        onClick={onShowSubscription}
                         className="px-5 py-2 rounded-full bg-purple-800/80 text-yellow-400 text-sm font-semibold border border-purple-600/50 hover:bg-purple-700/80 transition-colors"
                     >
                         Free Coins
@@ -54,17 +54,12 @@ const DesktopHeader = () => {
                     {/* Coin Balance */}
                     <div className="relative">
                         <button
-                            onClick={() => toggleModal('subscription')}
+                            onClick={onShowSubscription}
                             className="flex items-center gap-2 bg-purple-800/60 border border-purple-600/40 rounded-full px-4 py-2 hover:bg-purple-700/60 transition-colors"
                         >
                             <span className="text-base">🪙</span>
                             <span className="text-yellow-400 font-bold text-sm">{coins?.toLocaleString() || 0}</span>
                         </button>
-                        {activeModal === 'subscription' && (
-                            <div className="absolute top-14 right-0 z-[110]">
-                                <DesktopSubscriptionModal onClose={() => setActiveModal(null)} />
-                            </div>
-                        )}
                     </div>
 
                     {/* Match History */}

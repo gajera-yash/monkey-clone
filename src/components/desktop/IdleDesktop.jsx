@@ -19,13 +19,12 @@ const PREMIUM_BADGE = (
     <span className="ml-1.5 text-[9px] font-bold bg-yellow-400 text-black px-1.5 py-0.5 rounded-full tracking-wide">PLUS</span>
 );
 
-const IdleDesktop = ({ localVideoRef, isCamOn, isMicOn, onStartChat, onToggleCam, onToggleMic, onFiltersChange }) => {
+const IdleDesktop = ({ localVideoRef, isCamOn, isMicOn, onStartChat, onToggleCam, onToggleMic, onFiltersChange, onSubscriptionRequired }) => {
     const { isPremium } = usePremium();
     const [genderFilter, setGenderFilter] = useState('Both');
     const [locationFilter, setLocationFilter] = useState('Global');
     const [ageFilter, setAgeFilter] = useState('Any');
     const [showLocationDropdown, setShowLocationDropdown] = useState(false);
-    const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
 
     const isPremiumFilter = (gender, location, age) => {
         return gender !== 'Both' || location !== 'Global' || age !== 'Any';
@@ -39,7 +38,7 @@ const IdleDesktop = ({ localVideoRef, isCamOn, isMicOn, onStartChat, onToggleCam
 
     const handleGenderSelect = (option) => {
         if (option !== 'Both' && !isPremium) {
-            setShowSubscriptionModal(true);
+            onSubscriptionRequired();
             return;
         }
         setGenderFilter(option);
@@ -49,7 +48,7 @@ const IdleDesktop = ({ localVideoRef, isCamOn, isMicOn, onStartChat, onToggleCam
     const handleLocationSelect = (value) => {
         if (value !== 'Global' && !isPremium) {
             setShowLocationDropdown(false);
-            setShowSubscriptionModal(true);
+            onSubscriptionRequired();
             return;
         }
         setLocationFilter(value);
@@ -59,7 +58,7 @@ const IdleDesktop = ({ localVideoRef, isCamOn, isMicOn, onStartChat, onToggleCam
 
     const handleAgeSelect = (option) => {
         if (option !== 'Any' && !isPremium) {
-            setShowSubscriptionModal(true);
+            onSubscriptionRequired();
             return;
         }
         setAgeFilter(option);
@@ -68,7 +67,7 @@ const IdleDesktop = ({ localVideoRef, isCamOn, isMicOn, onStartChat, onToggleCam
 
     const handleStartChat = () => {
         if (isPremiumFilter(genderFilter, locationFilter, ageFilter) && !isPremium) {
-            setShowSubscriptionModal(true);
+            onSubscriptionRequired();
             return;
         }
         onStartChat();
@@ -78,13 +77,6 @@ const IdleDesktop = ({ localVideoRef, isCamOn, isMicOn, onStartChat, onToggleCam
 
     return (
         <div className="flex-1 flex flex-col z-10 mt-12" onClick={() => showLocationDropdown && setShowLocationDropdown(false)}>
-            {/* Subscription Modal Overlay */}
-            {showSubscriptionModal && (
-                <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/60 backdrop-blur-sm">
-                    <DesktopSubscriptionModal onClose={() => setShowSubscriptionModal(false)} />
-                </div>
-            )}
-
             {/* Main Content */}
             <div className="flex-1 flex items-center justify-center px-12 pt-4 pb-4">
                 <div className="flex w-full max-w-[960px] gap-6 items-stretch">
@@ -169,8 +161,8 @@ const IdleDesktop = ({ localVideoRef, isCamOn, isMicOn, onStartChat, onToggleCam
                                         key={option}
                                         onClick={() => handleGenderSelect(option)}
                                         className={`flex-1 py-2 rounded-full text-sm font-semibold transition-all flex items-center justify-center ${genderFilter === option
-                                                ? 'bg-green-500 text-white shadow-lg shadow-green-500/30'
-                                                : 'bg-white/10 text-white/70 hover:bg-white/15 border border-white/10'
+                                            ? 'bg-green-500 text-white shadow-lg shadow-green-500/30'
+                                            : 'bg-white/10 text-white/70 hover:bg-white/15 border border-white/10'
                                             }`}
                                     >
                                         {option}
@@ -191,8 +183,8 @@ const IdleDesktop = ({ localVideoRef, isCamOn, isMicOn, onStartChat, onToggleCam
                                         key={option}
                                         onClick={() => handleAgeSelect(option)}
                                         className={`flex-1 py-2 rounded-full text-xs font-semibold transition-all flex items-center justify-center ${ageFilter === option
-                                                ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/30'
-                                                : 'bg-white/10 text-white/70 hover:bg-white/15 border border-white/10'
+                                            ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/30'
+                                            : 'bg-white/10 text-white/70 hover:bg-white/15 border border-white/10'
                                             }`}
                                     >
                                         {option}
@@ -231,8 +223,8 @@ const IdleDesktop = ({ localVideoRef, isCamOn, isMicOn, onStartChat, onToggleCam
                                             key={loc.value}
                                             onClick={() => handleLocationSelect(loc.value)}
                                             className={`w-full px-4 py-2.5 text-sm text-left flex items-center justify-between transition-colors ${locationFilter === loc.value
-                                                    ? 'bg-purple-600/40 text-white font-semibold'
-                                                    : 'text-white/70 hover:bg-white/5'
+                                                ? 'bg-purple-600/40 text-white font-semibold'
+                                                : 'text-white/70 hover:bg-white/5'
                                                 }`}
                                         >
                                             <span>{loc.label}</span>
@@ -284,8 +276,8 @@ const IdleDesktop = ({ localVideoRef, isCamOn, isMicOn, onStartChat, onToggleCam
                         <button
                             onClick={handleStartChat}
                             className={`w-full font-extrabold py-4 rounded-2xl text-lg shadow-xl transform hover:-translate-y-0.5 transition-all active:scale-[0.98] flex items-center justify-center gap-2 mt-4 ${isPremiumFilter(genderFilter, locationFilter, ageFilter) && !isPremium
-                                    ? 'bg-yellow-400 hover:bg-yellow-300 text-black shadow-yellow-400/20'
-                                    : 'bg-yellow-400 hover:bg-yellow-300 text-black shadow-yellow-400/20'
+                                ? 'bg-yellow-400 hover:bg-yellow-300 text-black shadow-yellow-400/20'
+                                : 'bg-yellow-400 hover:bg-yellow-300 text-black shadow-yellow-400/20'
                                 }`}
                         >
                             {isPremiumFilter(genderFilter, locationFilter, ageFilter) && !isPremium ? (
