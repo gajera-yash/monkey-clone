@@ -242,15 +242,22 @@ export const AuthProvider = ({ children }) => {
     };
 
     useEffect(() => {
+        let unsubSnapshot = null;
+
         const unsubscribe = onAuthStateChanged(auth, async (user) => {
+            // Clean up previous snapshot listener if it exists
+            if (unsubSnapshot) {
+                unsubSnapshot();
+                unsubSnapshot = null;
+            }
+
             if (user) {
-                // Fetch user data from Firestore
                 const userRef = doc(db, "users", user.uid);
 
-                // Real-time listener for user data
-                const unsubDoc = onSnapshot(userRef, (doc) => {
-                    if (doc.exists()) {
-                        const data = doc.data();
+                // Set up new snapshot listener
+                unsubSnapshot = onSnapshot(userRef, (docSnap) => {
+                    if (docSnap.exists()) {
+                        const data = docSnap.data();
                         if (data.isBanned) {
                             signOut(auth);
                             toast.error("This account has been banned.");
@@ -262,16 +269,25 @@ export const AuthProvider = ({ children }) => {
                     } else {
                         setCurrentUser(user);
                     }
+                    setLoading(false);
+                }, (error) => {
+                    console.error("Firestore snapshot error:", error);
+                    setCurrentUser(user);
+                    setLoading(false);
                 });
-
-                return () => unsubDoc();
-            } else if (!isGuest) {
-                setCurrentUser(null);
-                setBlockedUsers([]);
+            } else {
+                if (!isGuest) {
+                    setCurrentUser(null);
+                    setBlockedUsers([]);
+                }
+                setLoading(false);
             }
-            setLoading(false);
         });
-        return unsubscribe;
+
+        return () => {
+            unsubscribe();
+            if (unsubSnapshot) unsubSnapshot();
+        };
     }, [isGuest]);
 
     // Fetch user location on mount

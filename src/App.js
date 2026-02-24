@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { useAuth } from './context/AuthContext';
 import { CoinsProvider } from './context/CoinsContext';
@@ -17,15 +17,16 @@ import AgeGate from './components/safety/AgeGate';
 import SafetyGuidelines from './components/safety/SafetyGuidelines';
 import GenderModal from './components/auth/GenderModal';
 
-function App() {
+const AppContent = () => {
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [isGenderModalOpen, setIsGenderModalOpen] = useState(false);
   const { currentUser } = useAuth();
+  const navigate = useNavigate();
 
   // Improved start chat handler with Gender Selection
   const handleStartChat = () => {
     if (currentUser) {
-      window.location.href = '/chat';
+      navigate('/chat');
     } else {
       // Check if gender is already selected
       const savedGender = localStorage.getItem('userGender');
@@ -44,57 +45,63 @@ function App() {
   };
 
   return (
+    <div className="font-sans antialiased text-white bg-dark-900 min-h-screen">
+      <AgeGate />
+      <Toaster position="top-center" toastOptions={{
+        style: {
+          background: '#333',
+          color: '#fff',
+        },
+      }} />
+
+      <LoginModal isOpen={isLoginOpen} onClose={() => setIsLoginOpen(false)} />
+      <GenderModal
+        isOpen={isGenderModalOpen}
+        onSelect={handleGenderSelect}
+        onClose={() => setIsGenderModalOpen(false)}
+      />
+
+      <Routes>
+        <Route path="/" element={
+          currentUser ? <Navigate to="/chat" replace /> : (
+            <>
+              <Header onStartChat={handleStartChat} />
+              <Hero onStartChat={handleStartChat} />
+              <Features />
+              <FAQ />
+              <Footer />
+            </>
+          )
+        } />
+
+        <Route path="/chat" element={
+          <PrivateRoute>
+            <ChatLayout />
+          </PrivateRoute>
+        } />
+
+        <Route path="/admin" element={
+          <AdminDashboard />
+        } />
+
+        <Route path="/safety" element={
+          <>
+            <Header onStartChat={handleStartChat} />
+            <SafetyGuidelines />
+            <Footer />
+          </>
+        } />
+      </Routes>
+    </div>
+  );
+};
+
+function App() {
+  return (
     <Router>
       <CoinsProvider>
         <PremiumProvider>
-          <div className="font-sans antialiased text-white bg-dark-900 min-h-screen">
-            <AgeGate />
-            <Toaster position="top-center" toastOptions={{
-              style: {
-                background: '#333',
-                color: '#fff',
-              },
-            }} />
-
-            <LoginModal isOpen={isLoginOpen} onClose={() => setIsLoginOpen(false)} />
-            <GenderModal
-              isOpen={isGenderModalOpen}
-              onSelect={handleGenderSelect}
-              onClose={() => setIsGenderModalOpen(false)}
-            />
-
-            <Routes>
-              <Route path="/" element={
-                currentUser ? <Navigate to="/chat" /> : (
-                  <>
-                    <Header onStartChat={handleStartChat} />
-                    <Hero onStartChat={handleStartChat} />
-                    <Features />
-                    <FAQ />
-                    <Footer />
-                  </>
-                )
-              } />
-
-              <Route path="/chat" element={
-                <PrivateRoute>
-                  <ChatLayout />
-                </PrivateRoute>
-              } />
-
-              <Route path="/admin" element={
-                <AdminDashboard />
-              } />
-
-              <Route path="/safety" element={
-                <>
-                  <Header onStartChat={handleStartChat} />
-                  <SafetyGuidelines />
-                  <Footer />
-                </>
-              } />
-            </Routes>
-          </div>
+          <AppContent />
         </PremiumProvider>
       </CoinsProvider>
     </Router>
@@ -103,13 +110,20 @@ function App() {
 
 // Wrapper to handle chat state inside the protected route
 const ChatLayout = () => {
+  const { currentUser } = useAuth();
+  const navigate = useNavigate();
   const [isChatting, setIsChatting] = useState(true);
 
   if (!isChatting) {
-    return <Navigate to="/" />;
+    return <Navigate to="/" replace />;
   }
 
-  return <VideoChat onEndChat={() => window.location.href = '/'} userName="User" />;
+  return (
+    <VideoChat
+      onEndChat={() => navigate('/')}
+      userName={currentUser?.displayName || 'User'}
+    />
+  );
 };
 
 export default App;
