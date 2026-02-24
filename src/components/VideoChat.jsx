@@ -65,6 +65,9 @@ const VideoChat = ({ onEndChat }) => {
   const [showCityName, setShowCityName] = useState(true);
   const [partnerIsPremium, setPartnerIsPremium] = useState(false);
 
+  // Filter state (set from IdleDesktop)
+  const [chatFilters, setChatFilters] = useState({ gender: 'Both', location: 'Global', ageRange: 'Any' });
+
   // Timer logic
   useEffect(() => {
     let interval;
@@ -95,13 +98,15 @@ const VideoChat = ({ onEndChat }) => {
         uid: currentUser.uid,
         blockedUsers: blockedUsers || [],
         location: userLocation,
-        isPremium
+        isPremium,
+        filters: chatFilters
       });
     } else {
       if (!stream) setStatus('Waiting for camera...');
       else if (!socket.connected) setStatus('Connecting to server...');
     }
-  }, [stream, currentUser, blockedUsers, userLocation]);
+  }, [stream, currentUser, blockedUsers, userLocation, chatFilters]);
+
 
   const handleStartChat = useCallback(() => {
     userInitiatedJoin.current = true;
@@ -576,6 +581,7 @@ const VideoChat = ({ onEndChat }) => {
                 onStartChat={handleStartChat}
                 onToggleCam={() => setIsCamOn(!isCamOn)}
                 onToggleMic={() => setIsMicOn(!isMicOn)}
+                onFiltersChange={setChatFilters}
               />
             </div>
 
