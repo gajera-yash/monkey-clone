@@ -5,7 +5,7 @@ const DesktopSubscriptionModal = ({ onClose }) => {
     const [activeTab, setActiveTab] = useState('plus');
 
     return (
-        <div className="bg-[#24213a] w-[500px] rounded-[32px] overflow-hidden flex flex-col shadow-2xl border border-white/5 relative">
+        <div className="bg-[#24213a] w-[380px] rounded-[28px] overflow-hidden flex flex-col shadow-2xl border border-white/5 relative">
             {/* Close Button */}
             <button onClick={onClose} className="absolute top-6 right-6 text-white/60 hover:text-white transition-colors z-[100]">
                 <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -14,11 +14,11 @@ const DesktopSubscriptionModal = ({ onClose }) => {
             </button>
 
             {/* Header */}
-            <div className="p-6">
-                <h2 className="text-white text-xl font-bold w-full text-center">Monkey Plus</h2>
+            <div className="p-4">
+                <h2 className="text-white text-base font-bold w-full text-center">Monkey Plus</h2>
             </div>
 
-            <div className="px-6 pb-8 space-y-6">
+            <div className="px-4 pb-5 space-y-4">
                 {/* Tabs */}
                 <div className="bg-white/5 p-1 rounded-2xl flex items-center border border-white/5">
                     <button
@@ -125,7 +125,7 @@ const DesktopSubscriptionModal = ({ onClose }) => {
 
                 {/* Confirm Button */}
                 <div className="space-y-4">
-                    <button className="w-full bg-yellow-400 hover:bg-yellow-300 text-black font-extrabold py-5 rounded-3xl text-sm shadow-xl shadow-yellow-400/30 transition-all flex flex-col items-center group overflow-hidden">
+                    <button className="w-full bg-yellow-400 hover:bg-yellow-300 text-black font-extrabold py-4 rounded-3xl text-sm shadow-xl shadow-yellow-400/30 transition-all flex flex-col items-center group overflow-hidden">
                         <span className="relative z-10 group-hover:scale-105 transition-transform">Discount on your first subscription</span>
                         <div className="flex items-center gap-2 mt-0.5 relative z-10 group-hover:scale-105 transition-transform">
                             <span className="line-through text-black/40">₹ 618</span>

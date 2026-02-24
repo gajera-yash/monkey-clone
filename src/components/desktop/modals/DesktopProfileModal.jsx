@@ -20,7 +20,7 @@ const DesktopProfileModal = ({ onClose }) => {
 
     if (isEditing) {
         return (
-            <div className="bg-white w-[400px] rounded-[32px] overflow-hidden flex flex-col shadow-2xl border border-gray-100 relative pointer-events-auto">
+            <div className="bg-white w-[320px] rounded-[24px] overflow-hidden flex flex-col shadow-2xl border border-gray-100 relative pointer-events-auto">
                 <div className="p-6 flex items-center justify-between border-b border-gray-50">
                     <h2 className="text-gray-900 text-xl font-bold w-full text-center">Edit Profile</h2>
                     <button onClick={() => setIsEditing(false)} className="absolute right-6 text-gray-400 hover:text-gray-600 transition-colors">
@@ -93,10 +93,10 @@ const DesktopProfileModal = ({ onClose }) => {
     }
 
     return (
-        <div className="bg-[#24213a] w-[400px] rounded-[32px] overflow-hidden flex flex-col shadow-2xl border border-white/5 pointer-events-auto">
+        <div className="bg-[#24213a] w-[320px] rounded-[24px] overflow-hidden flex flex-col shadow-2xl border border-white/5 pointer-events-auto">
             {/* Header */}
-            <div className="p-6 flex items-center justify-between">
-                <h2 className="text-white text-xl font-bold w-full text-center">My Profile</h2>
+            <div className="p-4 flex items-center justify-between">
+                <h2 className="text-white text-base font-bold w-full text-center">My Profile</h2>
                 <button onClick={onClose} className="absolute right-6 text-white/60 hover:text-white transition-colors">
                     <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -104,7 +104,7 @@ const DesktopProfileModal = ({ onClose }) => {
                 </button>
             </div>
 
-            <div className="px-6 pb-8 space-y-4">
+            <div className="px-4 pb-5 space-y-3">
                 {/* User Card */}
                 <div className="bg-[#1a172e] rounded-3xl p-5 flex items-center gap-4 border border-white/5">
                     <div className="relative">

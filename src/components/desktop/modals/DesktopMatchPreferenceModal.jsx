@@ -24,11 +24,11 @@ const DesktopMatchPreferenceModal = ({ onClose }) => {
     };
 
     return (
-        <div className="bg-white w-[450px] rounded-[32px] overflow-hidden flex flex-col shadow-2xl relative pointer-events-auto">
+        <div className="bg-white w-[340px] rounded-[24px] overflow-hidden flex flex-col shadow-2xl relative pointer-events-auto">
             {/* Header */}
-            <div className="p-6 flex items-center justify-between border-b border-gray-100">
+            <div className="px-4 py-3 flex items-center justify-between border-b border-gray-100">
                 <div className="flex items-center gap-2">
-                    <h2 className="text-gray-900 text-xl font-bold">Match Preference</h2>
+                    <h2 className="text-gray-900 text-base font-bold">Match Preference</h2>
                     <span className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-xs font-bold">i</span>
                 </div>
                 <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
@@ -38,9 +38,9 @@ const DesktopMatchPreferenceModal = ({ onClose }) => {
                 </button>
             </div>
 
-            <div className="p-6 space-y-6">
+            <div className="p-4 space-y-4">
                 {/* Monkey Plus Banner */}
-                <div className="bg-[#f0f2ff] rounded-2xl p-4 flex items-center justify-between">
+                <div className="bg-[#f0f2ff] rounded-xl p-3 flex items-center justify-between">
                     <div className="flex items-center gap-3">
                         <div className="relative">
                             <span className="text-3xl">👑</span>
@@ -88,7 +88,7 @@ const DesktopMatchPreferenceModal = ({ onClose }) => {
                         <span>abc</span>
                         <span>Language</span>
                     </div>
-                    <div className="bg-gray-50 rounded-2xl p-4 flex items-center justify-between border border-gray-100 cursor-pointer group hover:bg-gray-100 transition-colors">
+                    <div className="bg-gray-50 rounded-xl p-3 flex items-center justify-between border border-gray-100 cursor-pointer group hover:bg-gray-100 transition-colors">
                         <span className="text-gray-400">Language</span>
                         <div className="flex items-center gap-2">
                             <span className="text-gray-900 font-bold">Unlimited</span>
@@ -107,7 +107,7 @@ const DesktopMatchPreferenceModal = ({ onClose }) => {
                     </div>
                     <div className="space-y-2">
                         {Object.entries(prefs.regions).map(([key, value]) => (
-                            <div key={key} className="bg-gray-50 rounded-2xl p-4 flex items-center justify-between border border-gray-100 cursor-pointer hover:bg-gray-100 transition-colors">
+                            <div key={key} className="bg-gray-50 rounded-xl p-3 flex items-center justify-between border border-gray-100 cursor-pointer hover:bg-gray-100 transition-colors">
                                 <span className="text-gray-500 capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}</span>
                                 <div className="flex items-center gap-2">
                                     <span className="text-gray-900 font-bold">{value}</span>
@@ -124,7 +124,7 @@ const DesktopMatchPreferenceModal = ({ onClose }) => {
                 <div className="flex gap-4 pt-2">
                     <button
                         onClick={handleSave}
-                        className="flex-1 bg-indigo-600 text-white font-bold py-4 rounded-3xl hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-200"
+                        className="flex-1 bg-indigo-600 text-white font-bold py-3 rounded-2xl hover:bg-indigo-700 transition-colors text-sm"
                     >
                         Save
                     </button>
