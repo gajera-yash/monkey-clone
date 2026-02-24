@@ -4,6 +4,13 @@ const DesktopSubscriptionModal = ({ onClose }) => {
     const [selectedPlan, setSelectedPlan] = useState('7-days');
     const [activeTab, setActiveTab] = useState('plus');
 
+    const PLANS = {
+        '7-days': { original: 618, discounted: 405, unit: '7days' },
+        '30-days': { original: 1239, discounted: 805, unit: '30days' }
+    };
+
+    const currentPlan = PLANS[selectedPlan];
+
     return (
         <div className="bg-[#24213a] w-[380px] rounded-[28px] overflow-hidden flex flex-col shadow-2xl border border-white/5 relative">
             {/* Close Button */}
@@ -29,7 +36,7 @@ const DesktopSubscriptionModal = ({ onClose }) => {
                     </button>
                     <button
                         onClick={() => setActiveTab('plus-plus')}
-                        className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all ${activeTab === 'plus-plus' ? 'bg-[#24213a] text-white border border-white/5 shadow-xl' : 'text-white/40 hover:text-white/60'}`}
+                        className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all ${activeTab === 'plus-plus' ? 'bg-[#5143d9] text-white shadow-lg shadow-[#5143d9]/20' : 'text-white/40 hover:text-white/60'}`}
                     >
                         Monkey Plus+
                     </button>
@@ -39,7 +46,7 @@ const DesktopSubscriptionModal = ({ onClose }) => {
                 <div className="relative bg-[#1a172e] rounded-3xl p-6 border border-white/5 overflow-hidden">
                     <div className="flex items-start justify-between relative z-10">
                         {/* Labels */}
-                        <div className="space-y-6 text-xs font-semibold text-white pt-20">
+                        <div className="space-y-6 text-[10px] font-semibold text-white/60 pt-20">
                             <div className="flex items-center gap-2">
                                 <span className="w-4 h-4 flex items-center justify-center text-[10px] text-white/40 border border-white/20 rounded-full">i</span>
                                 <span>Filter-Both</span>
@@ -59,34 +66,34 @@ const DesktopSubscriptionModal = ({ onClose }) => {
                         </div>
 
                         {/* Plus Column */}
-                        <div className="flex flex-col items-center gap-6 bg-yellow-400 rounded-2xl pt-2 px-6 pb-8 border-4 border-yellow-400 shadow-2xl shadow-yellow-400/10">
+                        <div className={`flex flex-col items-center gap-6 rounded-2xl pt-2 px-6 pb-8 transition-all duration-300 ${activeTab === 'plus' ? 'bg-yellow-400 border-4 border-yellow-400 shadow-2xl shadow-yellow-400/10' : 'opacity-30 scale-95'}`}>
                             <div className="flex flex-col items-center mb-2">
-                                <span className="text-3xl mb-1">👑</span>
-                                <span className="text-black font-extrabold text-xl">Plus</span>
+                                <span className="text-2xl mb-1">👑</span>
+                                <span className={`font-extrabold text-lg ${activeTab === 'plus' ? 'text-black' : 'text-white'}`}>Plus</span>
                             </div>
-                            <span className="text-black/80 font-bold text-sm">Unlimited</span>
-                            <span className="text-black/80 font-bold text-sm">150</span>
-                            <div className="w-6 h-6 rounded-full bg-black/10 flex items-center justify-center">
-                                <span className="text-black font-extrabold">−</span>
+                            <span className={`font-bold text-xs ${activeTab === 'plus' ? 'text-black/80' : 'text-white/40'}`}>Unlimited</span>
+                            <span className={`font-bold text-xs ${activeTab === 'plus' ? 'text-black/80' : 'text-white/40'}`}>150</span>
+                            <div className={`w-5 h-5 rounded-full flex items-center justify-center ${activeTab === 'plus' ? 'bg-black/10' : 'bg-white/5'}`}>
+                                <span className={`font-extrabold ${activeTab === 'plus' ? 'text-black' : 'text-white/20'}`}>−</span>
                             </div>
-                            <div className="w-6 h-6 rounded-full bg-black flex items-center justify-center">
-                                <span className="text-yellow-400 text-xs">✔️</span>
+                            <div className={`w-5 h-5 rounded-full flex items-center justify-center ${activeTab === 'plus' ? 'bg-black' : 'bg-green-500/20'}`}>
+                                <span className={`${activeTab === 'plus' ? 'text-yellow-400' : 'text-green-400'} text-[10px]`}>✔️</span>
                             </div>
                         </div>
 
                         {/* Plus+ Column */}
-                        <div className="flex flex-col items-center gap-6 pt-2 px-6 pb-8 opacity-60">
+                        <div className={`flex flex-col items-center gap-6 rounded-2xl pt-2 px-6 pb-8 transition-all duration-300 ${activeTab === 'plus-plus' ? 'bg-[#5143d9] border-4 border-[#5143d9] shadow-2xl shadow-[#5143d9]/20' : 'opacity-30 scale-95'}`}>
                             <div className="flex flex-col items-center mb-2">
-                                <span className="text-3xl mb-1">💎</span>
-                                <span className="text-white font-extrabold text-xl">Plus+</span>
+                                <span className="text-2xl mb-1">💎</span>
+                                <span className="text-white font-extrabold text-lg">Plus+</span>
                             </div>
-                            <span className="text-white font-bold text-sm">Unlimited</span>
-                            <span className="text-white font-bold text-sm">Unlimited</span>
-                            <div className="w-6 h-6 rounded-full bg-green-500/20 flex items-center justify-center text-green-400">
-                                <span className="text-xs">✔️</span>
+                            <span className="text-white font-bold text-xs">Unlimited</span>
+                            <span className="text-white font-bold text-xs">Unlimited</span>
+                            <div className="w-5 h-5 rounded-full bg-green-500/20 flex items-center justify-center text-green-400">
+                                <span className="text-[10px]">✔️</span>
                             </div>
-                            <div className="w-6 h-6 rounded-full bg-green-500/20 flex items-center justify-center text-green-400">
-                                <span className="text-xs">✔️</span>
+                            <div className="w-5 h-5 rounded-full bg-green-500/20 flex items-center justify-center text-green-400">
+                                <span className="text-[10px]">✔️</span>
                             </div>
                         </div>
                     </div>
@@ -105,7 +112,7 @@ const DesktopSubscriptionModal = ({ onClose }) => {
                             </div>
                             <span className={`font-bold ${selectedPlan === '7-days' ? 'text-black' : 'text-white'}`}>7 days</span>
                         </div>
-                        <span className={`font-bold ${selectedPlan === '7-days' ? 'text-black' : 'text-white'}`}>₹ 618</span>
+                        <span className={`font-bold ${selectedPlan === '7-days' ? 'text-black' : 'text-white'}`}>₹ {PLANS['7-days'].original}</span>
                     </button>
 
                     <button
@@ -118,18 +125,18 @@ const DesktopSubscriptionModal = ({ onClose }) => {
                             </div>
                             <span className={`font-bold ${selectedPlan === '30-days' ? 'text-black' : 'text-white'}`}>30 days</span>
                         </div>
-                        <span className={`font-bold ${selectedPlan === '30-days' ? 'text-black' : 'text-white'}`}>₹ 1239</span>
+                        <span className={`font-bold ${selectedPlan === '30-days' ? 'text-black' : 'text-white'}`}>₹ {PLANS['30-days'].original}</span>
                     </button>
-                    <p className="text-center text-[10px] text-white/40">then ₹ 618 every 7 days until canceled</p>
+                    <p className="text-center text-[10px] text-white/40">then ₹ {currentPlan.original} every {currentPlan.unit} until canceled</p>
                 </div>
 
                 {/* Confirm Button */}
                 <div className="space-y-4">
                     <button className="w-full bg-yellow-400 hover:bg-yellow-300 text-black font-extrabold py-4 rounded-3xl text-sm shadow-xl shadow-yellow-400/30 transition-all flex flex-col items-center group overflow-hidden">
-                        <span className="relative z-10 group-hover:scale-105 transition-transform">Discount on your first subscription</span>
+                        <span className="relative z-10 group-hover:scale-105 transition-transform text-[10px] tracking-wide uppercase opacity-70">Confirm and Pay</span>
                         <div className="flex items-center gap-2 mt-0.5 relative z-10 group-hover:scale-105 transition-transform">
-                            <span className="line-through text-black/40">₹ 618</span>
-                            <span className="text-lg">₹ 405/7days</span>
+                            <span className="line-through text-black/40">₹ {currentPlan.original}</span>
+                            <span className="text-lg">₹ {currentPlan.discounted}/{currentPlan.unit}</span>
                         </div>
                     </button>
                     <div className="flex flex-col items-center gap-1 text-[10px] text-white/40">
@@ -141,5 +148,6 @@ const DesktopSubscriptionModal = ({ onClose }) => {
         </div>
     );
 };
+
 
 export default DesktopSubscriptionModal;
