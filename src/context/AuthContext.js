@@ -7,7 +7,8 @@ import {
     onAuthStateChanged,
     updateProfile
 } from 'firebase/auth';
-import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, getDoc, serverTimestamp, updateDoc, onSnapshot, collection, addDoc, increment } from 'firebase/firestore';
+
 import { auth, googleProvider, db } from '../firebase';
 import toast from 'react-hot-toast';
 import { getUserLocation } from '../utils/geolocation';

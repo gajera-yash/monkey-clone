@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../../context/AuthContext';
 import { useCoins } from '../../../context/CoinsContext';
+import toast from 'react-hot-toast';
+
 
 const DesktopProfileModal = ({ onClose }) => {
     const { currentUser, logout, updateProfileInfo } = useAuth();
