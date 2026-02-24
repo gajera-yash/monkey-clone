@@ -22,7 +22,7 @@ const RTC_CONFIG = {
 };
 
 const VideoChat = ({ onEndChat }) => {
-  const { currentUser, blockedUsers, reportUser, userLocation } = useAuth();
+  const { currentUser, blockedUsers, reportUser, userLocation, saveMatchToHistory } = useAuth();
   const { spendCoins } = useCoins();
   const { isPremium } = usePremium();
 
@@ -47,6 +47,7 @@ const VideoChat = ({ onEndChat }) => {
   const [isMicOn, setIsMicOn] = useState(true);
   const [isCamOn, setIsCamOn] = useState(true);
   const [status, setStatus] = useState('Idle');
+  const [startTime, setStartTime] = useState(null);
 
   // Chat & Timer States
   const [messages, setMessages] = useState([]);
@@ -293,6 +294,7 @@ const VideoChat = ({ onEndChat }) => {
       setPartnerLocation(partnerLocation || null);
       setPartnerIsPremium(partnerIsPremium || false);
       setStatus('Connected');
+      setStartTime(Date.now());
       setMessages([]);
       setChatTimer(0);
 
@@ -381,12 +383,29 @@ const VideoChat = ({ onEndChat }) => {
   }, [stream, performJoin]);
 
   const endCall = () => {
+    if (status === 'Connected' && partnerName) {
+      const durationSec = startTime ? Math.floor((Date.now() - startTime) / 1000) : 0;
+      const minutes = Math.floor(durationSec / 60);
+      const seconds = durationSec % 60;
+      const durationStr = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+
+      saveMatchToHistory({
+        name: partnerName,
+        location: partnerLocation ? getLocationDisplay(partnerLocation, true) : 'Unknown',
+        duration: durationStr,
+        avatar: partnerName.charAt(0).toUpperCase(),
+        hasRecording: false
+      });
+    }
+
     if (peerConnection.current) {
       peerConnection.current.close();
       peerConnection.current = null;
     }
     if (stream) stream.getTracks().forEach(t => t.stop());
     if (roomIdRef.current) socket.emit('leave-room', { roomId: roomIdRef.current });
+
+    setStartTime(null);
     onEndChat();
   };
 

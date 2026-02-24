@@ -1,13 +1,97 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '../../../context/AuthContext';
 import { useCoins } from '../../../context/CoinsContext';
 
 const DesktopProfileModal = ({ onClose }) => {
-    const { currentUser, logout } = useAuth();
+    const { currentUser, logout, updateProfileInfo } = useAuth();
     const { coins, stars } = useCoins();
+    const [isEditing, setIsEditing] = useState(false);
+    const [editData, setEditData] = useState({
+        displayName: currentUser?.displayName || '',
+        bio: currentUser?.bio || ''
+    });
+
+    const handleSave = async () => {
+        await updateProfileInfo(editData);
+        setIsEditing(false);
+    };
+
+    if (isEditing) {
+        return (
+            <div className="bg-white w-[400px] rounded-[32px] overflow-hidden flex flex-col shadow-2xl border border-gray-100 relative pointer-events-auto">
+                <div className="p-6 flex items-center justify-between border-b border-gray-50">
+                    <h2 className="text-gray-900 text-xl font-bold w-full text-center">Edit Profile</h2>
+                    <button onClick={() => setIsEditing(false)} className="absolute right-6 text-gray-400 hover:text-gray-600 transition-colors">
+                        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+
+                <div className="p-6 space-y-6">
+                    {/* Profile Picture Edit */}
+                    <div className="flex justify-center">
+                        <div className="relative group">
+                            <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-indigo-50">
+                                {currentUser?.photoURL ? (
+                                    <img src={currentUser.photoURL} alt="" className="w-full h-full object-cover" />
+                                ) : (
+                                    <div className="w-full h-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-4xl font-bold text-white">
+                                        {currentUser?.displayName?.charAt(0)?.toUpperCase()}
+                                    </div>
+                                )}
+                            </div>
+                            <button className="absolute bottom-1 right-1 w-10 h-10 bg-indigo-600 rounded-full border-4 border-white flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
+                                <span className="text-white text-lg">📷</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Name Input */}
+                    <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100">
+                        <div className="flex items-center gap-3">
+                            <span className="text-xl">😊</span>
+                            <input
+                                type="text"
+                                value={editData.displayName}
+                                onChange={(e) => setEditData(prev => ({ ...prev, displayName: e.target.value.slice(0, 16) }))}
+                                className="bg-transparent flex-1 text-gray-900 font-medium focus:outline-none"
+                                placeholder="Your name"
+                            />
+                            <span className="text-xs text-gray-400 font-medium">{editData.displayName.length}/16</span>
+                        </div>
+                    </div>
+
+                    {/* Bio Input */}
+                    <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100 flex flex-col gap-2">
+                        <div className="flex items-center gap-3 border-b border-gray-200 pb-2">
+                            <span className="text-xl">💬</span>
+                            <span className="text-gray-900 font-bold">About</span>
+                        </div>
+                        <textarea
+                            value={editData.bio}
+                            onChange={(e) => setEditData(prev => ({ ...prev, bio: e.target.value.slice(0, 140) }))}
+                            className="bg-transparent w-full h-32 text-gray-600 text-sm focus:outline-none resize-none pt-2"
+                            placeholder="Hobby | Status | Secret | Spirit Animal"
+                        />
+                        <div className="flex justify-end">
+                            <span className="text-xs text-gray-400 font-medium">{editData.bio.length}/140</span>
+                        </div>
+                    </div>
+
+                    <button
+                        onClick={handleSave}
+                        className="w-full bg-indigo-600 text-white font-bold py-4 rounded-[20px] hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-100"
+                    >
+                        Save
+                    </button>
+                </div>
+            </div>
+        );
+    }
 
     return (
-        <div className="bg-[#24213a] w-[400px] rounded-[32px] overflow-hidden flex flex-col shadow-2xl border border-white/5">
+        <div className="bg-[#24213a] w-[400px] rounded-[32px] overflow-hidden flex flex-col shadow-2xl border border-white/5 pointer-events-auto">
             {/* Header */}
             <div className="p-6 flex items-center justify-between">
                 <h2 className="text-white text-xl font-bold w-full text-center">My Profile</h2>
@@ -33,13 +117,22 @@ const DesktopProfileModal = ({ onClose }) => {
                     <div className="flex-1">
                         <div className="flex items-center justify-between">
                             <h3 className="text-white text-xl font-bold">{currentUser?.displayName || 'User'}</h3>
-                            <button className="flex items-center gap-1 text-xs bg-white/10 hover:bg-white/20 px-3 py-1 rounded-full text-white transition-colors">
+                            <button
+                                onClick={() => setIsEditing(true)}
+                                className="flex items-center gap-1 text-xs bg-white/10 hover:bg-white/20 px-3 py-1 rounded-full text-white transition-colors"
+                            >
                                 ✏️ Edit
                             </button>
                         </div>
                         <div className="flex items-center gap-2 mt-1">
                             <span className="text-white/40 text-sm">ID: {currentUser?.uid?.slice(0, 8) || '280826743'}</span>
-                            <button className="text-white/40 hover:text-white/60">
+                            <button
+                                onClick={() => {
+                                    navigator.clipboard.writeText(currentUser?.uid || '');
+                                    toast.success("ID copied!");
+                                }}
+                                className="text-white/40 hover:text-white/60"
+                            >
                                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                                 </svg>

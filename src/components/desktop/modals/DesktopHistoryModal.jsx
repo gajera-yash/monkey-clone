@@ -1,52 +1,49 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { collection, query, orderBy, limit, onSnapshot, doc, deleteDoc } from 'firebase/firestore';
+import { db } from '../../../firebase';
+import { useAuth } from '../../../context/AuthContext';
+import toast from 'react-hot-toast';
 
 const DesktopHistoryModal = ({ onClose }) => {
-    // Mock history data based on screenshot
-    const historyData = [
-        {
-            id: 1,
-            name: "Harsh Sanatni 😇",
-            location: "Prayagraj",
-            time: "02/16/2026 10:34PM",
-            duration: "00:06",
-            avatar: "H",
-            avatarColor: "bg-blue-500",
-            hasRecording: true
-        },
-        {
-            id: 2,
-            name: "Naveen Rajput 😇",
-            location: "Rohtak",
-            time: "02/16/2026 10:33PM",
-            duration: "00:06",
-            avatar: "N",
-            avatarColor: "bg-green-500",
-            hasRecording: true
-        },
-        {
-            id: 3,
-            name: "M.J. K 😇",
-            location: "Prayagraj",
-            time: "02/16/2026 10:12PM",
-            duration: "00:01",
-            avatar: "M",
-            avatarColor: "bg-orange-500",
-            hasRecording: false
-        },
-        {
-            id: 4,
-            name: "Krishna Linda 😇",
-            location: "Jammu",
-            time: "02/16/2026 10:12PM",
-            duration: "00:22",
-            avatar: "K",
-            avatarColor: "bg-red-500",
-            hasRecording: false
+    const { currentUser } = useAuth();
+    const [historyData, setHistoryData] = useState([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        if (!currentUser?.uid) return;
+
+        const historyRef = collection(db, `users/${currentUser.uid}/matchHistory`);
+        const q = query(historyRef, orderBy('timestamp', 'desc'), limit(50));
+
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const data = snapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data(),
+                time: doc.data().timestamp?.toDate()?.toLocaleString() || new Date().toLocaleString()
+            }));
+            setHistoryData(data);
+            setLoading(false);
+        });
+
+        return () => unsubscribe();
+    }, [currentUser]);
+
+    const handleDelete = async (id) => {
+        try {
+            await deleteDoc(doc(db, `users/${currentUser.uid}/matchHistory`, id));
+            toast.success("Record deleted");
+        } catch (error) {
+            toast.error("Failed to delete");
         }
+    };
+
+    const avatarColors = [
+        'bg-blue-500', 'bg-green-500', 'bg-orange-500', 'bg-red-500',
+        'bg-purple-500', 'bg-pink-500', 'bg-indigo-500', 'bg-teal-500'
     ];
 
     return (
-        <div className="bg-[#24213a] w-[450px] max-h-[700px] rounded-[32px] overflow-hidden flex flex-col shadow-2xl border border-white/5">
+        <div className="bg-[#24213a] w-[450px] max-h-[700px] rounded-[32px] overflow-hidden flex flex-col shadow-2xl border border-white/5 pointer-events-auto">
             {/* Header */}
             <div className="p-6 flex items-center justify-between border-b border-white/5">
                 <h2 className="text-white text-xl font-bold w-full text-center">Match History</h2>
@@ -59,49 +56,64 @@ const DesktopHistoryModal = ({ onClose }) => {
 
             {/* List */}
             <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-white/10">
-                {historyData.map((item) => (
-                    <div key={item.id} className="bg-[#1a172e] rounded-3xl p-4 border border-white/5 hover:border-white/10 transition-all group">
-                        {/* Top Info */}
-                        <div className="flex items-center justify-between mb-3">
-                            <div className="flex items-center gap-2 text-[10px] text-white/40 font-medium">
-                                <span>{item.time}</span>
-                                {item.hasRecording && (
-                                    <div className="flex items-center gap-1">
-                                        <span>📹</span>
-                                        <span>{item.duration}</span>
-                                    </div>
-                                )}
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <button className="w-7 h-7 rounded-full bg-[#ff2d55]/20 flex items-center justify-center text-[10px] text-[#ff2d55] border border-[#ff2d55]/30">
-                                    👮
-                                </button>
-                                <button className="w-7 h-7 rounded-full bg-white/5 flex items-center justify-center text-[10px] text-white/40 border border-white/10 hover:bg-red-500/20 hover:text-red-400 transition-colors">
-                                    🗑️
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* User Profile */}
-                        <div className="flex items-center justify-between px-1">
-                            <div className="flex items-center gap-4">
-                                <div className={`w-14 h-14 rounded-full flex items-center justify-center text-xl font-bold text-white shadow-lg ${item.avatarColor}`}>
-                                    {item.avatar}
-                                </div>
-                                <div>
-                                    <h4 className="text-white font-bold text-lg">{item.name}</h4>
-                                    <div className="flex items-center gap-1 text-white/40 text-xs mt-0.5">
-                                        <span>📍</span>
-                                        <span>{item.location}</span>
-                                    </div>
-                                </div>
-                            </div>
-                            <button className="w-12 h-12 rounded-full bg-yellow-400 flex items-center justify-center text-2xl shadow-lg shadow-yellow-400/20 transform hover:scale-110 active:scale-95 transition-all">
-                                💌
-                            </button>
-                        </div>
+                {loading ? (
+                    <div className="py-20 flex flex-col items-center justify-center text-white/20">
+                        <div className="w-10 h-10 border-4 border-white/10 border-t-white/40 rounded-full animate-spin mb-4"></div>
+                        <span>Loading history...</span>
                     </div>
-                ))}
+                ) : historyData.length === 0 ? (
+                    <div className="py-20 text-center text-white/20">
+                        <span className="text-4xl block mb-4">📭</span>
+                        <p>No matches yet</p>
+                    </div>
+                ) : (
+                    historyData.map((item, index) => (
+                        <div key={item.id} className="bg-[#1a172e] rounded-3xl p-4 border border-white/5 hover:border-white/10 transition-all group">
+                            {/* Top Info */}
+                            <div className="flex items-center justify-between mb-3">
+                                <div className="flex items-center gap-2 text-[10px] text-white/40 font-medium">
+                                    <span>{item.time}</span>
+                                    {item.duration && (
+                                        <div className="flex items-center gap-1">
+                                            <span>📹</span>
+                                            <span>{item.duration}</span>
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <button className="w-7 h-7 rounded-full bg-[#ff2d55]/20 flex items-center justify-center text-[10px] text-[#ff2d55] border border-[#ff2d55]/30 hover:bg-[#ff2d55]/40 transition-colors">
+                                        👮
+                                    </button>
+                                    <button
+                                        onClick={() => handleDelete(item.id)}
+                                        className="w-7 h-7 rounded-full bg-white/5 flex items-center justify-center text-[10px] text-white/40 border border-white/10 hover:bg-red-500/20 hover:text-red-400 transition-colors"
+                                    >
+                                        🗑️
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* User Profile */}
+                            <div className="flex items-center justify-between px-1">
+                                <div className="flex items-center gap-4">
+                                    <div className={`w-14 h-14 rounded-full flex items-center justify-center text-xl font-bold text-white shadow-lg ${item.avatarColor || avatarColors[index % avatarColors.length]}`}>
+                                        {item.avatar || item.name?.charAt(0) || '?'}
+                                    </div>
+                                    <div className="min-w-0">
+                                        <h4 className="text-white font-bold text-lg truncate pr-2">{item.name}</h4>
+                                        <div className="flex items-center gap-1 text-white/40 text-xs mt-0.5">
+                                            <span>📍</span>
+                                            <span className="truncate pr-2">{item.location}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <button className="w-12 h-12 rounded-full bg-yellow-400 flex items-center justify-center text-2xl shadow-lg shadow-yellow-400/20 transform hover:scale-110 active:scale-95 transition-all flex-shrink-0">
+                                    💌
+                                </button>
+                            </div>
+                        </div>
+                    ))
+                )}
             </div>
         </div>
     );

@@ -4,9 +4,13 @@ import DesktopProfileModal from './modals/DesktopProfileModal';
 import DesktopHistoryModal from './modals/DesktopHistoryModal';
 import DesktopSubscriptionModal from './modals/DesktopSubscriptionModal';
 import DesktopSearchModal from './modals/DesktopSearchModal';
+import DesktopSafetyModal from './modals/DesktopSafetyModal';
+import DesktopMatchPreferenceModal from './modals/DesktopMatchPreferenceModal';
+import { useCoins } from '../../context/CoinsContext';
 
 const DesktopHeader = () => {
     const { currentUser } = useAuth();
+    const { coins } = useCoins();
     const [activeModal, setActiveModal] = useState(null);
 
     const toggleModal = (name) => {
@@ -31,14 +35,11 @@ const DesktopHeader = () => {
 
                 {/* Center - Navigation */}
                 <div className="flex items-center gap-2">
-                    <button className="px-5 py-2 rounded-full text-white/80 text-sm font-medium hover:bg-white/10 transition-colors">
-                        Get App
-                    </button>
-                    <button className="px-5 py-2 rounded-full text-white/80 text-sm font-medium hover:bg-white/10 transition-colors">
+                    <button
+                        onClick={() => toggleModal('safety')}
+                        className={`px-5 py-2 rounded-full text-sm font-medium transition-colors ${activeModal === 'safety' ? 'bg-yellow-400 text-black' : 'text-white/80 hover:bg-white/10'}`}
+                    >
                         Safety Center
-                    </button>
-                    <button className="px-5 py-2 rounded-full text-white/80 text-sm font-medium hover:bg-white/10 transition-colors">
-                        Theater Mode
                     </button>
                     <button
                         onClick={() => toggleModal('subscription')}
@@ -57,7 +58,7 @@ const DesktopHeader = () => {
                             className="flex items-center gap-2 bg-purple-800/60 border border-purple-600/40 rounded-full px-4 py-2 hover:bg-purple-700/60 transition-colors"
                         >
                             <span className="text-base">🪙</span>
-                            <span className="text-yellow-400 font-bold text-sm">2,450</span>
+                            <span className="text-yellow-400 font-bold text-sm">{coins?.toLocaleString() || 0}</span>
                         </button>
                         {activeModal === 'subscription' && (
                             <div className="absolute top-14 right-0 z-[110]">
@@ -66,15 +67,31 @@ const DesktopHeader = () => {
                         )}
                     </div>
 
-                    {/* Settings */}
+                    {/* Match History */}
+                    <div className="relative">
+                        <button
+                            onClick={() => toggleModal('history')}
+                            className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${activeModal === 'history' ? 'bg-yellow-400 text-black' : 'bg-purple-800/60 border border-purple-600/40 text-white/80 hover:bg-purple-700/60'}`}
+                        >
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                        </button>
+                        {activeModal === 'history' && (
+                            <div className="absolute top-14 right-0 z-[110]">
+                                <DesktopHistoryModal onClose={() => setActiveModal(null)} />
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Search */}
                     <div className="relative">
                         <button
                             onClick={() => toggleModal('search')}
                             className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${activeModal === 'search' ? 'bg-yellow-400 text-black' : 'bg-purple-800/60 border border-purple-600/40 text-white/80 hover:bg-purple-700/60'}`}
                         >
                             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                             </svg>
                         </button>
                         {activeModal === 'search' && (
@@ -104,6 +121,22 @@ const DesktopHeader = () => {
                             </div>
                         )}
                     </div>
+
+                    {/* New Modals */}
+                    {activeModal === 'safety' && (
+                        <div className="fixed inset-0 z-[200] flex items-center justify-center pointer-events-none">
+                            <div className="pointer-events-auto">
+                                <DesktopSafetyModal onClose={() => setActiveModal(null)} />
+                            </div>
+                        </div>
+                    )}
+                    {activeModal === 'preferences' && (
+                        <div className="fixed inset-0 z-[200] flex items-center justify-center pointer-events-none">
+                            <div className="pointer-events-auto">
+                                <DesktopMatchPreferenceModal onClose={() => setActiveModal(null)} />
+                            </div>
+                        </div>
+                    )}
                 </div>
             </header>
         </>

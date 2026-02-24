@@ -37,7 +37,23 @@ export const AuthProvider = ({ children }) => {
                 createdAt: serverTimestamp(),
                 lastLogin: serverTimestamp(),
                 totalChats: 0,
-                blockedUsers: []
+                blockedUsers: [],
+                coins: 500, // Initial coins
+                bio: '',
+                safetySettings: {
+                    disableFriendRequests: false,
+                    invisibleMode: false
+                },
+                matchPreferences: {
+                    ageRange: [18, 35],
+                    language: 'Unlimited',
+                    regions: {
+                        northAmerica: 'Default',
+                        latinAmerica: 'Default',
+                        northAfrica: 'Default',
+                        middleEast: 'Default'
+                    }
+                }
             });
         } else {
             const data = userSnap.data();
@@ -175,29 +191,79 @@ export const AuthProvider = ({ children }) => {
         };
     }, [currentUser]);
 
+    // Update Profile Info
+    const updateProfileInfo = async (updates) => {
+        if (!currentUser?.uid) return;
+        try {
+            const userRef = doc(db, "users", currentUser.uid);
+            await updateDoc(userRef, {
+                ...updates,
+                updatedAt: serverTimestamp()
+            });
+            setCurrentUser(prev => ({ ...prev, ...updates }));
+            toast.success("Profile updated!");
+        } catch (error) {
+            console.error("Error updating profile:", error);
+            toast.error("Failed to update profile");
+        }
+    };
+
+    // Update Safety Settings
+    const updateSafetySettings = async (settings) => {
+        if (!currentUser?.uid) return;
+        try {
+            const userRef = doc(db, "users", currentUser.uid);
+            await updateDoc(userRef, {
+                safetySettings: settings
+            });
+            setCurrentUser(prev => ({ ...prev, safetySettings: settings }));
+            toast.success("Settings saved");
+        } catch (error) {
+            console.error("Error updating safety settings:", error);
+            toast.error("Failed to save settings");
+        }
+    };
+
+    // Update Match Preferences
+    const updateMatchPreferences = async (preferences) => {
+        if (!currentUser?.uid) return;
+        try {
+            const userRef = doc(db, "users", currentUser.uid);
+            await updateDoc(userRef, {
+                matchPreferences: preferences
+            });
+            setCurrentUser(prev => ({ ...prev, matchPreferences: preferences }));
+            toast.success("Preferences saved");
+        } catch (error) {
+            console.error("Error updating preferences:", error);
+            toast.error("Failed to save preferences");
+        }
+    };
+
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (user) => {
             if (user) {
                 // Fetch user data from Firestore
                 const userRef = doc(db, "users", user.uid);
-                const userSnap = await getDoc(userRef);
 
-                if (userSnap.exists()) {
-                    const data = userSnap.data();
-
-                    if (data.isBanned) {
-                        await signOut(auth);
-                        toast.error("This account has been banned.");
-                        setCurrentUser(null);
-                        setLoading(false);
-                        return;
+                // Real-time listener for user data
+                const unsubDoc = onSnapshot(userRef, (doc) => {
+                    if (doc.exists()) {
+                        const data = doc.data();
+                        if (data.isBanned) {
+                            signOut(auth);
+                            toast.error("This account has been banned.");
+                            setCurrentUser(null);
+                        } else {
+                            setBlockedUsers(data.blockedUsers || []);
+                            setCurrentUser({ ...user, ...data });
+                        }
+                    } else {
+                        setCurrentUser(user);
                     }
+                });
 
-                    setBlockedUsers(data.blockedUsers || []);
-                    setCurrentUser({ ...user, ...data }); // Merge auth user with firestore data
-                } else {
-                    setCurrentUser(user);
-                }
+                return () => unsubDoc();
             } else if (!isGuest) {
                 setCurrentUser(null);
                 setBlockedUsers([]);
@@ -246,6 +312,26 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
+    // Save match to history
+    const saveMatchToHistory = async (partnerData) => {
+        if (!currentUser?.uid || isGuest) return;
+        try {
+            const historyRef = collection(db, `users/${currentUser.uid}/matchHistory`);
+            await addDoc(historyRef, {
+                ...partnerData,
+                timestamp: serverTimestamp()
+            });
+
+            // Also update total chats count
+            const userRef = doc(db, "users", currentUser.uid);
+            await updateDoc(userRef, {
+                totalChats: increment(1)
+            });
+        } catch (error) {
+            console.error("Error saving match history:", error);
+        }
+    };
+
     const value = {
         currentUser,
         isGuest,
@@ -257,7 +343,11 @@ export const AuthProvider = ({ children }) => {
         signupWithEmail,
         continueAsGuest,
         logout,
-        reportUser
+        reportUser,
+        updateProfileInfo,
+        updateSafetySettings,
+        updateMatchPreferences,
+        saveMatchToHistory
     };
 
     return (
