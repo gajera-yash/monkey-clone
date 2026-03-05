@@ -417,7 +417,7 @@ const VideoChat = ({ onEndChat }) => {
   };
 
   return (
-    <div className={`relative w-full h-[100dvh] overflow-hidden flex flex-col desktop-purple-bg ${status === 'Connected' ? 'md:grid md:grid-cols-[1fr_360px]' : ''}`}>
+    <div className={`relative w-full h-[100dvh] overflow-hidden flex flex-col desktop-purple-bg`}>
       {/* Background Patterns for Idle Desktop */}
       {status === 'Idle' && (
         <div className="absolute inset-0 hidden md:block opacity-20 pointer-events-none overflow-hidden">
@@ -702,44 +702,51 @@ const VideoChat = ({ onEndChat }) => {
 
         {/* Top-Left: Monkey Chat badge + Timer */}
         {status === 'Connected' && (
-          <div className="absolute top-5 left-5 z-50 hidden md:flex items-center gap-3">
+          <div className="absolute top-6 left-6 z-50 hidden md:flex items-center gap-4">
             {/* Monkey Chat badge */}
-            <div className="flex items-center gap-2 bg-black/50 backdrop-blur-md border border-white/10 rounded-full px-4 py-2">
-              <span className="text-lg">🐵</span>
-              <span className="text-white font-bold text-sm">Monkey Chat</span>
+            <div className="flex items-center gap-2 bg-[#302b3e]/80 backdrop-blur-md rounded-full px-4 py-2 shadow-lg">
+              <div className="w-6 h-6 rounded-full bg-[#8234f9] flex items-center justify-center">
+                 <span className="text-[12px] relative top-[1px]">🐵</span>
+              </div>
+              <span className="text-white font-bold text-[15px] tracking-wide">Monkey Chat</span>
             </div>
             {/* Timer */}
-            <div className="flex items-center gap-2 bg-black/50 backdrop-blur-md border border-white/10 rounded-full px-4 py-2">
-              <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
-              <span className="text-white font-mono text-sm font-semibold">{formatTime(chatTimer)}</span>
+            <div className="flex items-center gap-2 bg-[#302b3e]/80 backdrop-blur-md rounded-full px-4 py-2.5 shadow-lg">
+              <span className="w-2.5 h-2.5 rounded-full bg-[#ff4b4b]"></span>
+              <span className="text-white font-mono text-[14px] font-bold tracking-wider">{formatTime(chatTimer)}</span>
             </div>
           </div>
         )}
 
         {/* Top-Right: Partner location */}
         {partnerName && partnerLocation && (
-          <div className="absolute top-5 right-5 z-50 hidden md:flex items-center gap-3">
-            <div className="flex items-center gap-3 bg-black/50 backdrop-blur-md border border-white/10 rounded-2xl px-4 py-2.5">
-              <div>
+          <div className="absolute top-6 right-6 z-50 hidden md:flex items-center">
+            <div className="flex items-center gap-4 bg-[#4a4049]/60 backdrop-blur-xl rounded-full pl-5 pr-1.5 py-1.5 shadow-2xl">
+              <div className="flex flex-col py-1">
                 <div className="flex items-center gap-1.5">
-                  <svg className="w-3.5 h-3.5 text-white/60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                  <span className="text-white font-bold text-sm">{getLocationDisplay(partnerLocation, showCityName)}</span>
+                  <svg className="w-4 h-4 text-white/80" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+                  <span className="text-white font-bold text-[15px]">{getLocationDisplay(partnerLocation, showCityName)}</span>
                   {partnerIsPremium && <PremiumBadge size="sm" />}
                 </div>
                 {userLocation && getDistanceBetween(userLocation, partnerLocation) && (
-                  <p className="text-white/50 text-xs mt-0.5">📍 {getDistanceBetween(userLocation, partnerLocation)} away</p>
+                  <p className="text-white/70 text-xs mt-0.5 flex items-center gap-1">
+                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+                    {getDistanceBetween(userLocation, partnerLocation)} away
+                  </p>
                 )}
               </div>
-              {/* Globe icon */}
-              <div className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center text-lg border border-white/10">🌍</div>
+              {/* Map/Globe icon */}
+              <div className="w-11 h-11 rounded-full overflow-hidden border border-white/20 flex-shrink-0">
+                  <img src="https://static.vecteezy.com/system/resources/previews/000/153/588/original/vector-map-of-city-with-streets-and-parks.jpg" alt="Map" className="w-full h-full object-cover" />
+              </div>
             </div>
           </div>
         )}
 
         {/* Bottom-Left: Local video PIP - Desktop only */}
         {status !== 'Idle' && (
-          <div className="absolute bottom-24 left-5 z-30 hidden md:block">
-            <div className="relative w-44 h-36 rounded-2xl overflow-hidden shadow-2xl border-2 border-purple-500/60">
+          <div className="absolute bottom-8 left-8 z-30 hidden md:block">
+            <div className="relative w-64 h-48 rounded-[20px] overflow-hidden shadow-[0_0_25px_rgba(168,85,247,0.4)] border-2 border-[#a27ef6]">
               <video
                 ref={localVideoRef}
                 autoPlay
@@ -748,15 +755,18 @@ const VideoChat = ({ onEndChat }) => {
                 className={`w-full h-full object-cover ${!isCamOn ? 'hidden' : ''}`}
               />
               {!isCamOn && (
-                <div className="absolute inset-0 flex items-center justify-center bg-gray-900">
-                  <span className="text-2xl">📷</span>
+                <div className="absolute inset-0 flex items-center justify-center bg-[#1a1c1e]">
+                  <span className="text-4xl">📷</span>
                 </div>
               )}
               {/* YOU (Live) label */}
-              <div className="absolute bottom-2 left-2 bg-black/70 backdrop-blur-sm px-2.5 py-1 rounded-full flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse"></span>
-                <span className="text-white text-[11px] font-semibold">YOU (Live)</span>
+              <div className="absolute bottom-3 left-3 bg-[#1a1c1e]/70 backdrop-blur-md px-3 py-1.5 rounded-full flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-green-400"></span>
+                <span className="text-white/90 text-[12px] font-bold tracking-wide">YOU (Live)</span>
                 {isPremium && <PremiumBadge size="sm" />}
+              </div>
+              <div className="absolute top-3 right-3 flex items-center justify-center w-8 h-8 rounded-full bg-black/30 backdrop-blur-md border border-white/10 text-white/70">
+                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/></svg>
               </div>
             </div>
           </div>
@@ -801,13 +811,13 @@ const VideoChat = ({ onEndChat }) => {
 
         {/* Controls Bar - Desktop Only */}
         {status === 'Connected' && (
-          <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 hidden md:flex items-center gap-3 z-50 bg-black/50 backdrop-blur-xl border border-white/10 px-5 py-3 rounded-full shadow-2xl">
+          <div className="absolute bottom-10 left-1/2 transform -translate-x-1/2 hidden md:flex items-center gap-5 z-50 bg-[#3a3b40]/90 backdrop-blur-2xl px-6 py-4 rounded-[32px] shadow-[0_10px_40px_rgba(0,0,0,0.5)] border border-white/5">
             {/* Mic */}
             <button
               onClick={() => setIsMicOn(!isMicOn)}
-              className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${isMicOn ? 'bg-white/15 hover:bg-white/25 text-white' : 'bg-red-500 text-white'}`}
+              className={`w-[52px] h-[52px] rounded-full flex items-center justify-center transition-all ${isMicOn ? 'bg-white/10 hover:bg-white/20 text-white' : 'bg-red-500 text-white'}`}
             >
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 {isMicOn
                   ? <path strokeLinecap="round" strokeLinejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
                   : <path strokeLinecap="round" strokeLinejoin="round" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
@@ -817,33 +827,34 @@ const VideoChat = ({ onEndChat }) => {
             {/* Cam */}
             <button
               onClick={() => setIsCamOn(!isCamOn)}
-              className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${isCamOn ? 'bg-white/15 hover:bg-white/25 text-white' : 'bg-red-500 text-white'}`}
+              className={`w-[52px] h-[52px] rounded-full flex items-center justify-center transition-all ${isCamOn ? 'bg-white/10 hover:bg-white/20 text-white' : 'bg-red-500 text-white'}`}
             >
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
               </svg>
             </button>
             {/* End Call */}
             <button
               onClick={endCall}
-              className="w-14 h-14 bg-red-500 hover:bg-red-600 rounded-full flex items-center justify-center transition-all shadow-lg shadow-red-500/30"
+              className="w-[60px] h-[60px] bg-[#ff4b4b] hover:bg-red-500 rounded-full flex items-center justify-center transition-all shadow-[0_0_20px_rgba(255,75,75,0.4)] mx-2 transform hover:scale-105"
             >
-              <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M16 8l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2M5 3a2 2 0 00-2 2v1c0 8.284 6.716 15 15 15h1a2 2 0 002-2v-3.28a1 1 0 00-.684-.948l-4.493-1.498a1 1 0 00-1.21.502l-1.13 2.257a11.042 11.042 0 01-5.516-5.517l2.257-1.128a1 1 0 00.502-1.21L9.228 3.683A1 1 0 008.279 3H5z" />
+              <svg className="w-8 h-8 text-white transform rotate-[135deg]" fill="currentColor" viewBox="0 0 20 20">
+                 <path d="M20 18.35V19c0 .55-.45 1-1 1h-1c-5.52 0-10.48-2.24-14.14-5.86S0 5.52 0 0V0C0-1 .45-1 1-1h.65C2.11-1 2.5-1.5 2.5-2v-3.5c0-.5-.5-1-1-1c-.5 0-1 .5-1 1v3.5c0 1.05-.85 1.9-1.9 1.9H-1c-1.66 0-3 1.34-3 3v0c0 4.97 2.01 9.47 5.27 12.73S9.03 20 14 20h0c1.66 0 3-1.34 3-3V19h-.65c-.55 0-1-.45-1-1v-4c0-.55.45-1 1-1H19c.55 0 1 .45 1 1v.65z" transform="translate(2 2)"/>
+                 <path d="M12.26 9l4.59-4.59c.39-.39.39-1.02 0-1.41s-1.02-.39-1.41 0L10.84 7.59l-4.59-4.59c-.39-.39-1.02-.39-1.41 0s-.39 1.02 0 1.41L9.43 9l-4.59 4.59c-.39.39-.39 1.02 0 1.41.19.19.45.29.71.29s.51-.1.71-.29l4.59-4.59 4.59 4.59c.19.19.45.29.71.29s.51-.1.71-.29c.39-.39.39-1.02 0-1.41L12.26 9z" />
               </svg>
             </button>
             {/* Effects */}
-            <button className="w-12 h-12 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center transition-all text-white">
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <button className="w-[52px] h-[52px] rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-all text-white">
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
               </svg>
             </button>
             {/* Next */}
             <button
               onClick={handleNext}
-              className="w-12 h-12 rounded-full bg-purple-600 hover:bg-purple-500 flex items-center justify-center transition-all shadow-lg shadow-purple-600/30"
+              className="w-[52px] h-[52px] rounded-full bg-[#8234f9] hover:bg-[#7220e9] flex items-center justify-center transition-all shadow-[0_0_15px_rgba(130,52,249,0.5)] transform hover:scale-105"
             >
-              <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
               </svg>
             </button>
@@ -853,14 +864,14 @@ const VideoChat = ({ onEndChat }) => {
 
       {/* Right Panel - Chat Interface */}
       {status === 'Connected' && (
-        <div className={`w-full md:w-[320px] h-full bg-[#2d2040]/95 backdrop-blur-xl border-l border-white/5 flex flex-col z-[60] absolute md:relative inset-0 transition-transform duration-300 transform ${showChat ? 'translate-x-0' : 'translate-x-full'} md:translate-x-0 md:col-start-2`}>
+        <div className={`w-full md:w-[350px] h-full md:h-auto md:max-h-[70vh] md:min-h-[480px] bg-[#665e64]/80 md:bg-[#5c545e]/80 backdrop-blur-2xl md:rounded-[24px] border-l md:border border-white/10 flex flex-col z-[60] absolute inset-0 md:inset-auto md:right-8 md:top-1/2 md:-translate-y-1/2 md:translate-x-0 ${showChat ? 'translate-x-0' : 'translate-x-full'} transition-transform duration-300 transform shadow-[0_15px_40px_rgba(0,0,0,0.5)] overflow-hidden`}>
           {/* Chat Header */}
-          <div className="px-5 py-4 border-b border-white/10 flex items-center justify-between">
+          <div className="px-6 py-5 border-b border-white/10 flex items-center justify-between bg-black/10">
             <div className="flex items-center gap-2">
-              <h3 className="font-bold text-sm tracking-widest uppercase text-white">Live Chat</h3>
+              <h3 className="font-[800] text-[15px] tracking-[0.1em] text-white">LIVE CHAT</h3>
             </div>
             <div className="flex items-center gap-2">
-              <span className="bg-purple-600/30 text-purple-300 text-xs font-semibold px-2.5 py-1 rounded-full border border-purple-500/30">24 Participants</span>
+              <span className="bg-[#8234f9]/40 text-[#d8b4fe] text-[11px] font-bold px-3 py-1.5 rounded-full backdrop-blur-md">24 Participants</span>
               <button
                 onClick={() => setShowChat(false)}
                 className="md:hidden p-2 hover:bg-white/5 rounded-full text-white"
@@ -885,15 +896,19 @@ const VideoChat = ({ onEndChat }) => {
                 key={msg.id}
                 className={`flex flex-col ${msg.senderId === currentUser.uid ? 'items-end' : 'items-start'}`}
               >
-                <div className={`max-w-[85%] px-4 py-2 rounded-2xl text-sm ${msg.senderId === currentUser.uid
-                  ? 'bg-accent-purple text-white rounded-tr-none'
-                  : 'bg-white/5 text-gray-200 border border-white/10 rounded-tl-none'
+                <span className="text-[11px] text-white/60 mb-1.5 px-0.5 flex items-center gap-1 font-medium">
+                  {msg.senderId === currentUser.uid ? (
+                    <><span className="text-[#a78bfa]">You</span> &bull; {msg.timestamp === 'Just now' ? 'Just now' : new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</>
+                  ) : (
+                    <>{partnerName || 'Stranger'} &bull; {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</>
+                  )}
+                </span>
+                <div className={`max-w-[85%] px-5 py-3.5 rounded-[18px] text-[14px] leading-snug font-medium shadow-sm ${msg.senderId === currentUser.uid
+                  ? 'bg-[#8234f9] text-white rounded-tr-sm'
+                  : 'bg-white/10 text-white/95 rounded-tl-sm'
                   }`}>
                   {msg.text}
                 </div>
-                <span className="text-[10px] text-gray-500 mt-1 px-1">
-                  {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </span>
               </div>
             ))}
 
@@ -932,7 +947,7 @@ const VideoChat = ({ onEndChat }) => {
           )}
 
           {/* Chat Input */}
-          <div className="p-4 bg-dark-900/50 backdrop-blur-md border-t border-white/5">
+          <div className="p-4 bg-transparent pb-6">
             <form onSubmit={handleSendMessage} className="flex items-center gap-2">
               <button
                 type="button"
@@ -984,15 +999,15 @@ const VideoChat = ({ onEndChat }) => {
                 onChange={handleTyping}
                 placeholder="Type a message..."
                 disabled={status !== 'Connected'}
-                className="flex-1 bg-white/5 border border-white/10 rounded-full px-4 py-2 text-sm focus:outline-none focus:border-accent-purple transition-colors disabled:opacity-50"
+                className="flex-1 bg-white/10 border-0 rounded-full px-5 py-3.5 text-[14px] font-medium text-white placeholder-white/50 focus:outline-none focus:ring-1 focus:ring-white/30 transition-all disabled:opacity-50"
               />
               <button
                 type="submit"
                 disabled={!newMessage.trim() || status !== 'Connected'}
-                className="p-2 bg-accent-purple text-white rounded-full hover:bg-accent-purple/80 transition-all disabled:opacity-50 disabled:grayscale"
+                className="flex items-center justify-center w-11 h-11 bg-[#8234f9] text-white rounded-full hover:bg-[#7220e9] transition-all disabled:opacity-50 disabled:grayscale flex-shrink-0"
               >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                <svg className="w-5 h-5 ml-1" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
                 </svg>
               </button>
             </form>
