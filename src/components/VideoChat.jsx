@@ -454,7 +454,7 @@ const VideoChat = ({ onEndChat }) => {
         </div>
       )}
 
-      <PermissionModal isOpen={false} onGrant={requestMedia} error={error} />
+      <PermissionModal isOpen={showPermissionModal} onGrant={requestMedia} error={error} />
       <ReportModal
         isOpen={showReportModal}
         onClose={() => setShowReportModal(false)}
