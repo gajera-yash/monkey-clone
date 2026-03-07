@@ -152,6 +152,7 @@ export const AuthProvider = ({ children }) => {
             setIsGuest(false);
             setCurrentUser(null);
             localStorage.removeItem('lastActivity'); // Clear activity on logout
+            localStorage.removeItem('userGender');   // Clear gender so gender modal shows next login
             toast.success("Logged out");
         } catch (error) {
             toast.error("Error logging out");

@@ -9,10 +9,12 @@ const LoginModal = ({ isOpen, onClose }) => {
 
     // Helper to navigate based on creator status
     const navigateAfterLogin = (user) => {
-        // user is the one just returned from login/signup (may not have Firestore data yet)
-        // Check localStorage gender as fallback for brand-new users
         const gender = localStorage.getItem('userGender');
-        if (user?.isCreator || gender === 'Female') {
+        const isCreatorUser = user?.isCreator || gender === 'Female';
+        // Clear gender from localStorage after using it (each new session should pick gender fresh)
+        localStorage.removeItem('userGender');
+
+        if (isCreatorUser) {
             const status = user?.accountStatus;
             if (status === 'active') {
                 navigate('/creator/dashboard');

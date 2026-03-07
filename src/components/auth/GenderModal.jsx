@@ -35,7 +35,7 @@ const GenderModal = ({ isOpen, onSelect, onClose }) => {
                     <div className="grid grid-cols-2 gap-6">
                         {/* Male Option */}
                         <button
-                            onClick={() => onSelect('male')}
+                            onClick={() => onSelect('Male')}
                             className="group relative flex flex-col items-center justify-center p-8 bg-white/5 border border-white/10 rounded-3xl hover:bg-accent-blue/10 hover:border-accent-blue/50 transition-all duration-300 hover:scale-105"
                         >
                             <div className="w-16 h-16 rounded-2xl bg-accent-blue/20 flex items-center justify-center mb-4 group-hover:bg-accent-blue group-hover:text-white transition-colors">
@@ -47,7 +47,7 @@ const GenderModal = ({ isOpen, onSelect, onClose }) => {
 
                         {/* Female Option */}
                         <button
-                            onClick={() => onSelect('female')}
+                            onClick={() => onSelect('Female')}
                             className="group relative flex flex-col items-center justify-center p-8 bg-white/5 border border-white/10 rounded-3xl hover:bg-accent-pink/10 hover:border-accent-pink/50 transition-all duration-300 hover:scale-105"
                         >
                             <div className="w-16 h-16 rounded-2xl bg-accent-pink/20 flex items-center justify-center mb-4 group-hover:bg-accent-pink group-hover:text-white transition-colors">
