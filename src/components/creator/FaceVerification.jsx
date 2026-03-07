@@ -60,7 +60,16 @@ const FaceVerification = () => {
         ctx.scale(-1, 1);
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-        const imageDataUrl = canvas.toDataURL('image/jpeg', 0.8);
+        // Compress: resize to max 640x480 and lower quality for fast upload
+        const MAX_W = 640;
+        const MAX_H = 480;
+        const scale = Math.min(MAX_W / canvas.width, MAX_H / canvas.height, 1);
+        const compressed = document.createElement('canvas');
+        compressed.width = Math.round(canvas.width * scale);
+        compressed.height = Math.round(canvas.height * scale);
+        const cctx = compressed.getContext('2d');
+        cctx.drawImage(canvas, 0, 0, compressed.width, compressed.height);
+        const imageDataUrl = compressed.toDataURL('image/jpeg', 0.45);
         setCapturedImage(imageDataUrl);
         stopCamera();
     };
@@ -78,29 +87,31 @@ const FaceVerification = () => {
         }
 
         setIsUploading(true);
-        const toastId = toast.loading("Uploading face verification...");
+        const toastId = toast.loading("Verifying...");
 
         try {
-            // 1. Upload to Storage
             const storageRef = ref(storage, `creator-verification/${currentUser.uid}/face.jpg`);
-            await uploadString(storageRef, capturedImage, 'data_url');
-            const downloadURL = await getDownloadURL(storageRef);
-
-            // 2. Create Verifications Document
             const verificationRef = doc(db, 'creatorVerifications', currentUser.uid);
-            await setDoc(verificationRef, {
-                creatorId: currentUser.uid,
-                faceImage: downloadURL,
-                status: 'pending',
-                submittedAt: serverTimestamp()
-            }, { merge: true });
 
-            toast.success("Face verified successfully!", { id: toastId });
+            // Start Firestore write (without URL) and Storage upload IN PARALLEL
+            const [, downloadURL] = await Promise.all([
+                setDoc(verificationRef, {
+                    creatorId: currentUser.uid,
+                    status: 'pending',
+                    submittedAt: serverTimestamp()
+                }, { merge: true }),
+                uploadString(storageRef, capturedImage, 'data_url').then(() => getDownloadURL(storageRef))
+            ]);
+
+            // Update Firestore with the face image URL (fast, single field update)
+            await updateDoc(verificationRef, { faceImage: downloadURL });
+
+            toast.success("Face verified!", { id: toastId });
             navigate('/creator/verify/voice');
 
         } catch (error) {
             console.error("Upload failed", error);
-            toast.error("Verification upload failed.", { id: toastId });
+            toast.error("Verification failed. Try again.", { id: toastId });
         } finally {
             setIsUploading(false);
         }
