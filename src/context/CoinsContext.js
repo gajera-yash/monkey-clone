@@ -128,7 +128,7 @@ export const CoinsProvider = ({ children }) => {
     // Purchase function
     const purchaseCoins = async (packageId) => {
         const packages = {
-            'pkg_100': { coins: 100, price: 99 },
+            'pkg_100': { coins: 50, price: 99 },
             'pkg_500': { coins: 500, price: 449 },
             'pkg_1000': { coins: 1000, price: 799 },
             'pkg_5000': { coins: 5000, price: 3499 }
