@@ -4,8 +4,25 @@ import { toast } from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 
 const LoginModal = ({ isOpen, onClose }) => {
-    const { loginWithGoogle, loginWithEmail, signupWithEmail, continueAsGuest } = useAuth();
+    const { loginWithGoogle, loginWithEmail, signupWithEmail, continueAsGuest, currentUser } = useAuth();
     const navigate = useNavigate();
+
+    // Helper to navigate based on creator status
+    const navigateAfterLogin = (user) => {
+        // user is the one just returned from login/signup (may not have Firestore data yet)
+        // Check localStorage gender as fallback for brand-new users
+        const gender = localStorage.getItem('userGender');
+        if (user?.isCreator || gender === 'Female') {
+            const status = user?.accountStatus;
+            if (status === 'active') {
+                navigate('/creator/dashboard');
+            } else {
+                navigate('/creator/onboarding');
+            }
+        } else {
+            navigate('/chat');
+        }
+    };
     const [isLogin, setIsLogin] = useState(true);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -18,13 +35,14 @@ const LoginModal = ({ isOpen, onClose }) => {
         e.preventDefault();
         setLoading(true);
         try {
+            let result;
             if (isLogin) {
-                await loginWithEmail(email, password);
+                result = await loginWithEmail(email, password);
             } else {
-                await signupWithEmail(email, password, name);
+                result = await signupWithEmail(email, password, name);
             }
             onClose();
-            navigate('/chat');
+            navigateAfterLogin(result);
         } catch (error) {
             console.error(error);
         } finally {
@@ -35,9 +53,9 @@ const LoginModal = ({ isOpen, onClose }) => {
     const handleGoogleLogin = async () => {
         setLoading(true);
         try {
-            await loginWithGoogle();
+            const result = await loginWithGoogle();
             onClose();
-            navigate('/chat');
+            navigateAfterLogin(result);
         } catch (error) {
             console.error(error);
         } finally {

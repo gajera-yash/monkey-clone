@@ -48,9 +48,18 @@ const AppContent = () => {
   // Improved start chat handler with Gender Selection
   const handleStartChat = () => {
     if (currentUser) {
-      navigate('/chat');
+      // Creator already logged in - send to right place
+      if (currentUser.isCreator) {
+        if (currentUser.accountStatus === 'active') {
+          navigate('/creator/dashboard');
+        } else {
+          navigate('/creator/onboarding');
+        }
+      } else {
+        navigate('/chat');
+      }
     } else {
-      // Check if gender is already selected
+      // Not logged in - show gender selection first
       const savedGender = localStorage.getItem('userGender');
       if (!savedGender) {
         setIsGenderModalOpen(true);
@@ -86,15 +95,28 @@ const AppContent = () => {
 
       <Routes>
         <Route path="/" element={
-          currentUser ? <Navigate to="/chat" replace /> : (
-            <>
-              <Header onStartChat={handleStartChat} />
-              <Hero onStartChat={handleStartChat} />
-              <Features />
-              <FAQ />
-              <Footer />
-            </>
-          )
+          (() => {
+            if (!currentUser) {
+              return (
+                <>
+                  <Header onStartChat={handleStartChat} />
+                  <Hero onStartChat={handleStartChat} />
+                  <Features />
+                  <FAQ />
+                  <Footer />
+                </>
+              );
+            }
+            // Creator redirect from root
+            if (currentUser.isCreator) {
+              if (currentUser.accountStatus === 'active') {
+                return <Navigate to="/creator/dashboard" replace />;
+              }
+              return <Navigate to="/creator/onboarding" replace />;
+            }
+            // Normal male user
+            return <Navigate to="/chat" replace />;
+          })()
         } />
 
         <Route path="/chat" element={
@@ -170,31 +192,33 @@ function App() {
 
 // Wrapper to handle chat state inside the protected route
 const ChatLayout = () => {
-  const { currentUser } = useAuth();
+  const { currentUser, loading } = useAuth();
   const navigate = useNavigate();
   const [isChatting, setIsChatting] = useState(true);
 
-  // Creator Redirect Logic
+  // Creator Redirect Logic — runs when user data is fully loaded
   useEffect(() => {
+    if (loading) return; // wait for Firestore data
     if (currentUser?.isCreator) {
-      if (currentUser.accountStatus !== 'active') {
-        navigate('/creator/onboarding', { replace: true });
-      } else {
-        // If active, go to dashboard. They must explicitly press "Go Live" to chat.
-        // We will assume "Go Live" goes to a special creator live state later, 
-        // but for now, keep them on dashboard to prevent auto-joining normal chat.
+      if (currentUser.accountStatus === 'active') {
         navigate('/creator/dashboard', { replace: true });
+      } else {
+        navigate('/creator/onboarding', { replace: true });
       }
     }
-  }, [currentUser, navigate]);
+  }, [currentUser, navigate, loading]);
+
+  // Show nothing while redirecting a creator
+  if (loading || currentUser?.isCreator) {
+    return (
+      <div className="min-h-screen bg-dark-900 flex items-center justify-center">
+        <div className="w-12 h-12 rounded-full border-4 border-t-accent-purple border-white/10 animate-spin"></div>
+      </div>
+    );
+  }
 
   if (!isChatting) {
     return <Navigate to="/" replace />;
-  }
-
-  // Prevent rendering video chat while redirect is happening
-  if (currentUser?.isCreator) {
-    return null;
   }
 
   return (
