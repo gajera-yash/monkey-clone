@@ -18,6 +18,8 @@ export const AdminProvider = ({ children }) => {
             }
 
             try {
+                console.log("Checking admin status for UID:", currentUser.uid);
+
                 // Check 'profiles' table in Supabase for admin role
                 const { data, error } = await supabase
                     .from('profiles')
@@ -25,9 +27,15 @@ export const AdminProvider = ({ children }) => {
                     .eq('id', currentUser.uid)
                     .single();
 
+                if (error) {
+                    console.error("Supabase error checking admin:", error);
+                }
+
                 if (data && data.role === 'admin') {
+                    console.log("Admin access granted!");
                     setIsAdmin(true);
                 } else {
+                    console.log("Admin access denied. Role:", data?.role);
                     setIsAdmin(false);
                 }
             } catch (err) {
