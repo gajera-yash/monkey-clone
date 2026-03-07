@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { useAuth } from './context/AuthContext';
-import { CoinsProvider } from './context/CoinsContext';
+import { CoinsProvider, useCoins } from './context/CoinsContext';
 import { PremiumProvider } from './context/PremiumContext';
 import Header from './components/Header';
 import Hero from './components/Hero';
