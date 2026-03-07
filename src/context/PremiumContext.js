@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { doc, updateDoc, onSnapshot, serverTimestamp } from 'firebase/firestore';
-import { db } from '../firebase';
+import { supabase } from '../supabase';
 import { useAuth } from './AuthContext';
 import toast from 'react-hot-toast';
 
@@ -15,47 +14,36 @@ export const PremiumProvider = ({ children }) => {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        if (!currentUser?.uid) {
+        if (!currentUser?.id) {
             setIsPremium(false);
             setSubscription(null);
             setLoading(false);
             return;
         }
 
-        const userRef = doc(db, 'users', currentUser.uid);
-
-        const unsubscribe = onSnapshot(userRef, (doc) => {
-            if (doc.exists()) {
-                const data = doc.data();
-                const now = new Date();
-
-                // Check if premium is active and not expired
-                if (data.isPremium && data.premiumExpiry) {
-                    const expiryDate = data.premiumExpiry.toDate();
-                    if (expiryDate > now) {
-                        setIsPremium(true);
-                        setSubscription({
-                            plan: data.subscriptionPlan,
-                            expiry: expiryDate
-                        });
-                    } else {
-                        // Expired
-                        setIsPremium(false);
-                        setSubscription(null);
-                    }
-                } else {
-                    setIsPremium(false);
-                    setSubscription(null);
-                }
+        const now = new Date();
+        // Sync with currentUser from AuthContext
+        if (currentUser.is_premium && currentUser.premium_expiry) {
+            const expiryDate = new Date(currentUser.premium_expiry);
+            if (expiryDate > now) {
+                setIsPremium(true);
+                setSubscription({
+                    plan: currentUser.subscription_plan,
+                    expiry: expiryDate
+                });
+            } else {
+                setIsPremium(false);
+                setSubscription(null);
             }
-            setLoading(false);
-        });
-
-        return () => unsubscribe();
+        } else {
+            setIsPremium(false);
+            setSubscription(null);
+        }
+        setLoading(false);
     }, [currentUser]);
 
     const purchaseSubscription = async (planId) => {
-        if (!currentUser?.uid) return false;
+        if (!currentUser?.id) return false;
 
         const plans = {
             'monthly': { duration: 30, price: 199, name: 'Monthly Plan' },
@@ -67,21 +55,23 @@ export const PremiumProvider = ({ children }) => {
         if (!selectedPlan) return false;
 
         try {
-            // Mock Payment Logic would go here
+            // Mock Payment Logic
             console.log(`Processing payment for ${selectedPlan.name}...`);
             await new Promise(resolve => setTimeout(resolve, 1500));
 
             const expiryDate = new Date();
             expiryDate.setDate(expiryDate.getDate() + selectedPlan.duration);
 
-            const userRef = doc(db, 'users', currentUser.uid);
-            await updateDoc(userRef, {
-                isPremium: true,
-                subscriptionPlan: planId,
-                premiumExpiry: expiryDate,
-                // Also give some bonus coins as a thank you!
-                // coins: increment(100) // Optional
-            });
+            const { error } = await supabase
+                .from('profiles')
+                .update({
+                    is_premium: true,
+                    subscription_plan: planId,
+                    premium_expiry: expiryDate.toISOString()
+                })
+                .eq('id', currentUser.id);
+
+            if (error) throw error;
 
             toast.success(`Welcome to Premium! You are now a VIP.`);
             return true;

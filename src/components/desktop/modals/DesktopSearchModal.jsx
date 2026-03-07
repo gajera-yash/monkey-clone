@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import toast from 'react-hot-toast';
-import { doc, getDoc } from 'firebase/firestore';
-import { db } from '../../../firebase';
+import { supabase } from '../../../supabase';
 
 const DesktopSearchModal = ({ onClose }) => {
     const [searchId, setSearchId] = useState('');
@@ -13,12 +12,25 @@ const DesktopSearchModal = ({ onClose }) => {
             setIsSearching(true);
             setSearchResult(null);
             try {
-                const userRef = doc(db, 'users', searchId.trim());
-                const userSnap = await getDoc(userRef);
-                if (userSnap.exists()) {
-                    setSearchResult(userSnap.data());
+                const { data, error } = await supabase
+                    .from('profiles')
+                    .select('*')
+                    .eq('id', searchId.trim())
+                    .single();
+
+                if (error) {
+                    if (error.code === 'PGRST116') {
+                        toast.error("User not found");
+                    } else {
+                        throw error;
+                    }
                 } else {
-                    toast.error("User not found");
+                    setSearchResult({
+                        ...data,
+                        displayName: data.username,
+                        photoURL: data.avatar_url,
+                        uid: data.id
+                    });
                 }
             } catch (error) {
                 console.error("Search error", error);

@@ -204,7 +204,7 @@ const ChatLayout = () => {
 
   // Creator Redirect Logic — runs when user data is fully loaded
   useEffect(() => {
-    if (loading) return; // wait for Firestore data
+    if (loading) return; // wait for Supabase data
     if (currentUser?.isCreator) {
       if (currentUser.accountStatus === 'active') {
         navigate('/creator/dashboard', { replace: true });

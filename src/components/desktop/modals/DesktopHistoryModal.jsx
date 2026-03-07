@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, query, orderBy, limit, onSnapshot, doc, deleteDoc } from 'firebase/firestore';
-import { db } from '../../../firebase';
+import { supabase } from '../../../supabase';
 import { useAuth } from '../../../context/AuthContext';
 import toast from 'react-hot-toast';
 
@@ -10,27 +9,62 @@ const DesktopHistoryModal = ({ onClose }) => {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        if (!currentUser?.uid) return;
+        if (!currentUser?.id) return;
 
-        const historyRef = collection(db, `users/${currentUser.uid}/matchHistory`);
-        const q = query(historyRef, orderBy('timestamp', 'desc'), limit(50));
+        const fetchHistory = async () => {
+            try {
+                // Fetch matches where user is user1 or user2
+                const { data, error } = await supabase
+                    .from('chat_logs')
+                    .select(`
+                        id,
+                        start_time,
+                        duration,
+                        user1_id,
+                        user2_id,
+                        partner:profiles!chat_logs_user2_id_fkey (
+                            username,
+                            avatar_url,
+                            gender
+                        )
+                    `)
+                    .or(`user1_id.eq.${currentUser.id},user2_id.eq.${currentUser.id}`)
+                    .order('start_time', { ascending: false })
+                    .limit(50);
 
-        const unsubscribe = onSnapshot(q, (snapshot) => {
-            const data = snapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data(),
-                time: doc.data().timestamp?.toDate()?.toLocaleString() || new Date().toLocaleString()
-            }));
-            setHistoryData(data);
-            setLoading(false);
-        });
+                if (error) throw error;
 
-        return () => unsubscribe();
+                const formatted = data.map(item => {
+                    const partner = item.partner;
+                    return {
+                        id: item.id,
+                        name: partner?.username || 'Unknown',
+                        avatar: partner?.avatar_url,
+                        time: new Date(item.start_time).toLocaleString(),
+                        duration: item.duration ? `${Math.floor(item.duration / 60)}m ${item.duration % 60}s` : null,
+                        location: 'Global' // Supabase schema doesn't have location yet
+                    };
+                });
+                setHistoryData(formatted);
+            } catch (error) {
+                console.error("Error fetching history:", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchHistory();
     }, [currentUser]);
 
     const handleDelete = async (id) => {
         try {
-            await deleteDoc(doc(db, `users/${currentUser.uid}/matchHistory`, id));
+            const { error } = await supabase
+                .from('chat_logs')
+                .delete()
+                .eq('id', id);
+
+            if (error) throw error;
+            setHistoryData(prev => prev.filter(item => item.id !== id));
             toast.success("Record deleted");
         } catch (error) {
             toast.error("Failed to delete");

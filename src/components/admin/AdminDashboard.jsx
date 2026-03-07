@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { db } from '../../firebase';
-import { collection, query, orderBy, getDocs, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { supabase } from '../../supabase';
 import { toast } from 'react-hot-toast';
 
 const AdminDashboard = () => {
@@ -13,13 +12,19 @@ const AdminDashboard = () => {
 
     const fetchReports = async () => {
         try {
-            const q = query(collection(db, "reports"), orderBy("timestamp", "desc"));
-            const querySnapshot = await getDocs(q);
-            const reportsData = querySnapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data()
-            }));
-            setReports(reportsData);
+            const { data, error } = await supabase
+                .from('reports')
+                .select('*')
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+
+            setReports(data.map(r => ({
+                ...r,
+                reportedUserId: r.reported_user_id,
+                reporterId: r.reporter_id,
+                timestamp: { seconds: new Date(r.created_at).getTime() / 1000 } // Compatibility
+            })));
         } catch (error) {
             console.error("Error fetching reports:", error);
             toast.error("Failed to fetch reports");
@@ -29,16 +34,25 @@ const AdminDashboard = () => {
     };
 
     const handleBanUser = async (report) => {
-        if (!window.confirm(`Are you sure you want to BAN user ${report.reportedUserId}?`)) return;
+        if (!report.reported_user_id) return;
+        if (!window.confirm(`Are you sure you want to BAN user ${report.reported_user_id}?`)) return;
 
         try {
-            // 1. Ban user in 'users' collection
-            const userRef = doc(db, "users", report.reportedUserId);
-            await updateDoc(userRef, { isBanned: true });
+            // 1. Ban user in 'profiles' table
+            const { error: banError } = await supabase
+                .from('profiles')
+                .update({ account_status: 'banned' })
+                .eq('id', report.reported_user_id);
+
+            if (banError) throw banError;
 
             // 2. Update report status
-            const reportRef = doc(db, "reports", report.id);
-            await updateDoc(reportRef, { status: "resolved_banned" });
+            const { error: reportError } = await supabase
+                .from('reports')
+                .update({ status: 'resolved_banned' })
+                .eq('id', report.id);
+
+            if (reportError) throw reportError;
 
             toast.success("User has been BANNED.");
             fetchReports();
@@ -50,8 +64,12 @@ const AdminDashboard = () => {
 
     const handleDismiss = async (reportId) => {
         try {
-            const reportRef = doc(db, "reports", reportId);
-            await updateDoc(reportRef, { status: "dismissed" });
+            const { error } = await supabase
+                .from('reports')
+                .update({ status: 'dismissed' })
+                .eq('id', reportId);
+
+            if (error) throw error;
             toast.success("Report dismissed.");
             fetchReports();
         } catch (error) {
@@ -84,8 +102,8 @@ const AdminDashboard = () => {
                             <tr key={report.id} className="hover:bg-white/5 transition-colors">
                                 <td className="px-6 py-4">
                                     <span className={`px-2 py-1 rounded text-xs font-bold ${report.status === 'pending' ? 'bg-yellow-500/20 text-yellow-500' :
-                                            report.status === 'dismissed' ? 'bg-gray-500/20 text-gray-500' :
-                                                'bg-green-500/20 text-green-500'
+                                        report.status === 'dismissed' ? 'bg-gray-500/20 text-gray-500' :
+                                            'bg-green-500/20 text-green-500'
                                         }`}>
                                         {report.status || 'pending'}
                                     </span>

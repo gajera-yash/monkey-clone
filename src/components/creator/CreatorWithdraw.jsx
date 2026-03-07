@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { db } from '../../firebase';
-import { collection, addDoc, serverTimestamp, doc, updateDoc, increment } from 'firebase/firestore';
+import { supabase } from '../../supabase';
 import toast from 'react-hot-toast';
 
 const CreatorWithdraw = () => {
@@ -47,26 +46,31 @@ const CreatorWithdraw = () => {
         const toastId = toast.loading("Processing request...");
 
         try {
-            // 1. Create withdrawal request
-            const requestsRef = collection(db, 'withdrawalRequests');
-            await addDoc(requestsRef, {
-                creatorId: currentUser.uid,
-                amount: withdrawAmount,
-                method,
-                details: method === 'upi' ? { upiId: paymentDetails } : bankDetails,
-                status: 'pending',
-                requestedAt: serverTimestamp()
+            // 1. Create withdrawal request in payouts table
+            const { error: payoutError } = await supabase
+                .from('payouts')
+                .insert({
+                    user_id: currentUser.uid,
+                    amount: withdrawAmount,
+                    method,
+                    details: method === 'upi' ? { upiId: paymentDetails } : bankDetails,
+                    status: 'pending'
+                });
+
+            if (payoutError) throw payoutError;
+
+            // 2. Deduct from available balance using RPC
+            const { error: balanceError } = await supabase.rpc('update_creator_balance', {
+                user_id: currentUser.uid,
+                earned: -withdrawAmount,
+                duration: 0 // Duration not relevant for withdrawal
             });
 
-            // 2. Deduct from available balance (optimistic local update + firestore update)
-            const userRef = doc(db, 'users', currentUser.uid);
-            await updateDoc(userRef, {
-                availableBalance: increment(-withdrawAmount)
-            });
+            if (balanceError) throw balanceError;
 
             // Update local context to reflect immediately
             await updateProfileInfo({
-                availableBalance: availableBalance - withdrawAmount
+                available_balance: (currentUser.available_balance || 0) - withdrawAmount
             });
 
             toast.success(`Withdrawal request for ₹${withdrawAmount} submitted!`, { id: toastId });
@@ -140,8 +144,8 @@ const CreatorWithdraw = () => {
                                         type="button"
                                         onClick={() => setMethod('upi')}
                                         className={`p-4 rounded-2xl border-2 flex flex-col items-center justify-center gap-2 transition-all ${method === 'upi'
-                                                ? 'border-accent-purple bg-accent-purple/10 text-white'
-                                                : 'border-white/5 hover:border-white/20 text-gray-400'
+                                            ? 'border-accent-purple bg-accent-purple/10 text-white'
+                                            : 'border-white/5 hover:border-white/20 text-gray-400'
                                             }`}
                                     >
                                         <span className="text-2xl">📱</span>
@@ -151,8 +155,8 @@ const CreatorWithdraw = () => {
                                         type="button"
                                         onClick={() => setMethod('bank')}
                                         className={`p-4 rounded-2xl border-2 flex flex-col items-center justify-center gap-2 transition-all ${method === 'bank'
-                                                ? 'border-blue-500 bg-blue-500/10 text-white'
-                                                : 'border-white/5 hover:border-white/20 text-gray-400'
+                                            ? 'border-blue-500 bg-blue-500/10 text-white'
+                                            : 'border-white/5 hover:border-white/20 text-gray-400'
                                             }`}
                                     >
                                         <span className="text-2xl">🏦</span>
@@ -239,8 +243,8 @@ const CreatorWithdraw = () => {
                                 type="submit"
                                 disabled={isSubmitting || !amount || Number(amount) < MINIMUM_WITHDRAWAL}
                                 className={`w-full py-4 rounded-2xl font-black text-lg shadow-xl flex items-center justify-center transition-all ${isSubmitting || !amount || Number(amount) < MINIMUM_WITHDRAWAL
-                                        ? 'bg-dark-900 text-gray-500 cursor-not-allowed'
-                                        : 'bg-gradient-to-r from-green-400 to-emerald-500 text-black hover:scale-[1.02] active:scale-95 shadow-green-500/20'
+                                    ? 'bg-dark-900 text-gray-500 cursor-not-allowed'
+                                    : 'bg-gradient-to-r from-green-400 to-emerald-500 text-black hover:scale-[1.02] active:scale-95 shadow-green-500/20'
                                     }`}
                             >
                                 {isSubmitting ? (

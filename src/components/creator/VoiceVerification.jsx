@@ -1,9 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { storage, db } from '../../firebase';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { supabase } from '../../supabase';
 import toast from 'react-hot-toast';
 
 const VoiceVerification = () => {
@@ -83,24 +81,35 @@ const VoiceVerification = () => {
         const toastId = toast.loading("Uploading voice verification...");
 
         try {
-            // 1. Upload to Storage
-            const storageRef = ref(storage, `creator-verification/${currentUser.uid}/voice.webm`);
-            await uploadBytes(storageRef, audioBlob);
-            const downloadURL = await getDownloadURL(storageRef);
+            const fileName = `${currentUser.uid}/voice_${Date.now()}.webm`;
 
-            // 2. Update Verifications Document
-            const verificationRef = doc(db, 'creatorVerifications', currentUser.uid);
-            await updateDoc(verificationRef, {
-                voiceAudio: downloadURL,
-                status: 'pending',
-                updatedAt: serverTimestamp()
-            });
+            // 1. Upload to Supabase Storage
+            const { data: uploadData, error: uploadError } = await supabase.storage
+                .from('verifications')
+                .upload(fileName, audioBlob, { contentType: 'audio/webm' });
 
-            // 3. Mark profile verification level
+            if (uploadError) throw uploadError;
+
+            // 2. Get Public URL
+            const { data: { publicUrl } } = supabase.storage
+                .from('verifications')
+                .getPublicUrl(fileName);
+
+            // 3. Update Verifications Table
+            const { error: dbError } = await supabase
+                .from('verifications')
+                .update({
+                    voice_url: publicUrl,
+                    status: 'pending'
+                })
+                .eq('user_id', currentUser.uid);
+
+            if (dbError) throw dbError;
+
+            // 4. Mark profile verification level
             await updateProfileInfo({ verificationLevel: 1 });
 
             toast.success("Voice verified successfully!", { id: toastId });
-            // Redirect to Dashboard
             navigate('/creator/dashboard');
 
         } catch (error) {
@@ -150,8 +159,8 @@ const VoiceVerification = () => {
                             <button
                                 onClick={isRecording ? stopRecording : startRecording}
                                 className={`w-24 h-24 rounded-full flex items-center justify-center transition-all ${isRecording
-                                        ? 'bg-red-500/20 border-4 border-red-500 animate-pulse'
-                                        : 'bg-blue-500/20 border-4 border-blue-500 hover:scale-105'
+                                    ? 'bg-red-500/20 border-4 border-red-500 animate-pulse'
+                                    : 'bg-blue-500/20 border-4 border-blue-500 hover:scale-105'
                                     }`}
                             >
                                 {isRecording ? (

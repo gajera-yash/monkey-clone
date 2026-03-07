@@ -1,19 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import {
-    doc,
-    updateDoc,
-    increment,
-    collection,
-    addDoc,
-    serverTimestamp,
-    onSnapshot,
-    query,
-    orderBy,
-    limit,
-    getDoc,
-    setDoc
-} from 'firebase/firestore';
-import { db } from '../firebase';
+import { supabase } from '../supabase';
 import { useAuth } from './AuthContext';
 import toast from 'react-hot-toast';
 
@@ -27,48 +13,32 @@ export const CoinsProvider = ({ children }) => {
     const [transactions, setTransactions] = useState([]);
     const [loading, setLoading] = useState(true);
 
-    // Listen to real-time coin balance
+    // Sync coins with currentUser from AuthContext
     useEffect(() => {
-        if (!currentUser?.uid) {
+        if (currentUser?.coins !== undefined) {
+            setCoins(currentUser.coins);
+            setLoading(false);
+        } else if (!currentUser) {
             setCoins(0);
             setTransactions([]);
             setLoading(false);
-            return;
         }
-
-        const userRef = doc(db, 'users', currentUser.uid);
-
-        const unsubscribe = onSnapshot(userRef, (doc) => {
-            if (doc.exists()) {
-                const data = doc.data();
-                setCoins(data.coins || 0);
-            }
-            setLoading(false);
-        });
-
-        return () => unsubscribe();
     }, [currentUser]);
 
     // Fetch transaction history
     const fetchTransactions = async () => {
-        if (!currentUser?.uid) return;
+        if (!currentUser?.id) return;
 
         try {
-            const q = query(
-                collection(db, `users/${currentUser.uid}/transactions`),
-                orderBy('timestamp', 'desc'),
-                limit(20)
-            );
+            const { data, error } = await supabase
+                .from('transactions')
+                .select('*')
+                .eq('user_id', currentUser.id)
+                .order('created_at', { ascending: false })
+                .limit(20);
 
-            const unsubscribe = onSnapshot(q, (snapshot) => {
-                const txs = snapshot.docs.map(doc => ({
-                    id: doc.id,
-                    ...doc.data()
-                }));
-                setTransactions(txs);
-            });
-
-            return unsubscribe; // allow cleanup if needed
+            if (error) throw error;
+            setTransactions(data);
         } catch (error) {
             console.error("Error fetching transactions:", error);
         }
@@ -80,24 +50,26 @@ export const CoinsProvider = ({ children }) => {
 
     // Add coins (earn/purchase)
     const addCoins = async (amount, reason, type = 'earn') => {
-        if (!currentUser?.uid) return;
+        if (!currentUser?.id) return;
 
         try {
-            const userRef = doc(db, 'users', currentUser.uid);
-            const txRef = collection(db, `users/${currentUser.uid}/transactions`);
-
-            // 1. Update balance
-            await updateDoc(userRef, {
-                coins: increment(amount)
+            // 1. Update balance in profiles table
+            const { error: updateError } = await supabase.rpc('add_coins', {
+                user_id: currentUser.id,
+                amount: amount
             });
+            if (updateError) throw updateError;
 
             // 2. Add transaction record
-            await addDoc(txRef, {
-                amount,
-                type,
-                description: reason,
-                timestamp: serverTimestamp()
-            });
+            const { error: txError } = await supabase
+                .from('transactions')
+                .insert({
+                    user_id: currentUser.id,
+                    amount,
+                    type,
+                    description: reason
+                });
+            if (txError) throw txError;
 
             toast.success(`+${amount} Coins! ${reason}`);
             return true;
@@ -110,7 +82,7 @@ export const CoinsProvider = ({ children }) => {
 
     // Spend coins
     const spendCoins = async (amount, reason) => {
-        if (!currentUser?.uid) {
+        if (!currentUser?.id) {
             toast.error("Please login to use coins");
             return false;
         }
@@ -121,21 +93,23 @@ export const CoinsProvider = ({ children }) => {
         }
 
         try {
-            const userRef = doc(db, 'users', currentUser.uid);
-            const txRef = collection(db, `users/${currentUser.uid}/transactions`);
-
-            // 1. Deduct balance
-            await updateDoc(userRef, {
-                coins: increment(-amount)
+            // 1. Deduct balance in profiles table
+            const { error: updateError } = await supabase.rpc('add_coins', {
+                user_id: currentUser.id,
+                amount: -amount
             });
+            if (updateError) throw updateError;
 
             // 2. Add transaction record
-            await addDoc(txRef, {
-                amount: -amount,
-                type: 'spend',
-                description: reason,
-                timestamp: serverTimestamp()
-            });
+            const { error: txError } = await supabase
+                .from('transactions')
+                .insert({
+                    user_id: currentUser.id,
+                    amount: -amount,
+                    type: 'spend',
+                    description: reason
+                });
+            if (txError) throw txError;
 
             return true;
         } catch (error) {
@@ -145,7 +119,7 @@ export const CoinsProvider = ({ children }) => {
         }
     };
 
-    // Mock purchase function
+    // Purchase function
     const purchaseCoins = async (packageId) => {
         const packages = {
             'pkg_100': { coins: 100, price: 99 },
@@ -168,24 +142,17 @@ export const CoinsProvider = ({ children }) => {
 
     // Check for daily bonus
     const checkDailyBonus = async () => {
-        if (!currentUser?.uid) return;
-
+        if (!currentUser?.id) return;
         const today = new Date().toDateString();
-        const lastBonusDate = localStorage.getItem(`dailyBonus_${currentUser.uid}`);
-
-        if (lastBonusDate !== today) {
-            // It's a new day!
-            return true;
-        }
-        return false;
+        const lastBonusDate = localStorage.getItem(`dailyBonus_${currentUser.id}`);
+        return lastBonusDate !== today;
     };
 
     const claimDailyBonus = async () => {
-        if (!currentUser?.uid) return;
-
+        if (!currentUser?.id) return;
         const success = await addCoins(50, "Daily Login Bonus");
         if (success) {
-            localStorage.setItem(`dailyBonus_${currentUser.uid}`, new Date().toDateString());
+            localStorage.setItem(`dailyBonus_${currentUser.id}`, new Date().toDateString());
         }
         return success;
     };

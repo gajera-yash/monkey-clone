@@ -2,8 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../../../context/AuthContext';
 import { useCoins } from '../../../context/CoinsContext';
 import toast from 'react-hot-toast';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { storage } from '../../../firebase';
+import { supabase } from '../../../supabase';
 
 
 const DesktopProfileModal = ({ onClose }) => {
@@ -27,10 +26,18 @@ const DesktopProfileModal = ({ onClose }) => {
 
         try {
             setUploadingImage(true);
-            const imageRef = ref(storage, `profiles/${currentUser.uid}_${Date.now()}`);
-            await uploadBytes(imageRef, file);
-            const url = await getDownloadURL(imageRef);
-            await updateProfileInfo({ photoURL: url });
+            const fileName = `${currentUser.uid}_${Date.now()}`;
+            const { data, error } = await supabase.storage
+                .from('avatars')
+                .upload(fileName, file);
+
+            if (error) throw error;
+
+            const { data: { publicUrl } } = supabase.storage
+                .from('avatars')
+                .getPublicUrl(fileName);
+
+            await updateProfileInfo({ photoURL: publicUrl });
             toast.success("Profile photo updated!");
         } catch (error) {
             console.error("Error uploading image:", error);

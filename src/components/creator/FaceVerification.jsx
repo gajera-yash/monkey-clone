@@ -1,9 +1,7 @@
 import React, { useRef, useState, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-import { storage, db } from "../../firebase";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { supabase } from "../../supabase";
 import toast from "react-hot-toast";
 
 const FaceVerification = () => {
@@ -107,36 +105,36 @@ const FaceVerification = () => {
     const toastId = toast.loading("Verifying face...");
 
     try {
-      const storageRef = ref(
-        storage,
-        `creator-verification/${currentUser.uid}/face.jpg`
-      );
-
-      const verificationRef = doc(db, "creatorVerifications", currentUser.uid);
+      const fileName = `${currentUser.uid}/face_${Date.now()}.jpg`;
 
       // Convert base64 to blob
       const res = await fetch(capturedImage);
       const blob = await res.blob();
 
-      // Upload image
-      await uploadBytes(storageRef, blob);
+      // 1. Upload image to Supabase Storage
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('verifications')
+        .upload(fileName, blob, { contentType: 'image/jpeg' });
 
-      const downloadURL = await getDownloadURL(storageRef);
+      if (uploadError) throw uploadError;
 
-      // Single Firestore write
-      await setDoc(
-        verificationRef,
-        {
-          creatorId: currentUser.uid,
-          faceImage: downloadURL,
-          status: "pending",
-          submittedAt: serverTimestamp(),
-        },
-        { merge: true }
-      );
+      // 2. Get Public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('verifications')
+        .getPublicUrl(fileName);
+
+      // 3. Insert into verifications table
+      const { error: dbError } = await supabase
+        .from('verifications')
+        .insert({
+          user_id: currentUser.uid,
+          face_url: publicUrl,
+          status: "pending"
+        });
+
+      if (dbError) throw dbError;
 
       toast.success("Face verified!", { id: toastId });
-
       navigate("/creator/verify/voice");
     } catch (error) {
       console.error(error);

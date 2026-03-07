@@ -1,15 +1,4 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import {
-    signInWithPopup,
-    signInWithEmailAndPassword,
-    createUserWithEmailAndPassword,
-    signOut,
-    onAuthStateChanged,
-    updateProfile
-} from 'firebase/auth';
-import { doc, setDoc, getDoc, serverTimestamp, updateDoc, onSnapshot, collection, addDoc, increment } from 'firebase/firestore';
-
-import { auth, googleProvider, db } from '../firebase';
 import { supabase } from '../supabase';
 import toast from 'react-hot-toast';
 import { getUserLocation } from '../utils/geolocation';
@@ -25,107 +14,42 @@ export const AuthProvider = ({ children }) => {
     const [blockedUsers, setBlockedUsers] = useState([]);
     const [userLocation, setUserLocation] = useState(null);
 
-    // Save user to Firestore
-    const saveUserToDb = async (user) => {
-        const userRef = doc(db, "users", user.uid);
-        const userSnap = await getDoc(userRef);
+    // Fetch Profile from Supabase
+    const fetchProfile = async (userId) => {
+        try {
+            const { data, error } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', userId)
+                .single();
 
-        if (!userSnap.exists()) {
-            const gender = localStorage.getItem('userGender');
-
-            const userData = {
-                uid: user.uid,
-                displayName: user.displayName || 'Anonymous',
-                email: user.email,
-                photoURL: user.photoURL,
-                gender: gender || 'unknown',
-                createdAt: serverTimestamp(),
-                lastLogin: serverTimestamp(),
-                totalChats: 0,
-                blockedUsers: [],
-                coins: 500, // Initial coins
-                bio: '',
-                ...(gender === 'Female' ? {
-                    isCreator: true,
-                    accountStatus: 'pending',
-                    verificationLevel: 0,
-                    currentTier: 1,
-                    totalEarnings: 0,
-                    availableBalance: 0,
-                    lifetimeWithdrawn: 0,
-                    totalHoursOnline: 0,
-                    rating: 0,
-                    totalRatings: 0,
-                    profileComplete: false
-                } : {
-                    isCreator: false
-                }),
-                safetySettings: {
-                    disableFriendRequests: false,
-                    invisibleMode: false
-                },
-                matchPreferences: {
-                    ageRange: [18, 35],
-                    language: 'Unlimited',
-                    regions: {
-                        northAmerica: 'Default',
-                        latinAmerica: 'Default',
-                        northAfrica: 'Default',
-                        middleEast: 'Default'
-                    }
-                }
+            if (error) throw error;
+            // Mapping to support existing components (uid, isCreator, etc)
+            return {
+                ...data,
+                uid: data.id,
+                isCreator: data.is_creator,
+                accountStatus: data.account_status,
+                displayName: data.username,
+                photoURL: data.avatar_url
             };
-
-            await setDoc(userRef, userData);
-
-            // SYNC TO SUPABASE
-            try {
-                const { error: supabaseError } = await supabase
-                    .from('profiles')
-                    .upsert({
-                        id: user.uid,
-                        username: user.displayName || 'Anonymous',
-                        email: user.email,
-                        avatar_url: user.photoURL,
-                        gender: (gender || 'unknown').toLowerCase(),
-                        role: 'user', // Default role
-                        coins: 500,
-                        is_creator: gender === 'Female',
-                        created_at: new Date().toISOString()
-                    });
-                if (supabaseError) console.error("Supabase sync error:", supabaseError);
-            } catch (err) {
-                console.error("Supabase profile sync failed:", err);
-            }
-        } else {
-            const data = userSnap.data();
-            setBlockedUsers(data.blockedUsers || []);
-            await setDoc(userRef, {
-                lastLogin: serverTimestamp()
-            }, { merge: true });
-
-            // SYNC TO SUPABASE (Update last seen)
-            try {
-                await supabase
-                    .from('profiles')
-                    .update({
-                        last_seen: new Date().toISOString()
-                    })
-                    .eq('id', user.uid);
-            } catch (err) {
-                console.error("Supabase login sync failed:", err);
-            }
+        } catch (error) {
+            console.error("Error fetching profile:", error);
+            return null;
         }
     };
 
     // Google Login
     const loginWithGoogle = async () => {
         try {
-            const result = await signInWithPopup(auth, googleProvider);
-            await saveUserToDb(result.user);
-            setIsGuest(false);
-            toast.success(`Welcome ${result.user.displayName}!`);
-            return result.user;
+            const { data, error } = await supabase.auth.signInWithOAuth({
+                provider: 'google',
+                options: {
+                    redirectTo: window.location.origin
+                }
+            });
+            if (error) throw error;
+            return data;
         } catch (error) {
             console.error(error);
             toast.error(error.message);
@@ -136,11 +60,14 @@ export const AuthProvider = ({ children }) => {
     // Email Login
     const loginWithEmail = async (email, password) => {
         try {
-            const result = await signInWithEmailAndPassword(auth, email, password);
-            // check if user exists in db (might be created via signup)
+            const { data, error } = await supabase.auth.signInWithPassword({
+                email,
+                password
+            });
+            if (error) throw error;
             setIsGuest(false);
             toast.success("Logged in successfully!");
-            return result.user;
+            return data.user;
         } catch (error) {
             toast.error(error.message);
             throw error;
@@ -150,14 +77,21 @@ export const AuthProvider = ({ children }) => {
     // Email Signup
     const signupWithEmail = async (email, password, name) => {
         try {
-            const result = await createUserWithEmailAndPassword(auth, email, password);
-            // Update profile with name
-            await updateProfile(result.user, { displayName: name });
-            // Save to DB
-            await saveUserToDb({ ...result.user, displayName: name });
+            const gender = localStorage.getItem('userGender');
+            const { data, error } = await supabase.auth.signUp({
+                email,
+                password,
+                options: {
+                    data: {
+                        full_name: name,
+                        gender: gender || 'unknown'
+                    }
+                }
+            });
+            if (error) throw error;
             setIsGuest(false);
-            toast.success("Account created!");
-            return result.user;
+            toast.success("Account created! Please check your email.");
+            return data.user;
         } catch (error) {
             toast.error(error.message);
             throw error;
@@ -167,9 +101,9 @@ export const AuthProvider = ({ children }) => {
     // Guest Login
     const continueAsGuest = () => {
         setIsGuest(true);
-        setBlockedUsers([]); // Reset blocked users
+        setBlockedUsers([]);
         const guestUser = {
-            uid: `guest_${Date.now()}`,
+            id: `guest_${Date.now()}`,
             displayName: 'Guest User',
             isAnonymous: true,
             photoURL: null
@@ -182,12 +116,12 @@ export const AuthProvider = ({ children }) => {
     const logout = async () => {
         try {
             if (!isGuest) {
-                await signOut(auth);
+                await supabase.auth.signOut();
             }
             setIsGuest(false);
             setCurrentUser(null);
-            localStorage.removeItem('lastActivity'); // Clear activity on logout
-            localStorage.removeItem('userGender');   // Clear gender so gender modal shows next login
+            localStorage.removeItem('lastActivity');
+            localStorage.removeItem('userGender');
             toast.success("Logged out");
         } catch (error) {
             toast.error("Error logging out");
@@ -198,8 +132,8 @@ export const AuthProvider = ({ children }) => {
     useEffect(() => {
         if (!currentUser) return;
 
-        const INACTIVITY_TIMEOUT = 24 * 60 * 60 * 1000; // 24 hours
-        const CHECK_INTERVAL = 60 * 1000; // 1 minute
+        const INACTIVITY_TIMEOUT = 24 * 60 * 60 * 1000;
+        const CHECK_INTERVAL = 60 * 1000;
 
         const updateActivity = () => {
             localStorage.setItem('lastActivity', Date.now().toString());
@@ -214,28 +148,23 @@ export const AuthProvider = ({ children }) => {
                     toast("Logged out due to inactivity", { icon: '⏰' });
                 }
             } else {
-                // If no activity record, initialize it
                 updateActivity();
             }
         };
 
-        // Events to track activity
         const activityEvents = [
             'mousedown', 'mousemove', 'keypress',
             'scroll', 'touchstart', 'click'
         ];
 
-        // Register event listeners
         activityEvents.forEach(event => {
             window.addEventListener(event, updateActivity);
         });
 
-        // Initialize activity if not present
         if (!localStorage.getItem('lastActivity')) {
             updateActivity();
         }
 
-        // Periodic check
         const interval = setInterval(checkInactivity, CHECK_INTERVAL);
 
         return () => {
@@ -248,30 +177,19 @@ export const AuthProvider = ({ children }) => {
 
     // Update Profile Info
     const updateProfileInfo = async (updates) => {
-        if (!currentUser?.uid) return;
+        if (!currentUser?.id) return;
         try {
-            const userRef = doc(db, "users", currentUser.uid);
-            await updateDoc(userRef, {
-                ...updates,
-                updatedAt: serverTimestamp()
-            });
+            const supabaseUpdates = {};
+            if (updates.displayName) supabaseUpdates.username = updates.displayName;
+            if (updates.photoURL) supabaseUpdates.avatar_url = updates.photoURL;
+            if (updates.bio !== undefined) supabaseUpdates.bio = updates.bio;
 
-            // SYNC TO SUPABASE
-            try {
-                const supabaseUpdates = {};
-                if (updates.displayName) supabaseUpdates.username = updates.displayName;
-                if (updates.photoURL) supabaseUpdates.avatar_url = updates.photoURL;
-                if (updates.bio !== undefined) supabaseUpdates.bio = updates.bio;
+            const { error } = await supabase
+                .from('profiles')
+                .update(supabaseUpdates)
+                .eq('id', currentUser.id);
 
-                if (Object.keys(supabaseUpdates).length > 0) {
-                    await supabase
-                        .from('profiles')
-                        .update(supabaseUpdates)
-                        .eq('id', currentUser.uid);
-                }
-            } catch (err) {
-                console.error("Supabase profile update sync failed:", err);
-            }
+            if (error) throw error;
 
             setCurrentUser(prev => ({ ...prev, ...updates }));
             toast.success("Profile updated!");
@@ -281,15 +199,17 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
-    // Update Safety Settings
+    // Update Safety Settings (Now in profiles table or a separate settings table)
     const updateSafetySettings = async (settings) => {
-        if (!currentUser?.uid) return;
+        if (!currentUser?.id) return;
         try {
-            const userRef = doc(db, "users", currentUser.uid);
-            await updateDoc(userRef, {
-                safetySettings: settings
-            });
-            setCurrentUser(prev => ({ ...prev, safetySettings: settings }));
+            const { error } = await supabase
+                .from('profiles')
+                .update({ safety_settings: settings })
+                .eq('id', currentUser.id);
+
+            if (error) throw error;
+            setCurrentUser(prev => ({ ...prev, safety_settings: settings }));
             toast.success("Settings saved");
         } catch (error) {
             console.error("Error updating safety settings:", error);
@@ -299,13 +219,15 @@ export const AuthProvider = ({ children }) => {
 
     // Update Match Preferences
     const updateMatchPreferences = async (preferences) => {
-        if (!currentUser?.uid) return;
+        if (!currentUser?.id) return;
         try {
-            const userRef = doc(db, "users", currentUser.uid);
-            await updateDoc(userRef, {
-                matchPreferences: preferences
-            });
-            setCurrentUser(prev => ({ ...prev, matchPreferences: preferences }));
+            const { error } = await supabase
+                .from('profiles')
+                .update({ match_preferences: preferences })
+                .eq('id', currentUser.id);
+
+            if (error) throw error;
+            setCurrentUser(prev => ({ ...prev, match_preferences: preferences }));
             toast.success("Preferences saved");
         } catch (error) {
             console.error("Error updating preferences:", error);
@@ -313,66 +235,37 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
+    // Auth State Listener
     useEffect(() => {
-        let unsubSnapshot = null;
-
-        const unsubscribe = onAuthStateChanged(auth, async (user) => {
-            // Clean up previous snapshot listener if it exists
-            if (unsubSnapshot) {
-                unsubSnapshot();
-                unsubSnapshot = null;
+        const getInitialSession = async () => {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session?.user) {
+                const profile = await fetchProfile(session.user.id);
+                setCurrentUser({ ...session.user, ...profile });
             }
+            setLoading(false);
+        };
 
-            if (user) {
-                const today = new Date().toDateString();
-                const lastLoginDate = localStorage.getItem('lastLoginDate');
+        getInitialSession();
 
-                if (lastLoginDate && lastLoginDate !== today) {
-                    signOut(auth);
-                    localStorage.removeItem('lastLoginDate');
-                    toast.success("New day! Please log in again.");
-                    setCurrentUser(null);
-                    setLoading(false);
-                    return;
+        const { data: { subscription } } = supabase.auth.onAuthStateChanged(async (event, session) => {
+            if (session?.user) {
+                const profile = await fetchProfile(session.user.id);
+                setCurrentUser({ ...session.user, ...profile });
+
+                // Check for ban
+                if (profile?.ban_expiry && new Date(profile.ban_expiry) > new Date()) {
+                    logout();
+                    toast.error(`Account banned until ${new Date(profile.ban_expiry).toLocaleDateString()}`);
                 }
-
-                localStorage.setItem('lastLoginDate', today);
-
-                const userRef = doc(db, "users", user.uid);
-
-                // Set up new snapshot listener
-                unsubSnapshot = onSnapshot(userRef, (docSnap) => {
-                    if (docSnap.exists()) {
-                        const data = docSnap.data();
-                        if (data.isBanned) {
-                            signOut(auth);
-                            toast.error("This account has been banned.");
-                            setCurrentUser(null);
-                        } else {
-                            setBlockedUsers(data.blockedUsers || []);
-                            setCurrentUser({ ...user, ...data });
-                        }
-                    } else {
-                        setCurrentUser(user);
-                    }
-                    setLoading(false);
-                }, (error) => {
-                    console.error("Firestore snapshot error:", error);
-                    setCurrentUser(user);
-                    setLoading(false);
-                });
-            } else {
-                if (!isGuest) {
-                    setCurrentUser(null);
-                    setBlockedUsers([]);
-                }
-                setLoading(false);
+            } else if (!isGuest) {
+                setCurrentUser(null);
             }
+            setLoading(false);
         });
 
         return () => {
-            unsubscribe();
-            if (unsubSnapshot) unsubSnapshot();
+            if (subscription) subscription.unsubscribe();
         };
     }, [isGuest]);
 
@@ -388,27 +281,18 @@ export const AuthProvider = ({ children }) => {
     // Report User
     const reportUser = async (reportedUserId, reason, description) => {
         try {
-            // 1. Create Report
-            const reportsRef = doc(db, "reports", `${Date.now()}_${currentUser?.uid || 'guest'}`);
-            await setDoc(reportsRef, {
-                reporterId: currentUser?.uid || 'guest',
-                reportedUserId,
-                reason,
-                description,
-                timestamp: serverTimestamp(),
-                status: 'pending'
-            });
+            const { error } = await supabase
+                .from('reports')
+                .insert({
+                    reporter_id: currentUser?.id,
+                    reported_id: reportedUserId,
+                    reason,
+                    description,
+                    status: 'pending'
+                });
 
-            // 2. Block User locally and in DB
-            const newBlocked = [...blockedUsers, reportedUserId];
-            setBlockedUsers(newBlocked);
-
-            if (!isGuest && currentUser) {
-                const userRef = doc(db, "users", currentUser.uid);
-                await setDoc(userRef, { blockedUsers: newBlocked }, { merge: true });
-            }
-
-            toast.success("User reported and blocked.");
+            if (error) throw error;
+            toast.success("User reported.");
         } catch (error) {
             console.error("Error reporting user:", error);
             toast.error("Failed to report user.");
@@ -417,48 +301,41 @@ export const AuthProvider = ({ children }) => {
 
     // Save match to history
     const saveMatchToHistory = async (partnerData) => {
-        if (!currentUser?.uid || isGuest) return;
+        if (!currentUser?.id || isGuest) return;
         try {
-            const historyRef = collection(db, `users/${currentUser.uid}/matchHistory`);
-            await addDoc(historyRef, {
-                ...partnerData,
-                timestamp: serverTimestamp()
-            });
+            await supabase
+                .from('chat_logs')
+                .insert({
+                    user1_id: currentUser.id,
+                    user2_id: partnerData.uid,
+                    start_time: new Date().toISOString()
+                });
 
-            // Also update total chats count
-            const userRef = doc(db, "users", currentUser.uid);
-            await updateDoc(userRef, {
-                totalChats: increment(1)
-            });
+            // Update total chats
+            await supabase.rpc('increment_chats', { user_id: currentUser.id });
         } catch (error) {
             console.error("Error saving match history:", error);
         }
     };
 
-    // Log Creator Earnings for a session
+    // Log Creator Earnings
     const logCreatorEarnings = async (durationSec, earnedAmount) => {
-        if (!currentUser?.uid || !currentUser?.isCreator || earnedAmount <= 0) return;
+        if (!currentUser?.id || !currentUser?.is_creator || earnedAmount <= 0) return;
         try {
-            // 1. Add to creatorEarnings collection for history/charts
-            const earningsRef = collection(db, 'creatorEarnings');
-            await addDoc(earningsRef, {
-                creatorId: currentUser.uid,
-                amount: earnedAmount,
-                durationSeconds: durationSec,
-                source: 'video_chat',
-                timestamp: serverTimestamp()
-            });
+            await supabase
+                .from('transactions')
+                .insert({
+                    user_id: currentUser.id,
+                    amount: earnedAmount,
+                    type: 'creator_earning'
+                });
 
-            // 2. Update the user's total balance
-            const userRef = doc(db, "users", currentUser.uid);
-            await updateDoc(userRef, {
-                totalEarnings: increment(earnedAmount),
-                availableBalance: increment(earnedAmount),
-                totalHoursOnline: increment(durationSec / 3600)
+            // Update balance
+            await supabase.rpc('update_creator_balance', {
+                user_id: currentUser.id,
+                earned: earnedAmount,
+                duration: durationSec
             });
-
-            // Note: In a real production app, we would also deduct coins from the partner here 
-            // via a secure Cloud Function using transaction.
         } catch (error) {
             console.error("Error logging creator earnings:", error);
         }
