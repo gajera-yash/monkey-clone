@@ -65,112 +65,116 @@ export const CoinsProvider = ({ children }) => {
                 .from('transactions')
                 .insert({
                     user_id: currentUser.id,
-                    amount,
+                    amount: amount, -- Decimal
+                    coins_amount: amount, --Integer
                     type,
                     description: reason
                 });
-            if (txError) throw txError;
-
-            toast.success(`+${amount} Coins! ${reason}`);
-            return true;
-        } catch (error) {
-            console.error("Error adding coins:", error);
-            toast.error("Failed to add coins");
-            return false;
-        }
-    };
-
-    // Spend coins
-    const spendCoins = async (amount, reason) => {
-        if (!currentUser?.id) {
-            toast.error("Please login to use coins");
-            return false;
+        if (txError) {
+            console.error("Error creating transaction record:", txError.message);
+            throw txError;
         }
 
-        if (coins < amount) {
-            toast.error(`Insufficient coins! Need ${amount - coins} more.`);
-            return false;
-        }
+        toast.success(`+${amount} Coins! ${reason}`);
+        return true;
+    } catch (error) {
+        console.error("Error adding coins:", error);
+        toast.error("Failed to add coins");
+        return false;
+    }
+};
 
-        try {
-            // 1. Deduct balance in profiles table
-            const { error: updateError } = await supabase.rpc('add_coins', {
-                user_id: currentUser.id,
-                amount_to_add: -amount
-            });
-            if (updateError) throw updateError;
+// Spend coins
+const spendCoins = async (amount, reason) => {
+    if (!currentUser?.id) {
+        toast.error("Please login to use coins");
+        return false;
+    }
 
-            // 2. Add transaction record
-            const { error: txError } = await supabase
-                .from('transactions')
-                .insert({
-                    user_id: currentUser.id,
-                    amount: -amount,
-                    type: 'spend',
-                    description: reason
-                });
-            if (txError) throw txError;
+    if (coins < amount) {
+        toast.error(`Insufficient coins! Need ${amount - coins} more.`);
+        return false;
+    }
 
-            return true;
-        } catch (error) {
-            console.error("Error spending coins:", error);
-            toast.error("Transaction failed");
-            return false;
-        }
-    };
-
-    // Purchase function
-    const purchaseCoins = async (packageId) => {
-        const packages = {
-            'pkg_100': { coins: 100, price: 99 },
-            'pkg_500': { coins: 500, price: 449 },
-            'pkg_1000': { coins: 1000, price: 799 },
-            'pkg_5000': { coins: 5000, price: 3499 }
-        };
-
-        const selectedPkg = packages[packageId];
-        if (!selectedPkg) return false;
-
-        // Simulate API call / Payment Gateway
-        return new Promise((resolve) => {
-            setTimeout(async () => {
-                const success = await addCoins(selectedPkg.coins, `Purchased ${selectedPkg.coins} Coins`, 'purchase');
-                resolve(success);
-            }, 1000);
+    try {
+        // 1. Deduct balance in profiles table
+        const { error: updateError } = await supabase.rpc('add_coins', {
+            user_id: currentUser.id,
+            amount_to_add: -amount
         });
+        if (updateError) throw updateError;
+
+        // 2. Add transaction record
+        const { error: txError } = await supabase
+            .from('transactions')
+            .insert({
+                user_id: currentUser.id,
+                amount: -amount,
+                type: 'spend',
+                description: reason
+            });
+        if (txError) throw txError;
+
+        return true;
+    } catch (error) {
+        console.error("Error spending coins:", error);
+        toast.error("Transaction failed");
+        return false;
+    }
+};
+
+// Purchase function
+const purchaseCoins = async (packageId) => {
+    const packages = {
+        'pkg_100': { coins: 100, price: 99 },
+        'pkg_500': { coins: 500, price: 449 },
+        'pkg_1000': { coins: 1000, price: 799 },
+        'pkg_5000': { coins: 5000, price: 3499 }
     };
 
-    // Check for daily bonus
-    const checkDailyBonus = async () => {
-        if (!currentUser?.id) return;
-        const today = new Date().toDateString();
-        const lastBonusDate = localStorage.getItem(`dailyBonus_${currentUser.id}`);
-        return lastBonusDate !== today;
-    };
+    const selectedPkg = packages[packageId];
+    if (!selectedPkg) return false;
 
-    const claimDailyBonus = async () => {
-        if (!currentUser?.id) return;
-        const success = await addCoins(50, "Daily Login Bonus");
-        if (success) {
-            localStorage.setItem(`dailyBonus_${currentUser.id}`, new Date().toDateString());
-        }
-        return success;
-    };
+    // Simulate API call / Payment Gateway
+    return new Promise((resolve) => {
+        setTimeout(async () => {
+            const success = await addCoins(selectedPkg.coins, `Purchased ${selectedPkg.coins} Coins`, 'purchase');
+            resolve(success);
+        }, 1000);
+    });
+};
 
-    const value = {
-        coins,
-        transactions,
-        loading,
-        addCoins,
-        spendCoins,
-        purchaseCoins,
-        checkDailyBonus,
-        claimDailyBonus
-    };
+// Check for daily bonus
+const checkDailyBonus = async () => {
+    if (!currentUser?.id) return;
+    const today = new Date().toDateString();
+    const lastBonusDate = localStorage.getItem(`dailyBonus_${currentUser.id}`);
+    return lastBonusDate !== today;
+};
 
-    return (
-        <CoinsContext.Provider value={value}>
-            {children}
-        </CoinsContext.Provider>
-    );
+const claimDailyBonus = async () => {
+    if (!currentUser?.id) return;
+    const success = await addCoins(50, "Daily Login Bonus");
+    if (success) {
+        localStorage.setItem(`dailyBonus_${currentUser.id}`, new Date().toDateString());
+    }
+    return success;
+};
+
+const value = {
+    coins,
+    transactions,
+    loading,
+    addCoins,
+    spendCoins,
+    purchaseCoins,
+    checkDailyBonus,
+    claimDailyBonus
+};
+
+return (
+    <CoinsContext.Provider value={value}>
+        {children}
+    </CoinsContext.Provider>
+);
 };
