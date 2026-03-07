@@ -42,6 +42,8 @@ export const AuthProvider = ({ children }) => {
     // Google Login
     const loginWithGoogle = async () => {
         try {
+            // This will redirect to the current domain (localhost or Vercel URL)
+            // Make sure to add both to Supabase -> Authentication -> Redirect URLs
             const { data, error } = await supabase.auth.signInWithOAuth({
                 provider: 'google',
                 options: {
