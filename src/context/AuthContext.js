@@ -341,6 +341,15 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
+    // Refresh Profile manually
+    const refreshProfile = async () => {
+        if (!currentUser?.id) return;
+        const profile = await fetchProfile(currentUser.id);
+        if (profile) {
+            setCurrentUser(prev => ({ ...prev, ...profile }));
+        }
+    };
+
     const value = {
         currentUser,
         isGuest,
@@ -357,7 +366,8 @@ export const AuthProvider = ({ children }) => {
         updateSafetySettings,
         updateMatchPreferences,
         saveMatchToHistory,
-        logCreatorEarnings
+        logCreatorEarnings,
+        refreshProfile
     };
 
     return (

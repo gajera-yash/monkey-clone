@@ -33,7 +33,7 @@ const AppContent = () => {
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [isGenderModalOpen, setIsGenderModalOpen] = useState(false);
   const [isBonusOpen, setIsBonusOpen] = useState(false);
-  const { currentUser } = useAuth();
+  const { currentUser, loading } = useAuth();
   const { checkDailyBonus } = useCoins();
   const navigate = useNavigate();
 
@@ -46,6 +46,14 @@ const AppContent = () => {
     };
     checkBonus();
   }, [currentUser, checkDailyBonus]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-dark-900 flex items-center justify-center">
+        <div className="w-12 h-12 rounded-full border-4 border-t-accent-purple border-white/10 animate-spin"></div>
+      </div>
+    );
+  }
 
   // Improved start chat handler with Gender Selection
   const handleStartChat = () => {

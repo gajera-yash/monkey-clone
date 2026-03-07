@@ -8,7 +8,7 @@ const CoinsContext = createContext();
 export const useCoins = () => useContext(CoinsContext);
 
 export const CoinsProvider = ({ children }) => {
-    const { currentUser } = useAuth();
+    const { currentUser, refreshProfile } = useAuth();
     const [coins, setCoins] = useState(0);
     const [transactions, setTransactions] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -75,6 +75,7 @@ export const CoinsProvider = ({ children }) => {
                 throw txError;
             }
 
+            await refreshProfile();
             toast.success(`+${amount} Coins! ${reason}`);
             return true;
         } catch (error) {
@@ -115,6 +116,7 @@ export const CoinsProvider = ({ children }) => {
                 });
             if (txError) throw txError;
 
+            await refreshProfile();
             return true;
         } catch (error) {
             console.error("Error spending coins:", error);

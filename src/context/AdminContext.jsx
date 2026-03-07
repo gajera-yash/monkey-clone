@@ -5,12 +5,14 @@ import { useAuth } from './AuthContext';
 const AdminContext = createContext();
 
 export const AdminProvider = ({ children }) => {
-    const { currentUser } = useAuth();
+    const { currentUser, loading: authLoading } = useAuth();
     const [isAdmin, setIsAdmin] = useState(false);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         const checkAdminRole = async () => {
+            if (authLoading) return;
+
             if (!currentUser) {
                 setIsAdmin(false);
                 setLoading(false);
