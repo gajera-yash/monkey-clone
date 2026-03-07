@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { useAuth } from './context/AuthContext';
+import { AdminProvider } from './context/AdminContext';
 import { CoinsProvider, useCoins } from './context/CoinsContext';
 import { PremiumProvider } from './context/PremiumContext';
 import Header from './components/Header';
@@ -13,6 +14,7 @@ import VideoChat from './components/VideoChat';
 import LoginModal from './components/auth/LoginModal';
 import PrivateRoute from './components/auth/PrivateRoute';
 import AdminDashboard from './components/admin/AdminDashboard';
+import AdminProtectedRoute from './components/auth/AdminProtectedRoute';
 import AgeGate from './components/safety/AgeGate';
 import SafetyGuidelines from './components/safety/SafetyGuidelines';
 import GenderModal from './components/auth/GenderModal';
@@ -125,8 +127,10 @@ const AppContent = () => {
           </PrivateRoute>
         } />
 
-        <Route path="/admin" element={
-          <AdminDashboard />
+        <Route path="/admin/*" element={
+          <AdminProtectedRoute>
+            <AdminLayout />
+          </AdminProtectedRoute>
         } />
 
         <Route path="/safety" element={
@@ -181,11 +185,13 @@ const AppContent = () => {
 function App() {
   return (
     <Router>
-      <CoinsProvider>
-        <PremiumProvider>
-          <AppContent />
-        </PremiumProvider>
-      </CoinsProvider>
+      <AdminProvider>
+        <CoinsProvider>
+          <PremiumProvider>
+            <AppContent />
+          </PremiumProvider>
+        </CoinsProvider>
+      </AdminProvider>
     </Router>
   );
 }
