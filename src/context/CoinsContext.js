@@ -56,7 +56,7 @@ export const CoinsProvider = ({ children }) => {
             // 1. Update balance in profiles table
             const { error: updateError } = await supabase.rpc('add_coins', {
                 user_id: currentUser.id,
-                amount: amount
+                amount_to_add: amount
             });
             if (updateError) throw updateError;
 
@@ -96,7 +96,7 @@ export const CoinsProvider = ({ children }) => {
             // 1. Deduct balance in profiles table
             const { error: updateError } = await supabase.rpc('add_coins', {
                 user_id: currentUser.id,
-                amount: -amount
+                amount_to_add: -amount
             });
             if (updateError) throw updateError;
 
