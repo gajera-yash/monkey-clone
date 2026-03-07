@@ -1,6 +1,4 @@
-import React from 'react';
-import { Navigate } from 'react-router-dom';
-import { useAdmin } from '../../context/AdminContext';
+import AdminLoginModal from './AdminLoginModal';
 
 const AdminProtectedRoute = ({ children }) => {
     const { isAdmin, loading } = useAdmin();
@@ -14,8 +12,8 @@ const AdminProtectedRoute = ({ children }) => {
     }
 
     if (!isAdmin) {
-        // Redirect if not admin - can redirect to home or 403 page
-        return <Navigate to="/" replace />;
+        // Show the login modal instead of redirecting
+        return <AdminLoginModal />;
     }
 
     return children;

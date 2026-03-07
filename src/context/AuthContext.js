@@ -70,7 +70,22 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
-    // Email authentication functions removed as per Google-only requirement
+    // Email Login (Specifically for Admin access)
+    const loginWithEmail = async (email, password) => {
+        try {
+            const { data, error } = await supabase.auth.signInWithPassword({
+                email,
+                password
+            });
+            if (error) throw error;
+            setIsGuest(false);
+            toast.success("Admin logged in successfully!");
+            return data.user;
+        } catch (error) {
+            toast.error(error.message);
+            throw error;
+        }
+    };
 
 
     // Guest Login
@@ -332,6 +347,7 @@ export const AuthProvider = ({ children }) => {
         blockedUsers,
         userLocation,
         loginWithGoogle,
+        loginWithEmail,
         continueAsGuest,
         logout,
         reportUser,
