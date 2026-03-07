@@ -248,7 +248,7 @@ export const AuthProvider = ({ children }) => {
 
         getInitialSession();
 
-        const { data: { subscription } } = supabase.auth.onAuthStateChanged(async (event, session) => {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
             if (session?.user) {
                 const profile = await fetchProfile(session.user.id);
                 setCurrentUser({ ...session.user, ...profile });
