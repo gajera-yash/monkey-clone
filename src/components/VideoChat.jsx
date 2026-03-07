@@ -554,13 +554,64 @@ const VideoChat = ({ onEndChat }) => {
 
               {/* Bottom Section */}
               <div className="relative z-10 px-5 pb-6 space-y-3">
-                {/* Filters */}
-                <button
-                  className="w-full bg-white/90 backdrop-blur-sm text-black font-bold py-3.5 rounded-full hover:bg-white transition-all flex items-center justify-center gap-2 shadow-lg"
-                  onClick={() => setShowPreferencesModal(true)}
-                >
-                  <span>⚙️</span> Match Preferences
-                </button>
+                {/* Mobile Filters */}
+                <div className="bg-black/40 backdrop-blur-md rounded-2xl p-4 space-y-3 mb-2 border border-white/10">
+                  {/* Gender */}
+                  <div className="flex gap-2">
+                    {['Both', 'Male', 'Female'].map(opt => (
+                      <button
+                        key={opt}
+                        onClick={() => {
+                          if (opt !== 'Both' && !isPremium) { setShowSubscriptionModal(true); return; }
+                          setChatFilters(p => ({ ...p, gender: opt }));
+                        }}
+                        className={`flex-1 py-2 rounded-xl text-xs font-bold transition-colors shadow-sm ${chatFilters.gender === opt ? 'bg-green-500 text-white shadow-green-500/30' : 'bg-white/10 text-white/70'}`}
+                      >
+                        {opt}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Age */}
+                  <div className="flex gap-2">
+                    {['Any', '18-25', '26-35', '36+'].map(opt => (
+                      <button
+                        key={opt}
+                        onClick={() => {
+                          if (opt !== 'Any' && !isPremium) { setShowSubscriptionModal(true); return; }
+                          setChatFilters(p => ({ ...p, ageRange: opt }));
+                        }}
+                        className={`flex-1 py-2 rounded-xl text-xs font-bold transition-colors shadow-sm ${chatFilters.ageRange === opt ? 'bg-blue-500 text-white shadow-blue-500/30' : 'bg-white/10 text-white/70'}`}
+                      >
+                        {opt}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Location */}
+                  <div className="relative">
+                    <select
+                      value={chatFilters.location}
+                      onChange={(e) => {
+                        if (e.target.value !== 'Global' && !isPremium) { setShowSubscriptionModal(true); return; }
+                        setChatFilters(p => ({ ...p, location: e.target.value }));
+                      }}
+                      className="w-full bg-white/10 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white outline-none appearance-none font-bold"
+                    >
+                      <option value="Global" className="bg-dark-800">🌍 Global (All Regions)</option>
+                      <option value="North America" className="bg-dark-800">🇺🇸 North America</option>
+                      <option value="Latin America" className="bg-dark-800">🇧🇷 Latin America</option>
+                      <option value="Europe" className="bg-dark-800">🇪🇺 Europe</option>
+                      <option value="Middle East" className="bg-dark-800">🇸🇦 Middle East</option>
+                      <option value="South Asia" className="bg-dark-800">🇮🇳 South Asia</option>
+                      <option value="East Asia" className="bg-dark-800">🇯🇵 East Asia</option>
+                      <option value="Africa" className="bg-dark-800">🌍 Africa</option>
+                    </select>
+                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-white/50">
+                      ▼
+                    </div>
+                  </div>
+                </div>
 
                 {/* Start Video Chat */}
                 <button
