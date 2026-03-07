@@ -58,12 +58,6 @@ const GenderModal = ({ isOpen, onSelect, onClose }) => {
                         </button>
                     </div>
 
-                    <button
-                        onClick={onClose}
-                        className="mt-8 text-sm text-gray-500 hover:text-gray-300 transition-colors"
-                    >
-                        Skip for now
-                    </button>
                 </div>
             </div>
         </div>

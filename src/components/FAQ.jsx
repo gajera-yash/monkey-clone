@@ -33,34 +33,36 @@ const FAQItem = ({ question, answer }) => {
 const FAQ = () => {
     const faqs = [
         {
-            question: "What Is Monkey Clone?",
-            answer: "Monkey Clone is a next-generation video chat platform that randomly pairs you with people from around the world for spontaneous conversations."
+            question: "What Is Strangy?",
+            answer: "Strangy is a next-generation video chat platform that randomly pairs you with people from around the world for spontaneous conversations."
         },
         {
-            question: "Is It Safe to Use?",
-            answer: "Safety is our top priority. We use AI-driven moderation and provide easy reporting tools to ensure a safe and respectful environment for all users."
+            question: "Is It Free to Use?",
+            answer: "Yes, the core features of Strangy are completely free. We also offer premium features for users who want enhanced matching options."
         },
         {
-            question: "Can I Use It to Talk to Strangers?",
-            answer: "Absolutely! The core experience is built around connecting you with new people (strangers) instantly."
+            question: "How Do I Start a Chat?",
+            answer: "Simply click the 'Start Chatting' button on the homepage, allow camera and microphone permissions, and you'll be connected instantly!"
         },
         {
-            question: "Do I Need an Account?",
-            answer: "You can start chatting as a guest for limited time, but creating an account unlocks profile features, friend lists, and history."
+            question: "Is It Safe?",
+            answer: "We prioritize user safety. We have active moderation, reporting tools, and the ability to instantly skip to the next person if you feel uncomfortable."
         },
         {
             question: "Is It Available on Mobile and Desktop?",
-            answer: "Yes! Monkey Clone is fully responsive and works seamlessly on both web browsers and mobile devices."
+            answer: "Yes! Strangy is fully responsive and works seamlessly on both web browsers and mobile devices."
         }
     ];
 
     return (
-        <section className="py-24 bg-dark-800">
-            <div className="container mx-auto px-6 max-w-3xl">
-                <div className="text-center mb-12">
-                    <span className="text-accent-pink font-semibold tracking-wide uppercase text-sm">Support</span>
-                    <h2 className="text-4xl font-bold text-white mt-2 mb-4">Frequently Asked Questions</h2>
-                    <p className="text-gray-400">Everything you need to know about Monkey Clone.</p>
+        <section id="faq" className="py-20 bg-dark-900 border-t border-white/10 relative overflow-hidden">
+            {/* Background Details */}
+            <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-purple-600/10 rounded-full blur-[100px] -translate-y-1/2 translate-x-1/2 pointer-events-none" />
+
+            <div className="max-w-4xl mx-auto px-4 relative z-10">
+                <div className="text-center mb-16">
+                    <h2 className="text-3xl md:text-5xl font-bold text-white mb-6 tracking-tight">Frequently Asked Questions</h2>
+                    <p className="text-gray-400">Everything you need to know about Strangy.</p>
                 </div>
 
                 <div className="glass-card px-8 py-4">

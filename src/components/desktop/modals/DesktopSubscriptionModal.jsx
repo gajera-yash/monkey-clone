@@ -22,7 +22,7 @@ const DesktopSubscriptionModal = ({ onClose }) => {
 
             {/* Header */}
             <div className="p-4">
-                <h2 className="text-white text-base font-bold w-full text-center">Monkey Plus</h2>
+                <h2 className="text-white text-base font-bold w-full text-center">Strangy Plus</h2>
             </div>
 
             <div className="px-4 pb-5 space-y-4">
@@ -32,13 +32,13 @@ const DesktopSubscriptionModal = ({ onClose }) => {
                         onClick={() => setActiveTab('plus')}
                         className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all ${activeTab === 'plus' ? 'bg-yellow-400 text-black shadow-lg shadow-yellow-400/20' : 'text-white/40 hover:text-white/60'}`}
                     >
-                        Monkey Plus
+                        Strangy Plus
                     </button>
                     <button
                         onClick={() => setActiveTab('plus-plus')}
                         className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all ${activeTab === 'plus-plus' ? 'bg-[#5143d9] text-white shadow-lg shadow-[#5143d9]/20' : 'text-white/40 hover:text-white/60'}`}
                     >
-                        Monkey Plus+
+                        Strangy Plus+
                     </button>
                 </div>
 

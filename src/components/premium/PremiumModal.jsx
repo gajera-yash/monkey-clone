@@ -70,7 +70,7 @@ const PremiumModal = ({ isOpen, onClose }) => {
                             <span className="text-5xl">💎</span>
                         </div>
                         <h2 className="text-3xl font-bold text-white mb-2">Go Premium</h2>
-                        <p className="text-purple-200 mb-8">Unlock the full potential of Monkey Clone with exclusive VIP benefits.</p>
+                        <p className="text-purple-200 mb-8">Unlock the full potential of Strangy with exclusive VIP benefits.</p>
 
                         <ul className="space-y-4 text-sm text-gray-300">
                             <li className="flex items-center gap-3">

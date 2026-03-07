@@ -252,6 +252,20 @@ export const AuthProvider = ({ children }) => {
             }
 
             if (user) {
+                const today = new Date().toDateString();
+                const lastLoginDate = localStorage.getItem('lastLoginDate');
+
+                if (lastLoginDate && lastLoginDate !== today) {
+                    signOut(auth);
+                    localStorage.removeItem('lastLoginDate');
+                    toast.success("New day! Please log in again.");
+                    setCurrentUser(null);
+                    setLoading(false);
+                    return;
+                }
+
+                localStorage.setItem('lastLoginDate', today);
+
                 const userRef = doc(db, "users", user.uid);
 
                 // Set up new snapshot listener

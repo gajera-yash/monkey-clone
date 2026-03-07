@@ -69,7 +69,7 @@ const LoginModal = ({ isOpen, onClose }) => {
                         {isLogin ? 'Welcome Back' : 'Create Account'}
                     </h2>
                     <p className="text-gray-400">
-                        {isLogin ? 'Login to continue to Monkey Clone' : 'Join the community today'}
+                        {isLogin ? 'Login to continue to Strangy' : 'Join the community today'}
                     </p>
                 </div>
 

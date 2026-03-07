@@ -56,9 +56,8 @@ const Header = ({ onStartChat }) => {
                         <div className="absolute inset-0 bg-accent-purple/20 blur-lg rounded-full opacity-50"></div>
                     </div>
                     <div className="flex flex-col">
-                        <h1 className="text-2xl font-bold tracking-tight leading-none">
-                            <span className="text-white">Monkey</span>
-                            <span className="text-gradient">Clone</span>
+                        <h1 className="text-2xl font-bold tracking-tight leading-none text-white">
+                            Strangy
                         </h1>
                         {isPremium && <span className="text-[10px] text-yellow-400 font-bold tracking-widest uppercase">Premium</span>}
                     </div>

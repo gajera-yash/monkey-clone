@@ -30,17 +30,24 @@ const DesktopHeader = ({ onShowSubscription }) => {
                     <div className="w-9 h-9 rounded-full bg-purple-700 flex items-center justify-center border-2 border-purple-400/50">
                         <span className="text-white font-black text-sm">M</span>
                     </div>
-                    <span className="text-white font-extrabold text-lg tracking-wide">MONKEY</span>
+                    <span className="text-white font-extrabold text-lg tracking-wide">STRANGY</span>
                 </div>
 
                 {/* Center - Navigation */}
                 <div className="flex items-center gap-2">
-                    <button
-                        onClick={() => toggleModal('safety')}
-                        className={`px-5 py-2 rounded-full text-sm font-medium transition-colors ${activeModal === 'safety' ? 'bg-yellow-400 text-black' : 'text-white/80 hover:bg-white/10'}`}
-                    >
-                        Safety Center
-                    </button>
+                    <div className="relative">
+                        <button
+                            onClick={() => toggleModal('safety')}
+                            className={`px-5 py-2 rounded-full text-sm font-medium transition-colors ${activeModal === 'safety' ? 'bg-yellow-400 text-black' : 'text-white/80 hover:bg-white/10'}`}
+                        >
+                            Safety Center
+                        </button>
+                        {activeModal === 'safety' && (
+                            <div className="absolute top-14 left-0 z-[110]">
+                                <DesktopSafetyModal onClose={() => setActiveModal(null)} />
+                            </div>
+                        )}
+                    </div>
                     <button
                         onClick={onShowSubscription}
                         className="px-5 py-2 rounded-full bg-purple-800/80 text-yellow-400 text-sm font-semibold border border-purple-600/50 hover:bg-purple-700/80 transition-colors"
@@ -117,14 +124,7 @@ const DesktopHeader = ({ onShowSubscription }) => {
                         )}
                     </div>
 
-                    {/* New Modals */}
-                    {activeModal === 'safety' && (
-                        <div className="fixed inset-0 z-[200] flex items-center justify-center pointer-events-none">
-                            <div className="pointer-events-auto">
-                                <DesktopSafetyModal onClose={() => setActiveModal(null)} />
-                            </div>
-                        </div>
-                    )}
+                    {/* Old Safety Modal position removed */}
                     {activeModal === 'preferences' && (
                         <div className="fixed inset-0 z-[200] flex items-center justify-center pointer-events-none">
                             <div className="pointer-events-auto">

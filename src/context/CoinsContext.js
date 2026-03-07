@@ -183,7 +183,7 @@ export const CoinsProvider = ({ children }) => {
     const claimDailyBonus = async () => {
         if (!currentUser?.uid) return;
 
-        const success = await addCoins(10, "Daily Login Bonus");
+        const success = await addCoins(50, "Daily Login Bonus");
         if (success) {
             localStorage.setItem(`dailyBonus_${currentUser.uid}`, new Date().toDateString());
         }

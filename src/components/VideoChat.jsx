@@ -14,6 +14,9 @@ import MatchHistoryMobile from './history/MatchHistoryMobile';
 import DesktopHeader from './desktop/DesktopHeader';
 import IdleDesktop from './desktop/IdleDesktop';
 import DesktopSubscriptionModal from './desktop/modals/DesktopSubscriptionModal';
+import DesktopSearchModal from './desktop/modals/DesktopSearchModal';
+import DesktopSafetyModal from './desktop/modals/DesktopSafetyModal';
+import DesktopMatchPreferenceModal from './desktop/modals/DesktopMatchPreferenceModal';
 
 const RTC_CONFIG = {
   iceServers: [
@@ -29,6 +32,7 @@ const VideoChat = ({ onEndChat }) => {
 
   const localVideoRef = useRef(null);
   const localVideoMobileRef = useRef(null);
+  const localVideoMobileIdleRef = useRef(null);
   const remoteVideoRef = useRef(null);
   const peerConnection = useRef(null);
   const roomIdRef = useRef(null);
@@ -61,6 +65,9 @@ const VideoChat = ({ onEndChat }) => {
   const [showProfile, setShowProfile] = useState(false);
   const [showMatchHistory, setShowMatchHistory] = useState(false);
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
+  const [showSearchModal, setShowSearchModal] = useState(false);
+  const [showSafetyModal, setShowSafetyModal] = useState(false);
+  const [showPreferencesModal, setShowPreferencesModal] = useState(false);
 
   // Location States
   const [partnerLocation, setPartnerLocation] = useState(null);
@@ -96,7 +103,7 @@ const VideoChat = ({ onEndChat }) => {
       hasEmittedJoin.current = true;
       setStatus('Searching for partner...');
       socket.emit('join-waiting', {
-        name: currentUser.displayName || 'Stranger',
+        name: currentUser?.safetySettings?.invisibleMode ? 'Ghost User' : (currentUser.displayName || 'Stranger'),
         uid: currentUser.uid,
         blockedUsers: blockedUsers || [],
         location: userLocation,
@@ -218,12 +225,18 @@ const VideoChat = ({ onEndChat }) => {
     requestMedia();
   }, [requestMedia]);
 
-  // Sync local stream to mobile video element
+  // Sync local stream to video elements
   useEffect(() => {
+    if (localVideoRef.current && stream) {
+      localVideoRef.current.srcObject = stream;
+    }
     if (localVideoMobileRef.current && stream) {
       localVideoMobileRef.current.srcObject = stream;
     }
-  }, [stream, remoteStream]);
+    if (localVideoMobileIdleRef.current && stream) {
+      localVideoMobileIdleRef.current.srcObject = stream;
+    }
+  }, [stream, remoteStream, status]);
 
   // Cleanup on unmount (back button, navigation away)
   useEffect(() => {
@@ -460,7 +473,7 @@ const VideoChat = ({ onEndChat }) => {
               {/* Camera Preview Background */}
               <div className="absolute inset-0 z-0">
                 <video
-                  ref={localVideoRef}
+                  ref={localVideoMobileIdleRef}
                   autoPlay
                   playsInline
                   muted
@@ -482,15 +495,8 @@ const VideoChat = ({ onEndChat }) => {
                   <span className="text-green-400 text-sm">✅</span>
                 </div>
 
-                {/* SOLO / SQUAD Toggle */}
-                <div className="bg-white/10 p-1 rounded-full flex items-center backdrop-blur-md border border-white/10">
-                  <button className="px-5 py-1.5 rounded-full bg-yellow-400 text-black font-bold text-xs shadow-lg shadow-yellow-400/20">
-                    SOLO
-                  </button>
-                  <button className="px-5 py-1.5 rounded-full text-gray-400 font-bold text-xs hover:text-white transition-colors">
-                    SQUAD
-                  </button>
-                </div>
+                {/* Free space where tabs used to be */}
+                <div className="flex-1"></div>
 
                 {/* Profile Avatar */}
                 <button
@@ -510,10 +516,12 @@ const VideoChat = ({ onEndChat }) => {
               {/* Left Sidebar Icons */}
               <div className="relative z-10 flex flex-col items-start gap-3 px-3 mt-4">
                 {/* Search */}
-                <button className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-md border border-white/10 flex items-center justify-center hover:bg-white/10 transition-colors">
+                <button
+                  onClick={() => setShowSearchModal(true)}
+                  className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-md border border-white/10 flex items-center justify-center hover:bg-white/10 transition-colors"
+                >
                   <span className="text-lg">🔍</span>
                 </button>
-
 
                 {/* Match History */}
                 <button
@@ -523,13 +531,19 @@ const VideoChat = ({ onEndChat }) => {
                   <span className="text-lg">🕐</span>
                 </button>
 
-                {/* Heart / Likes */}
-                <button className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-md border border-white/10 flex items-center justify-center hover:bg-white/10 transition-colors">
-                  <span className="text-lg">💚</span>
+                {/* Safety Center */}
+                <button
+                  onClick={() => setShowSafetyModal(true)}
+                  className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-md border border-white/10 flex items-center justify-center hover:bg-white/10 transition-colors"
+                >
+                  <span className="text-lg">🛡️</span>
                 </button>
 
                 {/* Coin Store */}
-                <button className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-md border border-yellow-400/30 flex items-center justify-center hover:bg-yellow-400/10 transition-colors relative">
+                <button
+                  onClick={() => setShowSubscriptionModal(true)}
+                  className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-md border border-yellow-400/30 flex items-center justify-center hover:bg-yellow-400/10 transition-colors relative"
+                >
                   <span className="text-lg">🪙</span>
                   <span className="absolute -bottom-1 text-[8px] bg-green-500 text-white px-1 rounded-full font-bold">FREE</span>
                 </button>
@@ -540,12 +554,12 @@ const VideoChat = ({ onEndChat }) => {
 
               {/* Bottom Section */}
               <div className="relative z-10 px-5 pb-6 space-y-3">
-                {/* Gender Filter */}
+                {/* Filters */}
                 <button
                   className="w-full bg-white/90 backdrop-blur-sm text-black font-bold py-3.5 rounded-full hover:bg-white transition-all flex items-center justify-center gap-2 shadow-lg"
-                  onClick={() => toast('Gender filter coming soon!', { icon: '🚻' })}
+                  onClick={() => setShowPreferencesModal(true)}
                 >
-                  <span>👫</span> Both
+                  <span>⚙️</span> Match Preferences
                 </button>
 
                 {/* Start Video Chat */}
@@ -561,7 +575,7 @@ const VideoChat = ({ onEndChat }) => {
               <div className="relative z-10 bg-gradient-to-r from-yellow-400/10 via-yellow-400/20 to-yellow-400/10 border-t border-yellow-400/20 px-4 py-3 flex items-center justify-center gap-2">
                 <span className="text-xl">🐵</span>
                 <div className="text-center">
-                  <span className="text-yellow-400 font-bold text-sm">Enjoy with Monkey Plus</span>
+                  <span className="text-yellow-400 font-bold text-sm">Enjoy with Strangy Plus</span>
                   <p className="text-[10px] text-gray-400">Select your preference to meet people you like</p>
                 </div>
                 <span className="text-xl">🐵</span>
@@ -605,6 +619,30 @@ const VideoChat = ({ onEndChat }) => {
                   </div>
                 </div>
               )}
+
+              {showSearchModal && (
+                <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+                  <DesktopSearchModal onClose={() => setShowSearchModal(false)} />
+                </div>
+              )}
+
+              {showSafetyModal && (
+                <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+                  <DesktopSafetyModal onClose={() => setShowSafetyModal(false)} />
+                </div>
+              )}
+
+              {showPreferencesModal && (
+                <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+                  <DesktopMatchPreferenceModal onClose={() => setShowPreferencesModal(false)} />
+                </div>
+              )}
+
+              {showSubscriptionModal && (
+                <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+                  <DesktopSubscriptionModal onClose={() => setShowSubscriptionModal(false)} />
+                </div>
+              )}
             </div>
           </>
         ) : (
@@ -616,12 +654,12 @@ const VideoChat = ({ onEndChat }) => {
                 {/* Remote Video - Top 50% on mobile, full on desktop */}
                 <div className="h-[50dvh] md:h-auto md:flex-none md:absolute md:inset-0 overflow-hidden relative bg-black flex-shrink-0">
                   <video ref={remoteVideoRef} autoPlay playsInline className="w-full h-full object-cover" />
-                  {/* monkey.app watermark */}
+                  {/* strangy.app watermark */}
                   <div className="absolute bottom-3 left-3 flex items-center gap-2 md:hidden">
                     <div className="w-7 h-7 rounded-lg bg-indigo-600 flex items-center justify-center shadow-lg">
                       <span className="text-[14px]">🐵</span>
                     </div>
-                    <span className="text-white/90 text-[13px] font-bold tracking-tight">monkey.app</span>
+                    <span className="text-white/90 text-[13px] font-bold tracking-tight">strangy.app</span>
                   </div>
                 </div>
 
@@ -700,15 +738,15 @@ const VideoChat = ({ onEndChat }) => {
 
         {/* ===== DESKTOP CONNECTED OVERLAYS ===== */}
 
-        {/* Top-Left: Monkey Chat badge + Timer */}
+        {/* Top-Left: Strangy Chat badge + Timer */}
         {status === 'Connected' && (
           <div className="absolute top-6 left-6 z-50 hidden md:flex items-center gap-4">
-            {/* Monkey Chat badge */}
+            {/* Strangy Chat badge */}
             <div className="flex items-center gap-2 bg-[#302b3e]/80 backdrop-blur-md rounded-full px-4 py-2 shadow-lg">
               <div className="w-6 h-6 rounded-full bg-[#8234f9] flex items-center justify-center">
-                 <span className="text-[12px] relative top-[1px]">🐵</span>
+                <span className="text-[12px] relative top-[1px]">🐵</span>
               </div>
-              <span className="text-white font-bold text-[15px] tracking-wide">Monkey Chat</span>
+              <span className="text-white font-bold text-[15px] tracking-wide">Strangy Chat</span>
             </div>
             {/* Timer */}
             <div className="flex items-center gap-2 bg-[#302b3e]/80 backdrop-blur-md rounded-full px-4 py-2.5 shadow-lg">
@@ -730,14 +768,14 @@ const VideoChat = ({ onEndChat }) => {
                 </div>
                 {userLocation && getDistanceBetween(userLocation, partnerLocation) && (
                   <p className="text-white/70 text-xs mt-0.5 flex items-center gap-1">
-                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" /></svg>
                     {getDistanceBetween(userLocation, partnerLocation)} away
                   </p>
                 )}
               </div>
               {/* Map/Globe icon */}
               <div className="w-11 h-11 rounded-full overflow-hidden border border-white/20 flex-shrink-0">
-                  <img src="https://static.vecteezy.com/system/resources/previews/000/153/588/original/vector-map-of-city-with-streets-and-parks.jpg" alt="Map" className="w-full h-full object-cover" />
+                <img src="https://static.vecteezy.com/system/resources/previews/000/153/588/original/vector-map-of-city-with-streets-and-parks.jpg" alt="Map" className="w-full h-full object-cover" />
               </div>
             </div>
           </div>
@@ -766,7 +804,7 @@ const VideoChat = ({ onEndChat }) => {
                 {isPremium && <PremiumBadge size="sm" />}
               </div>
               <div className="absolute top-3 right-3 flex items-center justify-center w-8 h-8 rounded-full bg-black/30 backdrop-blur-md border border-white/10 text-white/70">
-                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/></svg>
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" /></svg>
               </div>
             </div>
           </div>
@@ -839,8 +877,8 @@ const VideoChat = ({ onEndChat }) => {
               className="w-[60px] h-[60px] bg-[#ff4b4b] hover:bg-red-500 rounded-full flex items-center justify-center transition-all shadow-[0_0_20px_rgba(255,75,75,0.4)] mx-2 transform hover:scale-105"
             >
               <svg className="w-8 h-8 text-white transform rotate-[135deg]" fill="currentColor" viewBox="0 0 20 20">
-                 <path d="M20 18.35V19c0 .55-.45 1-1 1h-1c-5.52 0-10.48-2.24-14.14-5.86S0 5.52 0 0V0C0-1 .45-1 1-1h.65C2.11-1 2.5-1.5 2.5-2v-3.5c0-.5-.5-1-1-1c-.5 0-1 .5-1 1v3.5c0 1.05-.85 1.9-1.9 1.9H-1c-1.66 0-3 1.34-3 3v0c0 4.97 2.01 9.47 5.27 12.73S9.03 20 14 20h0c1.66 0 3-1.34 3-3V19h-.65c-.55 0-1-.45-1-1v-4c0-.55.45-1 1-1H19c.55 0 1 .45 1 1v.65z" transform="translate(2 2)"/>
-                 <path d="M12.26 9l4.59-4.59c.39-.39.39-1.02 0-1.41s-1.02-.39-1.41 0L10.84 7.59l-4.59-4.59c-.39-.39-1.02-.39-1.41 0s-.39 1.02 0 1.41L9.43 9l-4.59 4.59c-.39.39-.39 1.02 0 1.41.19.19.45.29.71.29s.51-.1.71-.29l4.59-4.59 4.59 4.59c.19.19.45.29.71.29s.51-.1.71-.29c.39-.39.39-1.02 0-1.41L12.26 9z" />
+                <path d="M20 18.35V19c0 .55-.45 1-1 1h-1c-5.52 0-10.48-2.24-14.14-5.86S0 5.52 0 0V0C0-1 .45-1 1-1h.65C2.11-1 2.5-1.5 2.5-2v-3.5c0-.5-.5-1-1-1c-.5 0-1 .5-1 1v3.5c0 1.05-.85 1.9-1.9 1.9H-1c-1.66 0-3 1.34-3 3v0c0 4.97 2.01 9.47 5.27 12.73S9.03 20 14 20h0c1.66 0 3-1.34 3-3V19h-.65c-.55 0-1-.45-1-1v-4c0-.55.45-1 1-1H19c.55 0 1 .45 1 1v.65z" transform="translate(2 2)" />
+                <path d="M12.26 9l4.59-4.59c.39-.39.39-1.02 0-1.41s-1.02-.39-1.41 0L10.84 7.59l-4.59-4.59c-.39-.39-1.02-.39-1.41 0s-.39 1.02 0 1.41L9.43 9l-4.59 4.59c-.39.39-.39 1.02 0 1.41.19.19.45.29.71.29s.51-.1.71-.29l4.59-4.59 4.59 4.59c.19.19.45.29.71.29s.51-.1.71-.29c.39-.39.39-1.02 0-1.41L12.26 9z" />
               </svg>
             </button>
             {/* Effects */}

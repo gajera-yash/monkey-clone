@@ -10,7 +10,7 @@ const Footer = () => {
                         <div className="flex items-center justify-center md:justify-start space-x-3 mb-4">
                             <span className="text-3xl">🐵</span>
                             <h2 className="text-2xl font-bold text-gradient">
-                                Monkey Clone
+                                Strangy
                             </h2>
                         </div>
                         <p className="text-gray-400 max-w-xs mx-auto md:mx-0">
@@ -39,7 +39,7 @@ const Footer = () => {
 
                 <div className="border-t border-white/5 pt-8 flex flex-col md:flex-row justify-between items-center">
                     <div className="flex flex-col md:flex-row items-center gap-4 text-gray-500 text-sm mb-4 md:mb-0">
-                        <p>© 2026 Monkey Clone. All rights reserved.</p>
+                        <p>© 2026 Strangy. All rights reserved.</p>
                         <div className="hidden md:block w-1 h-1 bg-gray-700 rounded-full"></div>
                         <a href="/safety" className="hover:text-white transition-colors">Safety Guidelines</a>
                         <a href="/" className="hover:text-white transition-colors">Terms of Service</a>

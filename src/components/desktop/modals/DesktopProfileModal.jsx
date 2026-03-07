@@ -2,12 +2,15 @@ import React, { useState } from 'react';
 import { useAuth } from '../../../context/AuthContext';
 import { useCoins } from '../../../context/CoinsContext';
 import toast from 'react-hot-toast';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { storage } from '../../../firebase';
 
 
 const DesktopProfileModal = ({ onClose }) => {
     const { currentUser, logout, updateProfileInfo } = useAuth();
     const { coins, stars } = useCoins();
     const [isEditing, setIsEditing] = useState(false);
+    const [uploadingImage, setUploadingImage] = useState(false);
     const [editData, setEditData] = useState({
         displayName: currentUser?.displayName || '',
         bio: currentUser?.bio || ''
@@ -16,6 +19,25 @@ const DesktopProfileModal = ({ onClose }) => {
     const handleSave = async () => {
         await updateProfileInfo(editData);
         setIsEditing(false);
+    };
+
+    const handleImageUpload = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        try {
+            setUploadingImage(true);
+            const imageRef = ref(storage, `profiles/${currentUser.uid}_${Date.now()}`);
+            await uploadBytes(imageRef, file);
+            const url = await getDownloadURL(imageRef);
+            await updateProfileInfo({ photoURL: url });
+            toast.success("Profile photo updated!");
+        } catch (error) {
+            console.error("Error uploading image:", error);
+            toast.error("Failed to upload image.");
+        } finally {
+            setUploadingImage(false);
+        }
     };
 
     if (isEditing) {
@@ -43,9 +65,10 @@ const DesktopProfileModal = ({ onClose }) => {
                                     </div>
                                 )}
                             </div>
-                            <button className="absolute bottom-1 right-1 w-10 h-10 bg-indigo-600 rounded-full border-4 border-white flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
-                                <span className="text-white text-lg">📷</span>
-                            </button>
+                            <label className={`absolute bottom-1 right-1 w-10 h-10 bg-indigo-600 rounded-full border-4 border-white flex items-center justify-center shadow-lg transition-transform cursor-pointer ${uploadingImage ? 'opacity-50' : 'hover:scale-110'}`}>
+                                {uploadingImage ? <span className="animate-spin text-white">⌛</span> : <span className="text-white text-lg">📷</span>}
+                                <input type="file" accept="image/*" onChange={handleImageUpload} disabled={uploadingImage} hidden />
+                            </label>
                         </div>
                     </div>
 
@@ -148,7 +171,7 @@ const DesktopProfileModal = ({ onClose }) => {
                     <div className="flex items-center gap-3">
                         <span className="text-3xl">👑</span>
                         <div>
-                            <h4 className="text-white font-bold">Monkey Plus</h4>
+                            <h4 className="text-white font-bold">Strangy Plus</h4>
                             <p className="text-white/60 text-xs">Get More Gender Filters</p>
                         </div>
                     </div>

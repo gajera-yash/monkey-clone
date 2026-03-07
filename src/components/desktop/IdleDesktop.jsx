@@ -147,7 +147,7 @@ const IdleDesktop = ({ localVideoRef, isCamOn, isMicOn, onStartChat, onToggleCam
                     {/* Right Panel - Controls */}
                     <div className="flex-1 bg-[#6c3fcf]/70 backdrop-blur-xl rounded-2xl p-7 flex flex-col border border-white/10 shadow-2xl min-h-[480px]">
                         {/* Title */}
-                        <h1 className="text-white font-extrabold text-3xl mb-1">Monkey</h1>
+                        <h1 className="text-white font-extrabold text-3xl mb-1">Strangy</h1>
                         <p className="text-white/60 text-sm mb-5">Make new friends face-to-face</p>
 
                         {/* Gender Filter */}

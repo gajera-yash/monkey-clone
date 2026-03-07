@@ -47,7 +47,7 @@ const DesktopMatchPreferenceModal = ({ onClose }) => {
                             <div className="absolute -top-1 -right-1 w-3 h-3 bg-blue-400 rounded-full border-2 border-white"></div>
                         </div>
                         <div>
-                            <h4 className="text-gray-900 font-bold">Monkey Plus+</h4>
+                            <h4 className="text-gray-900 font-bold">Strangy Plus+</h4>
                             <p className="text-gray-500 text-xs">Set your preferences, meet someone who's right for you.</p>
                         </div>
                     </div>
