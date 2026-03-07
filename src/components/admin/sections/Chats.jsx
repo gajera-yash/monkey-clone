@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { supabase } from '../../../supabase';
 import {
     Video, MessageSquare, Clock, ShieldAlert,
-    XCircle, Play, Users, Globe, Filter, Search
+    XCircle, Play, Users, Globe, Filter, Search, Eye
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -82,8 +82,8 @@ const Chats = () => {
                     <button
                         onClick={() => setActiveView('active')}
                         className={`px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2 ${activeView === 'active'
-                                ? 'bg-indigo-600 text-white shadow-lg'
-                                : 'text-slate-400 hover:text-slate-600'
+                            ? 'bg-indigo-600 text-white shadow-lg'
+                            : 'text-slate-400 hover:text-slate-600'
                             }`}
                     >
                         <div className={`w-2 h-2 rounded-full ${activeView === 'active' ? 'bg-white animate-pulse' : 'bg-slate-300'}`}></div>
@@ -92,8 +92,8 @@ const Chats = () => {
                     <button
                         onClick={() => setActiveView('history')}
                         className={`px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeView === 'history'
-                                ? 'bg-indigo-600 text-white shadow-lg'
-                                : 'text-slate-400 hover:text-slate-600'
+                            ? 'bg-indigo-600 text-white shadow-lg'
+                            : 'text-slate-400 hover:text-slate-600'
                             }`}
                     >
                         Chat Logs

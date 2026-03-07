@@ -3,7 +3,7 @@ import { supabase } from '../../../supabase';
 import {
     Search, Filter, MoreVertical, UserMinus, UserCheck,
     ShieldCheck, Eye, Mail, Trash2, Calendar,
-    Clock, MessageCircle, Crown, Info
+    Clock, MessageCircle, Crown, Info, X
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
