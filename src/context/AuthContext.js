@@ -10,6 +10,7 @@ import {
 import { doc, setDoc, getDoc, serverTimestamp, updateDoc, onSnapshot, collection, addDoc, increment } from 'firebase/firestore';
 
 import { auth, googleProvider, db } from '../firebase';
+import { supabase } from '../supabase';
 import toast from 'react-hot-toast';
 import { getUserLocation } from '../utils/geolocation';
 
@@ -32,7 +33,7 @@ export const AuthProvider = ({ children }) => {
         if (!userSnap.exists()) {
             const gender = localStorage.getItem('userGender');
 
-            await setDoc(userRef, {
+            const userData = {
                 uid: user.uid,
                 displayName: user.displayName || 'Anonymous',
                 email: user.email,
@@ -73,13 +74,47 @@ export const AuthProvider = ({ children }) => {
                         middleEast: 'Default'
                     }
                 }
-            });
+            };
+
+            await setDoc(userRef, userData);
+
+            // SYNC TO SUPABASE
+            try {
+                const { error: supabaseError } = await supabase
+                    .from('profiles')
+                    .upsert({
+                        id: user.uid,
+                        username: user.displayName || 'Anonymous',
+                        email: user.email,
+                        avatar_url: user.photoURL,
+                        gender: (gender || 'unknown').toLowerCase(),
+                        role: 'user', // Default role
+                        coins: 500,
+                        is_creator: gender === 'Female',
+                        created_at: new Date().toISOString()
+                    });
+                if (supabaseError) console.error("Supabase sync error:", supabaseError);
+            } catch (err) {
+                console.error("Supabase profile sync failed:", err);
+            }
         } else {
             const data = userSnap.data();
             setBlockedUsers(data.blockedUsers || []);
             await setDoc(userRef, {
                 lastLogin: serverTimestamp()
             }, { merge: true });
+
+            // SYNC TO SUPABASE (Update last seen)
+            try {
+                await supabase
+                    .from('profiles')
+                    .update({
+                        last_seen: new Date().toISOString()
+                    })
+                    .eq('id', user.uid);
+            } catch (err) {
+                console.error("Supabase login sync failed:", err);
+            }
         }
     };
 
@@ -220,6 +255,24 @@ export const AuthProvider = ({ children }) => {
                 ...updates,
                 updatedAt: serverTimestamp()
             });
+
+            // SYNC TO SUPABASE
+            try {
+                const supabaseUpdates = {};
+                if (updates.displayName) supabaseUpdates.username = updates.displayName;
+                if (updates.photoURL) supabaseUpdates.avatar_url = updates.photoURL;
+                if (updates.bio !== undefined) supabaseUpdates.bio = updates.bio;
+
+                if (Object.keys(supabaseUpdates).length > 0) {
+                    await supabase
+                        .from('profiles')
+                        .update(supabaseUpdates)
+                        .eq('id', currentUser.uid);
+                }
+            } catch (err) {
+                console.error("Supabase profile update sync failed:", err);
+            }
+
             setCurrentUser(prev => ({ ...prev, ...updates }));
             toast.success("Profile updated!");
         } catch (error) {
