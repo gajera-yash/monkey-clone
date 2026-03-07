@@ -13,7 +13,7 @@ import Footer from './components/Footer';
 import VideoChat from './components/VideoChat';
 import LoginModal from './components/auth/LoginModal';
 import PrivateRoute from './components/auth/PrivateRoute';
-import AdminDashboard from './components/admin/AdminDashboard';
+import AdminLayout from './components/admin/AdminLayout';
 import AdminProtectedRoute from './components/auth/AdminProtectedRoute';
 import AgeGate from './components/safety/AgeGate';
 import SafetyGuidelines from './components/safety/SafetyGuidelines';
