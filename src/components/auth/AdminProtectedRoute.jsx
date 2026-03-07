@@ -1,4 +1,5 @@
 import AdminLoginModal from './AdminLoginModal';
+import { useAdmin } from '../../context/AdminContext';
 
 const AdminProtectedRoute = ({ children }) => {
     const { isAdmin, loading } = useAdmin();
