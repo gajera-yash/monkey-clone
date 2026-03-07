@@ -39,15 +39,26 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
+    // Robust URL detector for Supabase redirects
+    const getURL = () => {
+        let url = window.location.origin;
+        // Ensure it ends correctly without a trailing slash for Supabase consistency
+        return url.charAt(url.length - 1) === '/' ? url.slice(0, -1) : url;
+    };
+
     // Google Login
     const loginWithGoogle = async () => {
+        const redirectUrl = getURL();
+        console.log("🚀 Initiating Google Auth. Redirecting to:", redirectUrl);
+
         try {
-            // This will redirect to the current domain (localhost or Vercel URL)
-            // Make sure to add both to Supabase -> Authentication -> Redirect URLs
             const { data, error } = await supabase.auth.signInWithOAuth({
                 provider: 'google',
                 options: {
-                    redirectTo: window.location.origin
+                    redirectTo: redirectUrl,
+                    queryParams: {
+                        prompt: 'select_account' // Forces account selection to avoid auto-login loops
+                    }
                 }
             });
             if (error) throw error;
