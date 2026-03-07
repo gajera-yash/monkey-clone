@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { useAuth } from './context/AuthContext';
@@ -16,12 +16,25 @@ import AdminDashboard from './components/admin/AdminDashboard';
 import AgeGate from './components/safety/AgeGate';
 import SafetyGuidelines from './components/safety/SafetyGuidelines';
 import GenderModal from './components/auth/GenderModal';
+import DailyBonusModal from './components/coins/DailyBonusModal';
 
 const AppContent = () => {
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [isGenderModalOpen, setIsGenderModalOpen] = useState(false);
+  const [isBonusOpen, setIsBonusOpen] = useState(false);
   const { currentUser } = useAuth();
+  const { checkDailyBonus } = useCoins();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const checkBonus = async () => {
+      if (currentUser) {
+        const hasBonus = await checkDailyBonus();
+        if (hasBonus) setIsBonusOpen(true);
+      }
+    };
+    checkBonus();
+  }, [currentUser, checkDailyBonus]);
 
   // Improved start chat handler with Gender Selection
   const handleStartChat = () => {
@@ -60,6 +73,7 @@ const AppContent = () => {
         onSelect={handleGenderSelect}
         onClose={() => setIsGenderModalOpen(false)}
       />
+      <DailyBonusModal isOpen={isBonusOpen} onClose={() => setIsBonusOpen(false)} />
 
       <Routes>
         <Route path="/" element={

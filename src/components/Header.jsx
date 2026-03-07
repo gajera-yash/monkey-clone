@@ -4,18 +4,15 @@ import { useCoins } from '../context/CoinsContext';
 import { usePremium } from '../context/PremiumContext';
 import CoinBalance from './coins/CoinBalance';
 import CoinStoreModal from './coins/CoinStoreModal';
-import DailyBonusModal from './coins/DailyBonusModal';
 import PremiumModal from './premium/PremiumModal';
 import PremiumBadge from './premium/PremiumBadge';
 
 const Header = ({ onStartChat }) => {
     const { currentUser, logout } = useAuth();
-    const { checkDailyBonus } = useCoins();
     const { isPremium } = usePremium();
     const [isScrolled, setIsScrolled] = useState(false);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isStoreOpen, setIsStoreOpen] = useState(false);
-    const [isBonusOpen, setIsBonusOpen] = useState(false);
     const [isPremiumModalOpen, setIsPremiumModalOpen] = useState(false);
 
     useEffect(() => {
@@ -24,17 +21,8 @@ const Header = ({ onStartChat }) => {
         };
         window.addEventListener('scroll', handleScroll);
 
-        // Check for daily bonus
-        const checkBonus = async () => {
-            if (currentUser) {
-                const hasBonus = await checkDailyBonus();
-                if (hasBonus) setIsBonusOpen(true);
-            }
-        };
-        checkBonus();
-
         return () => window.removeEventListener('scroll', handleScroll);
-    }, [currentUser, checkDailyBonus]);
+    }, [currentUser]);
 
     return (
         <header
@@ -148,7 +136,6 @@ const Header = ({ onStartChat }) => {
             </div>
 
             <CoinStoreModal isOpen={isStoreOpen} onClose={() => setIsStoreOpen(false)} />
-            <DailyBonusModal isOpen={isBonusOpen} onClose={() => setIsBonusOpen(false)} />
             <PremiumModal isOpen={isPremiumModalOpen} onClose={() => setIsPremiumModalOpen(false)} />
         </header>
     );
