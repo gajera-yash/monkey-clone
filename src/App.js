@@ -18,6 +18,15 @@ import SafetyGuidelines from './components/safety/SafetyGuidelines';
 import GenderModal from './components/auth/GenderModal';
 import DailyBonusModal from './components/coins/DailyBonusModal';
 
+// Creator Components
+import CreatorRoute from './components/creator/CreatorRoute';
+import CreatorOnboarding from './components/creator/CreatorOnboarding';
+import FaceVerification from './components/creator/FaceVerification';
+import VoiceVerification from './components/creator/VoiceVerification';
+import CreatorDashboard from './components/creator/CreatorDashboard';
+import CreatorWithdraw from './components/creator/CreatorWithdraw';
+import CreatorSettings from './components/creator/CreatorSettings';
+
 const AppContent = () => {
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [isGenderModalOpen, setIsGenderModalOpen] = useState(false);
@@ -105,6 +114,43 @@ const AppContent = () => {
             <Footer />
           </>
         } />
+
+        {/* Creator Routes */}
+        <Route path="/creator/onboarding" element={
+          <PrivateRoute>
+            <CreatorOnboarding />
+          </PrivateRoute>
+        } />
+
+        <Route path="/creator/verify/face" element={
+          <PrivateRoute>
+            <FaceVerification />
+          </PrivateRoute>
+        } />
+
+        <Route path="/creator/verify/voice" element={
+          <PrivateRoute>
+            <VoiceVerification />
+          </PrivateRoute>
+        } />
+
+        <Route path="/creator/dashboard" element={
+          <CreatorRoute>
+            <CreatorDashboard />
+          </CreatorRoute>
+        } />
+
+        <Route path="/creator/withdraw" element={
+          <CreatorRoute>
+            <CreatorWithdraw />
+          </CreatorRoute>
+        } />
+
+        <Route path="/creator/settings" element={
+          <CreatorRoute>
+            <CreatorSettings />
+          </CreatorRoute>
+        } />
       </Routes>
     </div>
   );
@@ -128,8 +174,27 @@ const ChatLayout = () => {
   const navigate = useNavigate();
   const [isChatting, setIsChatting] = useState(true);
 
+  // Creator Redirect Logic
+  useEffect(() => {
+    if (currentUser?.isCreator) {
+      if (currentUser.accountStatus !== 'active') {
+        navigate('/creator/onboarding', { replace: true });
+      } else {
+        // If active, go to dashboard. They must explicitly press "Go Live" to chat.
+        // We will assume "Go Live" goes to a special creator live state later, 
+        // but for now, keep them on dashboard to prevent auto-joining normal chat.
+        navigate('/creator/dashboard', { replace: true });
+      }
+    }
+  }, [currentUser, navigate]);
+
   if (!isChatting) {
     return <Navigate to="/" replace />;
+  }
+
+  // Prevent rendering video chat while redirect is happening
+  if (currentUser?.isCreator) {
+    return null;
   }
 
   return (

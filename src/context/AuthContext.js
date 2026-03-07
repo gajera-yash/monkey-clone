@@ -30,17 +30,35 @@ export const AuthProvider = ({ children }) => {
         const userSnap = await getDoc(userRef);
 
         if (!userSnap.exists()) {
+            const gender = localStorage.getItem('userGender');
+
             await setDoc(userRef, {
                 uid: user.uid,
                 displayName: user.displayName || 'Anonymous',
                 email: user.email,
                 photoURL: user.photoURL,
+                gender: gender || 'unknown',
                 createdAt: serverTimestamp(),
                 lastLogin: serverTimestamp(),
                 totalChats: 0,
                 blockedUsers: [],
                 coins: 500, // Initial coins
                 bio: '',
+                ...(gender === 'Female' ? {
+                    isCreator: true,
+                    accountStatus: 'pending',
+                    verificationLevel: 0,
+                    currentTier: 1,
+                    totalEarnings: 0,
+                    availableBalance: 0,
+                    lifetimeWithdrawn: 0,
+                    totalHoursOnline: 0,
+                    rating: 0,
+                    totalRatings: 0,
+                    profileComplete: false
+                } : {
+                    isCreator: false
+                }),
                 safetySettings: {
                     disableFriendRequests: false,
                     invisibleMode: false
@@ -363,6 +381,35 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
+    // Log Creator Earnings for a session
+    const logCreatorEarnings = async (durationSec, earnedAmount) => {
+        if (!currentUser?.uid || !currentUser?.isCreator || earnedAmount <= 0) return;
+        try {
+            // 1. Add to creatorEarnings collection for history/charts
+            const earningsRef = collection(db, 'creatorEarnings');
+            await addDoc(earningsRef, {
+                creatorId: currentUser.uid,
+                amount: earnedAmount,
+                durationSeconds: durationSec,
+                source: 'video_chat',
+                timestamp: serverTimestamp()
+            });
+
+            // 2. Update the user's total balance
+            const userRef = doc(db, "users", currentUser.uid);
+            await updateDoc(userRef, {
+                totalEarnings: increment(earnedAmount),
+                availableBalance: increment(earnedAmount),
+                totalHoursOnline: increment(durationSec / 3600)
+            });
+
+            // Note: In a real production app, we would also deduct coins from the partner here 
+            // via a secure Cloud Function using transaction.
+        } catch (error) {
+            console.error("Error logging creator earnings:", error);
+        }
+    };
+
     const value = {
         currentUser,
         isGuest,
@@ -378,7 +425,8 @@ export const AuthProvider = ({ children }) => {
         updateProfileInfo,
         updateSafetySettings,
         updateMatchPreferences,
-        saveMatchToHistory
+        saveMatchToHistory,
+        logCreatorEarnings
     };
 
     return (

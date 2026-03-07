@@ -26,7 +26,7 @@ const RTC_CONFIG = {
 };
 
 const VideoChat = ({ onEndChat }) => {
-  const { currentUser, blockedUsers, reportUser, userLocation, saveMatchToHistory } = useAuth();
+  const { currentUser, blockedUsers, reportUser, userLocation, saveMatchToHistory, logCreatorEarnings } = useAuth();
   const { spendCoins } = useCoins();
   const { isPremium } = usePremium();
 
@@ -59,6 +59,7 @@ const VideoChat = ({ onEndChat }) => {
   const [newMessage, setNewMessage] = useState('');
   const [isPartnerTyping, setIsPartnerTyping] = useState(false);
   const [chatTimer, setChatTimer] = useState(0);
+  const [sessionEarnings, setSessionEarnings] = useState(0);
   const [showChat, setShowChat] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -77,18 +78,27 @@ const VideoChat = ({ onEndChat }) => {
   // Filter state (set from IdleDesktop)
   const [chatFilters, setChatFilters] = useState({ gender: 'Both', location: 'Global', ageRange: 'Any' });
 
-  // Timer logic
+  // Timer & Earnings logic
   useEffect(() => {
     let interval;
     if (status === 'Connected' && roomIdRef.current) {
       interval = setInterval(() => {
-        setChatTimer(prev => prev + 1);
+        setChatTimer(prev => {
+          const newTime = prev + 1;
+          // Calculate Earnings for Creators (e.g. 10 coins per minute roughly 0.16 coins per second for Tier 1)
+          if (currentUser?.isCreator) {
+            const ratePerSecond = (currentUser.currentTier || 1) * 10 / 60;
+            setSessionEarnings(prevEarnings => prevEarnings + ratePerSecond);
+          }
+          return newTime;
+        });
       }, 1000);
     } else {
       setChatTimer(0);
+      setSessionEarnings(0);
     }
     return () => clearInterval(interval);
-  }, [status]);
+  }, [status, currentUser]);
 
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);
@@ -156,7 +166,7 @@ const VideoChat = ({ onEndChat }) => {
     performJoin();
   };
 
-  const sendMessage = (text, type = 'text') => {
+  const sendMessage = (text, type = 'text', giftValue = 0) => {
     if (!roomIdRef.current) return;
 
     const messageData = {
@@ -165,7 +175,8 @@ const VideoChat = ({ onEndChat }) => {
       senderId: currentUser.uid,
       senderName: currentUser.displayName || 'Me',
       timestamp: new Date().toISOString(),
-      type
+      type,
+      giftValue: giftValue
     };
 
     socket.emit('send-message', { roomId: roomIdRef.current, message: messageData });
@@ -192,7 +203,7 @@ const VideoChat = ({ onEndChat }) => {
 
     const success = await spendCoins(cost, `Sent ${name} gift`);
     if (success) {
-      sendMessage(`Sent a ${name} ${emoji}`, 'gift');
+      sendMessage(`Sent a ${name} ${emoji}`, 'gift', cost);
       toast.success(`Sent ${name}! -${cost} coins`);
     }
   };
@@ -377,6 +388,13 @@ const VideoChat = ({ onEndChat }) => {
       // Increment unread count if chat is hidden
       setUnreadCount(prevCount => showChat ? 0 : prevCount + 1);
       notificationSound.current.play().catch(e => console.log("Sound play failed", e));
+
+      // Process Gift Commission for Creators
+      if (message.type === 'gift' && currentUser?.isCreator && message.giftValue) {
+        const commission = message.giftValue * 0.70; // 70% cut
+        setSessionEarnings(prev => prev + commission);
+        toast.success(`Received ${commission.toFixed(0)} coins from gift!`);
+      }
     };
 
     const handlePartnerTyping = (typing) => {
@@ -416,6 +434,10 @@ const VideoChat = ({ onEndChat }) => {
         avatar: partnerName.charAt(0).toUpperCase(),
         hasRecording: false
       });
+
+      if (currentUser?.isCreator && sessionEarnings > 0) {
+        logCreatorEarnings(durationSec, sessionEarnings);
+      }
     }
 
     if (peerConnection.current) {
@@ -426,6 +448,7 @@ const VideoChat = ({ onEndChat }) => {
     if (roomIdRef.current) socket.emit('leave-room', { roomId: roomIdRef.current });
 
     setStartTime(null);
+    setSessionEarnings(0);
     onEndChat();
   };
 
@@ -789,21 +812,38 @@ const VideoChat = ({ onEndChat }) => {
 
         {/* ===== DESKTOP CONNECTED OVERLAYS ===== */}
 
-        {/* Top-Left: Strangy Chat badge + Timer */}
+        {/* Top-Left: Strangy Chat badge + Timer & Earnings Tracker */}
         {status === 'Connected' && (
-          <div className="absolute top-6 left-6 z-50 hidden md:flex items-center gap-4">
-            {/* Strangy Chat badge */}
-            <div className="flex items-center gap-2 bg-[#302b3e]/80 backdrop-blur-md rounded-full px-4 py-2 shadow-lg">
-              <div className="w-6 h-6 rounded-full bg-[#8234f9] flex items-center justify-center">
-                <span className="text-[12px] relative top-[1px]">🐵</span>
+          <div className="absolute top-6 left-6 z-50 flex flex-col gap-3">
+            <div className="hidden md:flex flex-row items-center gap-4">
+              {/* Strangy Chat badge */}
+              <div className="flex items-center gap-2 bg-[#302b3e]/80 backdrop-blur-md rounded-full px-4 py-2 shadow-lg">
+                <div className="w-6 h-6 rounded-full bg-[#8234f9] flex items-center justify-center">
+                  <span className="text-[12px] relative top-[1px]">🐵</span>
+                </div>
+                <span className="text-white font-bold text-[15px] tracking-wide">Strangy Chat</span>
               </div>
-              <span className="text-white font-bold text-[15px] tracking-wide">Strangy Chat</span>
+              {/* Timer */}
+              <div className="flex items-center gap-2 bg-[#302b3e]/80 backdrop-blur-md rounded-full px-4 py-2.5 shadow-lg">
+                <span className="w-2.5 h-2.5 rounded-full bg-[#ff4b4b]"></span>
+                <span className="text-white font-mono text-[14px] font-bold tracking-wider">{formatTime(chatTimer)}</span>
+              </div>
             </div>
-            {/* Timer */}
-            <div className="flex items-center gap-2 bg-[#302b3e]/80 backdrop-blur-md rounded-full px-4 py-2.5 shadow-lg">
-              <span className="w-2.5 h-2.5 rounded-full bg-[#ff4b4b]"></span>
-              <span className="text-white font-mono text-[14px] font-bold tracking-wider">{formatTime(chatTimer)}</span>
-            </div>
+
+            {/* CREATOR EARNINGS TRACKER (Shows on both mobile & desktop) */}
+            {currentUser?.isCreator && (
+              <div className="flex items-center gap-3 bg-gradient-to-r from-accent-pink/90 to-accent-purple/90 backdrop-blur-xl border border-white/20 rounded-2xl px-5 py-3 shadow-[0_0_30px_rgba(236,72,153,0.3)] animate-fade-in-down mt-12 md:mt-0">
+                <div className="w-10 h-10 rounded-full bg-white/20 flex flex-col items-center justify-center text-white">
+                  <span className="text-xl leading-none">₹</span>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-white/80 text-[10px] uppercase font-black tracking-widest leading-none mb-1">Session Earnings</span>
+                  <span className="text-white font-mono text-2xl font-black leading-none drop-shadow-md">
+                    {sessionEarnings.toFixed(2)}
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
