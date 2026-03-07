@@ -70,46 +70,8 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
-    // Email Login
-    const loginWithEmail = async (email, password) => {
-        try {
-            const { data, error } = await supabase.auth.signInWithPassword({
-                email,
-                password
-            });
-            if (error) throw error;
-            setIsGuest(false);
-            toast.success("Logged in successfully!");
-            return data.user;
-        } catch (error) {
-            toast.error(error.message);
-            throw error;
-        }
-    };
+    // Email authentication functions removed as per Google-only requirement
 
-    // Email Signup
-    const signupWithEmail = async (email, password, name) => {
-        try {
-            const gender = localStorage.getItem('userGender');
-            const { data, error } = await supabase.auth.signUp({
-                email,
-                password,
-                options: {
-                    data: {
-                        full_name: name,
-                        gender: gender || 'unknown'
-                    }
-                }
-            });
-            if (error) throw error;
-            setIsGuest(false);
-            toast.success("Account created! Please check your email.");
-            return data.user;
-        } catch (error) {
-            toast.error(error.message);
-            throw error;
-        }
-    };
 
     // Guest Login
     const continueAsGuest = () => {
@@ -370,8 +332,6 @@ export const AuthProvider = ({ children }) => {
         blockedUsers,
         userLocation,
         loginWithGoogle,
-        loginWithEmail,
-        signupWithEmail,
         continueAsGuest,
         logout,
         reportUser,
