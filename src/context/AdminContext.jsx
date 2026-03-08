@@ -11,6 +11,7 @@ export const AdminProvider = ({ children }) => {
 
     useEffect(() => {
         const checkAdminRole = async () => {
+            // Wait until auth has finished loading
             if (authLoading) return;
 
             if (!currentUser) {
@@ -22,7 +23,6 @@ export const AdminProvider = ({ children }) => {
             try {
                 console.log("Checking admin status for UID:", currentUser.uid);
 
-                // Check 'profiles' table in Supabase for admin role
                 const { data, error } = await supabase
                     .from('profiles')
                     .select('role, email')
@@ -31,25 +31,17 @@ export const AdminProvider = ({ children }) => {
 
                 if (error) {
                     console.error("Supabase error checking admin:", error.message);
-                    console.info("TIP: Check if you have run schema_v2.sql in Supabase SQL Editor.");
                 }
 
-                if (data) {
-                    console.log("Supabase Profile Data:", data);
-                    if (data.role === 'admin') {
-                        console.log("Admin access granted!");
-                        setIsAdmin(true);
-                    } else {
-                        console.log("Admin access denied. Current Role:", data.role);
-                        console.info("TIP: Run 'UPDATE profiles SET role = \"admin\" WHERE id = \"' + currentUser.uid + '\";' in Supabase SQL Editor.");
-                        setIsAdmin(false);
-                    }
+                if (data && data.role === 'admin') {
+                    console.log("Admin access granted!");
+                    setIsAdmin(true);
                 } else {
-                    console.log("No profile found for this user in database.");
+                    console.log("Admin access denied. Role:", data?.role);
                     setIsAdmin(false);
                 }
             } catch (err) {
-                console.error("Admin check failed with exception:", err);
+                console.error("Admin check failed:", err);
                 setIsAdmin(false);
             } finally {
                 setLoading(false);
@@ -57,7 +49,7 @@ export const AdminProvider = ({ children }) => {
         };
 
         checkAdminRole();
-    }, [currentUser]);
+    }, [currentUser, authLoading]);
 
     return (
         <AdminContext.Provider value={{ isAdmin, loading }}>
