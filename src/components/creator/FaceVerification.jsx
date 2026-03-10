@@ -138,7 +138,12 @@ const FaceVerification = () => {
       navigate("/creator/verify/voice");
     } catch (error) {
       console.error("Verification Error:", error);
-      const errorMessage = error.message || "Face Verification failed";
+      let errorMessage = error.message || "Face Verification failed";
+
+      if (errorMessage.includes("bucket_not_found") || errorMessage.includes("Bucket not found")) {
+        errorMessage = "Storage Bucket 'verifications' not found. Please create it in Supabase dashboard.";
+      }
+
       toast.error(errorMessage, { id: toastId });
     } finally {
       setIsUploading(false);

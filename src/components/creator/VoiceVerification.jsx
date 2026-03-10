@@ -114,7 +114,13 @@ const VoiceVerification = () => {
 
         } catch (error) {
             console.error("Voice Upload failed", error);
-            toast.error("Voice verification upload failed.", { id: toastId });
+            let errorMessage = "Voice verification upload failed.";
+
+            if (error.message?.includes("bucket_not_found") || error.message?.includes("Bucket not found")) {
+                errorMessage = "Storage Bucket 'verifications' not found. Please create it in Supabase.";
+            }
+
+            toast.error(errorMessage, { id: toastId });
         } finally {
             setIsUploading(false);
         }
