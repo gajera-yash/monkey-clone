@@ -234,7 +234,24 @@ export const AuthProvider = ({ children }) => {
                     console.error("Session error:", error);
                 } else if (session?.user) {
                     try {
-                        const profile = await fetchProfile(session.user.id);
+                        let profile = await fetchProfile(session.user.id);
+
+                        // Handle female creator registration logic
+                        const savedGender = localStorage.getItem('userGender');
+                        if (savedGender === 'Female' && profile && !profile.isCreator) {
+                            const { error: updateErr } = await supabase
+                                .from('profiles')
+                                .update({ is_creator: true, gender: 'Female', account_status: 'pending' })
+                                .eq('id', session.user.id);
+
+                            if (!updateErr) {
+                                profile = { ...profile, isCreator: true, gender: 'Female', accountStatus: 'pending' };
+                            }
+                            localStorage.removeItem('userGender');
+                        } else if (savedGender) {
+                            localStorage.removeItem('userGender');
+                        }
+
                         setCurrentUser({ ...session.user, ...profile });
                     } catch (profileError) {
                         console.error("Profile fetch error on initial load:", profileError);
@@ -255,7 +272,24 @@ export const AuthProvider = ({ children }) => {
             try {
                 if (session?.user) {
                     try {
-                        const profile = await fetchProfile(session.user.id);
+                        let profile = await fetchProfile(session.user.id);
+
+                        // Handle female creator registration logic
+                        const savedGender = localStorage.getItem('userGender');
+                        if (savedGender === 'Female' && profile && !profile.isCreator) {
+                            const { error: updateErr } = await supabase
+                                .from('profiles')
+                                .update({ is_creator: true, gender: 'Female', account_status: 'pending' })
+                                .eq('id', session.user.id);
+
+                            if (!updateErr) {
+                                profile = { ...profile, isCreator: true, gender: 'Female', accountStatus: 'pending' };
+                            }
+                            localStorage.removeItem('userGender');
+                        } else if (savedGender) {
+                            localStorage.removeItem('userGender');
+                        }
+
                         setCurrentUser({ ...session.user, ...profile });
 
                         // Check for ban
