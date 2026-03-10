@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../supabase';
 import toast from 'react-hot-toast';
+import { verifyGenderFromImage } from '../../utils/aiVerification';
 
 const VoiceVerification = () => {
     const { currentUser, updateProfileInfo } = useAuth();
@@ -106,10 +107,54 @@ const VoiceVerification = () => {
 
             if (dbError) throw dbError;
 
-            // 4. Mark profile verification level
-            await updateProfileInfo({ verificationLevel: 1 });
+            // 4. Trigger AI Automated Verification
+            toast.loading("AI is analyzing your profile...", { id: toastId });
 
-            toast.success("Voice verified successfully!", { id: toastId });
+            try {
+                // Get the face_url for AI analysis
+                const { data: verifData } = await supabase
+                    .from('verifications')
+                    .select('face_url')
+                    .eq('user_id', currentUser.uid)
+                    .single();
+
+                if (verifData?.face_url) {
+                    const aiResult = await verifyGenderFromImage(verifData.face_url);
+
+                    if (aiResult.isFemale) {
+                        // AUTO APPROVE
+                        await supabase
+                            .from('verifications')
+                            .update({ status: 'approved', ai_notes: aiResult.reason })
+                            .eq('user_id', currentUser.uid);
+
+                        await supabase
+                            .from('profiles')
+                            .update({ is_verified: true, accountStatus: 'active' })
+                            .eq('id', currentUser.uid);
+
+                        toast.success("AI Verified Successfully!", { id: toastId });
+                        navigate('/creator/dashboard');
+                        return;
+                    } else {
+                        // AUTO REJECT
+                        await supabase
+                            .from('verifications')
+                            .update({ status: 'rejected', ai_notes: aiResult.reason })
+                            .eq('user_id', currentUser.uid);
+
+                        toast.error(`Verification Failed: ${aiResult.reason}`, { id: toastId, duration: 5000 });
+                        navigate('/creator/dashboard'); // Or back to start
+                        return;
+                    }
+                }
+            } catch (aiErr) {
+                console.error("AI Auto-verification failed:", aiErr);
+                // Fallback to manual review if AI fails
+                toast.success("Submitted for manual review (AI busy).", { id: toastId });
+            }
+
+            // Fallback for manual review if logic above falls through
             navigate('/creator/dashboard');
 
         } catch (error) {
