@@ -12,11 +12,14 @@ const DesktopSubscriptionModal = ({ onClose }) => {
     const currentPlan = PLANS[selectedPlan];
 
     return (
-        <div className="bg-[#24213a] w-[380px] rounded-[28px] overflow-hidden flex flex-col shadow-2xl border border-white/5 relative">
+        <div className="bg-[#24213a] w-full max-w-[360px] rounded-[28px] overflow-hidden flex flex-col shadow-2xl border border-white/5 relative">
             {/* Close Button */}
-            <button onClick={onClose} className="absolute top-6 right-6 text-white/60 hover:text-white transition-colors z-[200]">
+            <button
+                onClick={onClose}
+                className="absolute top-4 right-4 z-[200] w-10 h-10 bg-white/5 hover:bg-white/10 text-white/70 hover:text-white rounded-full flex items-center justify-center transition-all border border-white/5 backdrop-blur-md"
+            >
                 <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" />
                 </svg>
             </button>
 

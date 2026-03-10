@@ -105,7 +105,15 @@ export const AuthProvider = ({ children }) => {
     // Logout
     const logout = async () => {
         try {
-            if (!isGuest) {
+            if (!isGuest && currentUser) {
+                // Save last user info for persistent login UI
+                const lastUserInfo = {
+                    id: currentUser.id,
+                    displayName: currentUser.displayName,
+                    photoURL: currentUser.photoURL,
+                    email: currentUser.email
+                };
+                localStorage.setItem('lastLoggedUser', JSON.stringify(lastUserInfo));
                 await supabase.auth.signOut();
             }
             setIsGuest(false);
@@ -114,6 +122,7 @@ export const AuthProvider = ({ children }) => {
             localStorage.removeItem('userGender');
             toast.success("Logged out");
         } catch (error) {
+            console.error("Logout error:", error);
             toast.error("Error logging out");
         }
     };
@@ -255,6 +264,15 @@ export const AuthProvider = ({ children }) => {
                         }
 
                         setCurrentUser({ ...session.user, ...profile });
+
+                        // Update last user info OR clear if it's a new login
+                        const lastUserInfo = {
+                            id: session.user.id,
+                            displayName: profile?.displayName || session.user.email?.split('@')[0],
+                            photoURL: profile?.photoURL || session.user.user_metadata?.avatar_url,
+                            email: session.user.email
+                        };
+                        localStorage.setItem('lastLoggedUser', JSON.stringify(lastUserInfo));
 
                         // Check for ban
                         if (profile?.ban_expiry && new Date(profile.ban_expiry) > new Date()) {

@@ -69,6 +69,8 @@ const VideoChat = ({ onEndChat }) => {
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [showSafetyModal, setShowSafetyModal] = useState(false);
   const [showPreferencesModal, setShowPreferencesModal] = useState(false);
+  const [showConnectedUsers, setShowConnectedUsers] = useState(false);
+  const [showStickerPicker, setShowStickerPicker] = useState(false);
 
   // Location States
   const [partnerLocation, setPartnerLocation] = useState(null);
@@ -752,27 +754,46 @@ const VideoChat = ({ onEndChat }) => {
                     </div>
                   )}
                   {/* Chat & Gift buttons bottom bar */}
-                  <div className="absolute bottom-6 left-0 right-0 flex items-center justify-between px-6 z-10">
-                    {/* Chat Button - matches reference style */}
+                  <div className="absolute bottom-6 left-0 right-0 flex items-center justify-center gap-4 z-10 px-4">
+                    {/* Chat Button */}
                     <button
                       onClick={() => {
                         setShowChat(!showChat);
                         if (!showChat) setUnreadCount(0);
                       }}
-                      className="w-12 h-12 rounded-full bg-[#1a1c1e]/80 backdrop-blur-md border border-white/10 flex items-center justify-center relative shadow-xl active:scale-90 transition-transform"
+                      className="w-12 h-12 rounded-full bg-black/40 backdrop-blur-md border border-white/10 flex items-center justify-center relative shadow-xl active:scale-90 transition-transform"
                     >
                       <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                       </svg>
                       {unreadCount > 0 && (
-                        <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center border-2 border-[#1a1c1e]">
+                        <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center border-2 border-black">
                           {unreadCount > 9 ? '9+' : unreadCount}
                         </span>
                       )}
                     </button>
-                    {/* Gift Button - matches reference style */}
-                    <button className="w-12 h-12 rounded-full bg-[#ffea00] flex items-center justify-center shadow-lg shadow-yellow-400/40 active:scale-95 transition-transform">
-                      <svg className="w-7 h-7 text-[#d32f2f]" fill="currentColor" viewBox="0 0 24 24">
+
+                    {/* Stickers Button */}
+                    <button
+                      onClick={() => setShowStickerPicker(!showStickerPicker)}
+                      className="w-12 h-12 rounded-full bg-yellow-400 flex items-center justify-center shadow-lg active:scale-95 transition-transform"
+                    >
+                      <span className="text-2xl">✨</span>
+                    </button>
+
+                    {/* End Call Button (Call Cut) */}
+                    <button
+                      onClick={endCall}
+                      className="w-14 h-14 rounded-full bg-red-500 flex items-center justify-center shadow-lg shadow-red-500/40 active:scale-95 transition-transform"
+                    >
+                      <svg className="w-8 h-8 text-white transform rotate-[135deg]" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2c-11.045 0-20-8.955-20-20V3z" />
+                      </svg>
+                    </button>
+
+                    {/* Gift Button */}
+                    <button className="w-12 h-12 rounded-full bg-white/10 backdrop-blur-md border border-white/10 flex items-center justify-center shadow-lg active:scale-95 transition-transform">
+                      <svg className="w-7 h-7 text-pink-500" fill="currentColor" viewBox="0 0 24 24">
                         <path d="M20 6h-2.18c.11-.31.18-.65.18-1a2.5 2.5 0 00-5-0c0 .35.07.69.18 1H11c.11-.31.18-.65.18-1a2.5 2.5 0 00-5-0c0 .35.07.69.18 1H4a2 2 0 00-2 2v2c0 .55.45 1 1 1h1v10a2 2 0 002 2h12a2 2 0 002-2V10h1c.55 0 1-.45 1-1V8a2 2 0 00-2-2M15.5 5c0-.83.67-1.5 1.5-1.5s1.5.67 1.5 1.5-0.67 1.5-1.5 1.5h-1.5V5M7 5c0-.83.67-1.5 1.5-1.5S10 4.17 10 5v1.5H8.5C7.67 6.5 7 5.83 7 5m11 15H6V10h12v10m1-11H5V8h14v1" />
                       </svg>
                     </button>
@@ -924,16 +945,29 @@ const VideoChat = ({ onEndChat }) => {
                   </div>
                 </div>
               </div>
-              {/* Next Button - Square icon to match reference */}
-              <button
-                onClick={handleNext}
-                className="w-10 h-10 bg-[#3a4959]/90 backdrop-blur-md rounded-lg flex items-center justify-center text-white shadow-lg active:scale-95 transition-all"
-              >
-                <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M4.555 13.904l1.39-1.39a1 1 0 011.414 0l.293.293V10a1 1 0 112 0v2.807l.293-.293a1 1 0 011.414 0l1.39 1.39a1 1 0 01-1.414 1.414l-1.39-1.39L8 15.414l-1.39 1.39-1.39-1.39z" />
-                  <path fillRule="evenodd" d="M12.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-2.293-2.293a1 1 0 010-1.414z" clipRule="evenodd" />
-                </svg>
-              </button>
+              {/* Right Side Buttons */}
+              <div className="flex items-center gap-2">
+                {/* Connected Users Button */}
+                <button
+                  onClick={() => setShowConnectedUsers(true)}
+                  className="w-10 h-10 bg-[#3a4959]/90 backdrop-blur-md rounded-lg flex items-center justify-center text-white shadow-lg active:scale-95 transition-all"
+                >
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor font-bold">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 6h16M4 12h16M4 18h16" />
+                  </svg>
+                </button>
+
+                {/* Next Button */}
+                <button
+                  onClick={handleNext}
+                  className="w-10 h-10 bg-[#3a4959]/90 backdrop-blur-md rounded-lg flex items-center justify-center text-white shadow-lg active:scale-95 transition-all"
+                >
+                  <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M4.555 13.904l1.39-1.39a1 1 0 011.414 0l.293.293V10a1 1 0 112 0v2.807l.293-.293a1 1 0 011.414 0l1.39 1.39a1 1 0 01-1.414 1.414l-1.39-1.39L8 15.414l-1.39 1.39-1.39-1.39z" />
+                    <path fillRule="evenodd" d="M12.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-2.293-2.293a1 1 0 010-1.414z" clipRule="evenodd" />
+                  </svg>
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -1025,19 +1059,26 @@ const VideoChat = ({ onEndChat }) => {
                 key={msg.id}
                 className={`flex flex-col ${msg.senderId === currentUser.uid ? 'items-end' : 'items-start'}`}
               >
-                <span className="text-[11px] text-white/60 mb-1.5 px-0.5 flex items-center gap-1 font-medium">
-                  {msg.senderId === currentUser.uid ? (
-                    <><span className="text-[#a78bfa]">You</span> &bull; {msg.timestamp === 'Just now' ? 'Just now' : new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</>
-                  ) : (
-                    <>{partnerName || 'Stranger'} &bull; {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</>
-                  )}
+                <span className="text-[10px] text-white/40 mb-1 px-1 font-bold uppercase tracking-wider">
+                  {msg.senderId === currentUser.uid ? 'You' : (partnerName || 'Stranger')}
                 </span>
-                <div className={`max-w-[85%] px-5 py-3.5 rounded-[18px] text-[14px] leading-snug font-medium shadow-sm ${msg.senderId === currentUser.uid
-                  ? 'bg-[#8234f9] text-white rounded-tr-sm'
-                  : 'bg-white/10 text-white/95 rounded-tl-sm'
-                  }`}>
-                  {msg.text}
-                </div>
+
+                {msg.type === 'sticker' ? (
+                  <div className="text-6xl my-2 animate-bounce-short">
+                    {msg.text}
+                  </div>
+                ) : (
+                  <div className={`max-w-[85%] px-4 py-3 rounded-[20px] text-[14px] leading-relaxed shadow-lg ${msg.senderId === currentUser.uid
+                      ? 'bg-gradient-to-br from-accent-purple to-indigo-600 text-white rounded-tr-none border border-white/10'
+                      : 'bg-white/10 backdrop-blur-md text-white/90 rounded-tl-none border border-white/5'
+                    }`}>
+                    {msg.text}
+                  </div>
+                )}
+
+                <span className="text-[9px] text-white/20 mt-1 px-1">
+                  {msg.timestamp === 'Just now' ? 'Just now' : new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </span>
               </div>
             ))}
 
@@ -1146,6 +1187,49 @@ const VideoChat = ({ onEndChat }) => {
 
 
       {/* Mobile Chat Toggle - REMOVED (now unified at top-left) */}
+
+      {/* Mobile Connected Users List Overlay */}
+      {showConnectedUsers && (
+        <div className="fixed inset-0 z-[120] bg-black/80 backdrop-blur-xl flex flex-col animate-fade-in">
+          <div className="flex items-center justify-between p-6 border-b border-white/10">
+            <h3 className="text-xl font-bold">Recent Connections</h3>
+            <button
+              onClick={() => setShowConnectedUsers(false)}
+              className="w-10 h-10 bg-white/10 flex items-center justify-center rounded-full hover:bg-white/20 transition-colors"
+            >✕</button>
+          </div>
+          <div className="flex-1 overflow-y-auto px-4 py-2">
+            <MatchHistoryMobile onClose={() => setShowConnectedUsers(false)} />
+          </div>
+        </div>
+      )}
+
+      {/* Mobile Sticker Picker Overlay */}
+      {showStickerPicker && (
+        <div className="fixed inset-x-0 bottom-0 z-[120] bg-[#1a1c1e]/95 backdrop-blur-2xl rounded-t-[32px] p-6 border-t border-white/10 shadow-2xl animate-fade-in-up">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-lg font-bold">Send Sticker</h3>
+            <button
+              onClick={() => setShowStickerPicker(false)}
+              className="text-gray-400 hover:text-white"
+            >✕</button>
+          </div>
+          <div className="grid grid-cols-4 gap-4 pb-8">
+            {['👋', '😂', '🔥', '❤', '😮', '👍', '🙈', '🚀', '🌈', '💎', '🎨', '✨', '🎈', '🍿', '🥤', '🎮'].map(sticker => (
+              <button
+                key={sticker}
+                onClick={() => {
+                  sendMessage(sticker, 'sticker');
+                  setShowStickerPicker(false);
+                }}
+                className="text-4xl hover:scale-125 transition-transform active:scale-90"
+              >
+                {sticker}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Root Level Subscription Modal Overlay - Fixed Z-Index Context */}
       {showSubscriptionModal && (

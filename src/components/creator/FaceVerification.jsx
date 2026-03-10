@@ -137,8 +137,9 @@ const FaceVerification = () => {
       toast.success("Face verified!", { id: toastId });
       navigate("/creator/verify/voice");
     } catch (error) {
-      console.error(error);
-      toast.error("Verification failed", { id: toastId });
+      console.error("Verification Error:", error);
+      const errorMessage = error.message || "Face Verification failed";
+      toast.error(errorMessage, { id: toastId });
     } finally {
       setIsUploading(false);
     }

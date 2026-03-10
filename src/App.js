@@ -55,6 +55,19 @@ const AppContent = () => {
     checkBonus();
   }, [currentUser?.id, checkDailyBonus]);
 
+  // Force navigate to home on back button
+  useEffect(() => {
+    const handlePopState = (event) => {
+      // If we are not at home, force go home
+      if (window.location.pathname !== '/') {
+        navigate('/', { replace: true });
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [navigate]);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-dark-900 flex items-center justify-center">
