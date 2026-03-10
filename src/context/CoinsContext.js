@@ -223,7 +223,8 @@ export const CoinsProvider = ({ children }) => {
         spendCoins,
         purchaseCoins,
         checkDailyBonus,
-        claimDailyBonus
+        claimDailyBonus,
+        getDailyStreakInfo
     };
 
     return (
