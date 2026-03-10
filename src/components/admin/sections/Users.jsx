@@ -83,6 +83,20 @@ const Users = () => {
         }
     };
 
+    const handleDeleteUser = async (userId) => {
+        if (!window.confirm("CRITICAL: Are you sure you want to PERMANENTLY delete this user? This action cannot be undone.")) return;
+
+        setLoading(true);
+        const { error } = await supabase.from('profiles').delete().eq('id', userId);
+        if (error) toast.error("Delete failed: " + error.message);
+        else {
+            toast.success("User permanently removed");
+            fetchUsers();
+            setIsModalOpen(false);
+        }
+        setLoading(false);
+    };
+
     const filteredUsers = useMemo(() => {
         return users.filter(user => {
             const matchesSearch =
@@ -322,7 +336,10 @@ const Users = () => {
                                         </div>
                                     )}
 
-                                    <button className="w-full py-5 border-2 border-dashed border-slate-200 hover:border-red-400 hover:text-red-500 transition-all text-slate-400 font-black rounded-3xl flex items-center justify-center gap-3 mt-10">
+                                    <button
+                                        onClick={() => handleDeleteUser(selectedUser.id)}
+                                        className="w-full py-5 border-2 border-dashed border-slate-200 hover:border-red-400 hover:text-red-500 transition-all text-slate-400 font-black rounded-3xl flex items-center justify-center gap-3 mt-10"
+                                    >
                                         <Trash2 size={18} />
                                         ERASE PLAYER DATA PERMANENTLY
                                     </button>

@@ -13,40 +13,104 @@ import { supabase } from '../../../supabase';
 const Dashboard = () => {
     const [stats, setStats] = useState({
         totalUsers: 0,
-        activeNow: 12, // Dummy for now, would use Presence
+        activeNow: 0,
         totalChats: 0,
         revenue: 0,
-        growth: 12.5,
+        growth: 0,
         reportsPending: 0
     });
 
-    const [chartData, setChartData] = useState([
-        { name: 'Mon', users: 400, chats: 240 },
-        { name: 'Tue', users: 300, chats: 139 },
-        { name: 'Wed', users: 200, chats: 980 },
-        { name: 'Thu', users: 278, chats: 390 },
-        { name: 'Fri', users: 189, chats: 480 },
-        { name: 'Sat', users: 239, chats: 380 },
-        { name: 'Sun', users: 349, chats: 430 },
-    ]);
+    const [chartData, setChartData] = useState([]);
+    const [activities, setActivities] = useState([]);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        fetchDashboardStats();
+        const initDashboard = async () => {
+            setLoading(true);
+            await Promise.all([
+                fetchDashboardStats(),
+                fetchChartData(),
+                fetchRecentActivities()
+            ]);
+            setLoading(false);
+        };
+        initDashboard();
+
+        // Optional: Real-time subscription could be added here
     }, []);
 
     const fetchDashboardStats = async () => {
-        // Fetch real counts from Supabase
-        const { count: usersCount } = await supabase.from('profiles').select('*', { count: 'exact', head: true });
-        const { count: reportsCount } = await supabase.from('reports').select('*', { count: 'exact', head: true }).eq('status', 'pending');
+        try {
+            // 1. Total Users
+            const { count: usersCount } = await supabase.from('profiles').select('*', { count: 'exact', head: true });
 
-        setStats(prev => ({
-            ...prev,
-            totalUsers: usersCount || 0,
-            reportsPending: reportsCount || 0
-        }));
+            // 2. Active Now (seen in last 5 minutes)
+            const fiveMinsAgo = new Date(Date.now() - 5 * 60000).toISOString();
+            const { count: activeCount } = await supabase.from('profiles').select('*', { count: 'exact', head: true }).gt('last_seen', fiveMinsAgo);
+
+            // 3. Reports Pending
+            const { count: reportsCount } = await supabase.from('reports').select('*', { count: 'exact', head: true }).eq('status', 'pending');
+
+            // 4. Chats Today
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const { count: chatsToday } = await supabase.from('chat_logs').select('*', { count: 'exact', head: true }).gt('start_time', today.toISOString());
+
+            // 5. Total Revenue (Success only)
+            const { data: revData } = await supabase.from('transactions').select('amount').eq('status', 'success');
+            const totalRev = revData?.reduce((sum, tx) => sum + (tx.amount || 0), 0) || 0;
+
+            setStats({
+                totalUsers: usersCount || 0,
+                activeNow: activeCount || 0,
+                totalChats: chatsToday || 0,
+                revenue: totalRev,
+                growth: 12.5, // Trend could be calculated by comparing with yesterday
+                reportsPending: reportsCount || 0
+            });
+        } catch (err) {
+            console.error("Dashboard Stats Error:", err);
+        }
     };
 
-    const StatCard = ({ title, value, icon: Icon, trend, color }) => (
+    const fetchChartData = async () => {
+        // Fetch last 7 days of user growth
+        const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        const data = [];
+        const now = new Date();
+
+        for (let i = 6; i >= 0; i--) {
+            const d = new Date(now);
+            d.setDate(d.getDate() - i);
+            const start = new Date(d.setHours(0, 0, 0, 0)).toISOString();
+            const end = new Date(d.setHours(23, 59, 59, 999)).toISOString();
+
+            const { count: uCount } = await supabase.from('profiles').select('*', { count: 'exact', head: true }).gte('created_at', start).lte('created_at', end);
+            const { count: cCount } = await supabase.from('chat_logs').select('*', { count: 'exact', head: true }).gte('start_time', start).lte('start_time', end);
+
+            data.push({
+                name: days[new Date(start).getDay()],
+                users: uCount || 0,
+                chats: cCount || 0
+            });
+        }
+        setChartData(data);
+    };
+
+    const fetchRecentActivities = async () => {
+        // Fetch combined recent events
+        const { data: users } = await supabase.from('profiles').select('username, created_at, is_premium').order('created_at', { ascending: false }).limit(5);
+        const activityList = users?.map(u => ({
+            id: u.id || Math.random(),
+            type: u.is_premium ? 'Premium User Joined' : 'New User Joined',
+            name: u.username || 'Guest',
+            time: u.created_at,
+            icon: '👤'
+        })) || [];
+        setActivities(activityList);
+    };
+
+    const StatCard = ({ title, value, icon: Icon, trend, color, suffix = "" }) => (
         <div className="bg-white p-8 rounded-[32px] border border-slate-200 shadow-sm hover:shadow-xl hover:shadow-slate-200/50 transition-all group">
             <div className="flex justify-between items-start mb-6">
                 <div className={`p-4 rounded-2xl ${color} bg-opacity-10 shadow-sm transition-transform group-hover:scale-110`}>
@@ -60,7 +124,9 @@ const Dashboard = () => {
                 )}
             </div>
             <h3 className="text-slate-400 text-[11px] font-black uppercase tracking-[2px] mb-1">{title}</h3>
-            <div className="text-3xl font-black text-slate-800 tracking-tighter">{value.toLocaleString()}</div>
+            <div className="text-3xl font-black text-slate-800 tracking-tighter">
+                {typeof value === 'number' ? value.toLocaleString() : value}{suffix}
+            </div>
         </div>
     );
 
@@ -76,21 +142,22 @@ const Dashboard = () => {
                     color="bg-indigo-500"
                 />
                 <StatCard
-                    title="Active Rooms Now"
+                    title="Active Now"
                     value={stats.activeNow}
                     icon={Activity}
                     color="bg-green-500"
                 />
                 <StatCard
                     title="Chats Today"
-                    value={2842}
+                    value={stats.totalChats}
                     icon={MessageSquare}
                     trend={-2.4}
                     color="bg-orange-500"
                 />
                 <StatCard
-                    title="Monthly Revenue"
-                    value={"$12,450"}
+                    title="Total Revenue"
+                    value={stats.revenue}
+                    suffix="$"
                     icon={DollarSign}
                     trend={18.2}
                     color="bg-purple-500"
@@ -136,11 +203,7 @@ const Dashboard = () => {
                     <div className="flex justify-between items-center mb-10">
                         <div>
                             <h3 className="text-xl font-black text-slate-800 tracking-tight">Chat Activities</h3>
-                            <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mt-1">Hourly traffic distribution</p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <TrendingUp className="text-green-500" size={18} />
-                            <span className="text-xs font-black text-green-500 uppercase tracking-widest">+14% Peak</span>
+                            <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mt-1">Daily traffic distribution</p>
                         </div>
                     </div>
                     <div className="h-[350px] w-full">
@@ -171,16 +234,18 @@ const Dashboard = () => {
                         <span className="text-[10px] font-black text-indigo-500 bg-indigo-50 px-3 py-1 rounded-full uppercase tracking-tighter shadow-sm border border-indigo-100">Streaming Live</span>
                     </div>
                     <div className="divide-y divide-slate-50">
-                        {[1, 2, 3, 4, 5].map((i) => (
-                            <div key={i} className="p-6 flex items-center justify-between hover:bg-slate-50/50 transition-colors">
+                        {activities.map((act) => (
+                            <div key={act.id} className="p-6 flex items-center justify-between hover:bg-slate-50/50 transition-colors">
                                 <div className="flex items-center gap-4">
-                                    <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center font-black text-slate-400 text-xs">U</div>
+                                    <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center font-black text-slate-400 text-lg">{act.icon}</div>
                                     <div>
-                                        <p className="text-sm font-black text-slate-800">New premium user joined</p>
-                                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">John Doe from United States</p>
+                                        <p className="text-sm font-black text-slate-800">{act.type}</p>
+                                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">{act.name}</p>
                                     </div>
                                 </div>
-                                <span className="text-[10px] text-slate-400 font-black">2m ago</span>
+                                <span className="text-[10px] text-slate-400 font-black">
+                                    {new Date(act.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </span>
                             </div>
                         ))}
                     </div>
@@ -201,7 +266,10 @@ const Dashboard = () => {
                                         <span className="text-2xl font-black text-red-400">{stats.reportsPending}</span>
                                     </div>
                                     <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
-                                        <div className="h-full bg-red-500 rounded-full w-[40%]" />
+                                        <div
+                                            className="h-full bg-red-500 rounded-full transition-all duration-1000"
+                                            style={{ width: `${Math.min(100, (stats.reportsPending / 10) * 100)}%` }}
+                                        />
                                     </div>
                                 </div>
                                 <div>
@@ -232,7 +300,7 @@ const Dashboard = () => {
                     </div>
                 </div>
             </div>
-        </div>
+        </div >
     );
 };
 

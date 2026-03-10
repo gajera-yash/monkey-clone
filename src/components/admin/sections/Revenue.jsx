@@ -13,25 +13,77 @@ import toast from 'react-hot-toast';
 
 const Revenue = () => {
     const [stats, setStats] = useState({
-        totalRevenue: 15420.50,
-        mrr: 4200.00,
-        subscriptions: 142,
-        avgTicket: 24.50
+        totalRevenue: 0,
+        mrr: 0,
+        subscriptions: 0,
+        avgTicket: 0
     });
 
     const [transactions, setTransactions] = useState([]);
+    const [chartData, setChartData] = useState([]);
     const [loading, setLoading] = useState(true);
 
-    const chartData = [
-        { name: 'Week 1', revenue: 4200 },
-        { name: 'Week 2', revenue: 5800 },
-        { name: 'Week 3', revenue: 3900 },
-        { name: 'Week 4', revenue: 6100 },
-    ];
-
     useEffect(() => {
-        fetchTransactions();
+        const initRevenue = async () => {
+            setLoading(true);
+            await Promise.all([
+                fetchRevenueStats(),
+                fetchChartData(),
+                fetchTransactions()
+            ]);
+            setLoading(false);
+        };
+        initRevenue();
     }, []);
+
+    const [segments, setSegments] = useState({
+        plus_annual: 0,
+        plus_monthly: 0,
+        coins: 0
+    });
+
+    const fetchRevenueStats = async () => {
+        try {
+            // 1. Total Revenue
+            const { data: revData } = await supabase.from('transactions').select('amount, type').eq('status', 'success');
+            const total = revData?.reduce((sum, tx) => sum + (tx.amount || 0), 0) || 0;
+
+            // 2. Active Subscriptions
+            const { count: subCount } = await supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('is_premium', true);
+
+            // 3. Segment Calculation
+            const subData = revData?.filter(t => t.type === 'subscription') || [];
+            const coinData = revData?.filter(t => t.type === 'coins') || [];
+
+            setSegments({
+                plus_annual: 42, // Mocking distribution ratios for now but based on real totals soon
+                plus_monthly: 35,
+                coins: total > 0 ? Math.round((coinData.reduce((s, t) => s + (t.amount || 0), 0) / total) * 100) : 0
+            });
+
+            // Calculate trends (Simple mock based on last week vs previous)
+            setStats({
+                totalRevenue: total,
+                mrr: subData.reduce((s, t) => s + (t.amount || 0), 0),
+                subscriptions: subCount || 0,
+                avgTicket: revData?.length ? (total / revData.length) : 0
+            });
+        } catch (err) {
+            console.error("Revenue Stats Error:", err);
+        }
+    };
+
+    const fetchChartData = async () => {
+        const now = new Date();
+        const data = [];
+        for (let i = 3; i >= 0; i--) {
+            const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (i * 7)).toISOString();
+            const { data: weekRev } = await supabase.from('transactions').select('amount').eq('status', 'success').gte('created_at', start);
+            const weeklyTotal = weekRev?.reduce((sum, tx) => sum + (tx.amount || 0), 0) || 0;
+            data.push({ name: `Week ${4 - i}`, revenue: weeklyTotal });
+        }
+        setChartData(data);
+    };
 
     const fetchTransactions = async () => {
         setLoading(true);
@@ -42,14 +94,14 @@ const Revenue = () => {
                 user:profiles(username, avatar_url)
             `)
             .order('created_at', { ascending: false })
-            .limit(20);
+            .limit(50);
 
         if (error) toast.error("Failed to load transactions");
         else setTransactions(data || []);
         setLoading(false);
     };
 
-    const StatCard = ({ title, value, subtext, trend, icon: Icon, color }) => (
+    const StatCard = ({ title, value, subtext, trend, icon: Icon, color, suffix = "$" }) => (
         <div className="bg-white p-8 rounded-[40px] border border-slate-200 shadow-sm relative overflow-hidden group">
             <div className={`absolute top-0 right-0 p-6 opacity-5 group-hover:scale-110 transition-transform duration-500`}>
                 <Icon size={80} className={color.replace('bg-', 'text-')} />
@@ -66,7 +118,7 @@ const Revenue = () => {
                     )}
                 </div>
                 <h3 className="text-slate-400 text-[11px] font-black uppercase tracking-[2px] mb-1">{title}</h3>
-                <div className="text-3xl font-black text-slate-800 tracking-tighter">${value.toLocaleString()}</div>
+                <div className="text-3xl font-black text-slate-800 tracking-tighter">{suffix}{value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                 <p className="text-[10px] text-slate-400 font-bold uppercase mt-2 tracking-widest">{subtext}</p>
             </div>
         </div>
@@ -169,29 +221,20 @@ const Revenue = () => {
                         <div className="space-y-10 flex-1">
                             <div className="group/item">
                                 <div className="flex justify-between items-end mb-3">
-                                    <span className="text-xs font-bold text-slate-400 group-hover/item:text-white transition-colors">Monkey Plus+ (Annual)</span>
-                                    <span className="text-xl font-black text-indigo-400">42%</span>
+                                    <span className="text-xs font-bold text-slate-400 group-hover/item:text-white transition-colors">Premium Subscriptions</span>
+                                    <span className="text-xl font-black text-indigo-400">{100 - segments.coins}%</span>
                                 </div>
                                 <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                                    <div className="h-full bg-indigo-500 w-[42%]" />
+                                    <div className="h-full bg-indigo-500 transition-all duration-1000" style={{ width: `${100 - segments.coins}%` }} />
                                 </div>
                             </div>
                             <div className="group/item">
                                 <div className="flex justify-between items-end mb-3">
-                                    <span className="text-xs font-bold text-slate-400 group-hover/item:text-white transition-colors">Monkey Plus (Monthly)</span>
-                                    <span className="text-xl font-black text-purple-400">35%</span>
+                                    <span className="text-xs font-bold text-slate-400 group-hover/item:text-white transition-colors">Virtual Gifts & Coins</span>
+                                    <span className="text-xl font-black text-orange-400">{segments.coins}%</span>
                                 </div>
                                 <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                                    <div className="h-full bg-purple-500 w-[35%]" />
-                                </div>
-                            </div>
-                            <div className="group/item">
-                                <div className="flex justify-between items-end mb-3">
-                                    <span className="text-xs font-bold text-slate-400 group-hover/item:text-white transition-colors">Virtual Gifts</span>
-                                    <span className="text-xl font-black text-orange-400">23%</span>
-                                </div>
-                                <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                                    <div className="h-full bg-orange-500 w-[23%]" />
+                                    <div className="h-full bg-orange-500 transition-all duration-1000" style={{ width: `${segments.coins}%` }} />
                                 </div>
                             </div>
                         </div>
@@ -261,8 +304,8 @@ const Revenue = () => {
                                     </td>
                                     <td className="px-8 py-5">
                                         <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border shadow-sm ${tx.status === 'success'
-                                                ? 'bg-green-50 text-green-600 border-green-100'
-                                                : 'bg-red-50 text-red-600 border-red-100'
+                                            ? 'bg-green-50 text-green-600 border-green-100'
+                                            : 'bg-red-50 text-red-600 border-red-100'
                                             }`}>
                                             {tx.status}
                                         </span>
