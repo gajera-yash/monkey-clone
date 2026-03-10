@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { supabase } from "../../supabase";
 import toast from "react-hot-toast";
+import * as faceapi from 'face-api.js';
 
 const FaceVerification = () => {
   const videoRef = useRef(null);
@@ -14,6 +15,30 @@ const FaceVerification = () => {
   const [capturedImage, setCapturedImage] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
   const [cameraActive, setCameraActive] = useState(false);
+  const [detectedGender, setDetectedGender] = useState(null);
+  const [modelsLoaded, setModelsLoaded] = useState(false);
+
+  // Load Models
+  useEffect(() => {
+    const loadModels = async () => {
+      try {
+        const MODEL_URL = '/models';
+        await Promise.all([
+          faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+          faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
+          faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
+          faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL),
+          faceapi.nets.ageGenderNet.loadFromUri(MODEL_URL),
+        ]);
+        setModelsLoaded(true);
+        console.log("Models Loaded Successfully");
+      } catch (err) {
+        console.error("Error loading face-api models:", err);
+        toast.error("AI Models failed to load. Check internet.");
+      }
+    };
+    loadModels();
+  }, []);
 
   // START CAMERA
   const startCamera = async () => {
@@ -53,8 +78,8 @@ const FaceVerification = () => {
   }, []);
 
   // CAPTURE PHOTO
-  const capturePhoto = () => {
-    if (!videoRef.current || !canvasRef.current) return;
+  const capturePhoto = async () => {
+    if (!videoRef.current || !canvasRef.current || !modelsLoaded) return;
 
     const video = videoRef.current;
     const canvas = canvasRef.current;
@@ -69,10 +94,22 @@ const FaceVerification = () => {
     ctx.scale(-1, 1);
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-    // Resize to 320x320
-    const MAX_W = 320;
-    const MAX_H = 320;
+    // AI Detection
+    const detections = await faceapi.detectSingleFace(canvas, new faceapi.TinyFaceDetectorOptions())
+      .withFaceLandmarks()
+      .withAgeAndGender();
 
+    if (!detections) {
+      toast.error("No face detected. Please try again.");
+      return;
+    }
+
+    setDetectedGender(detections.gender);
+    console.log("Detected:", detections.gender);
+
+    // Resize and set image
+    const MAX_W = 640;
+    const MAX_H = 640;
     const scale = Math.min(MAX_W / canvas.width, MAX_H / canvas.height, 1);
 
     const compressed = document.createElement("canvas");
@@ -82,14 +119,21 @@ const FaceVerification = () => {
     const cctx = compressed.getContext("2d");
     cctx.drawImage(canvas, 0, 0, compressed.width, compressed.height);
 
-    const imageDataUrl = compressed.toDataURL("image/jpeg", 0.3);
+    const imageDataUrl = compressed.toDataURL("image/jpeg", 0.7);
 
     setCapturedImage(imageDataUrl);
     stopCamera();
+
+    if (detections.gender === 'male') {
+      toast.error("Female only verification required!", { duration: 4000 });
+    } else {
+      toast.success("Identity Verified!", { icon: '✨' });
+    }
   };
 
   const retakePhoto = () => {
     setCapturedImage(null);
+    setDetectedGender(null);
     startCamera();
   };
 
@@ -159,7 +203,13 @@ const FaceVerification = () => {
           Make sure your face is clearly visible.
         </p>
 
-        <div className="relative w-full aspect-[3/4] bg-dark-800 rounded-3xl overflow-hidden mb-8 border border-white/10">
+        <div className="relative w-full aspect-[3/4] bg-dark-800 rounded-3xl overflow-hidden mb-8 border border-white/10 shadow-2xl">
+          {!modelsLoaded && (
+            <div className="absolute inset-0 bg-dark-900/80 flex flex-col items-center justify-center z-20">
+              <div className="w-12 h-12 border-4 border-pink-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+              <p className="text-pink-400 font-bold">Loading AI System...</p>
+            </div>
+          )}
 
           {!capturedImage ? (
             <>
@@ -173,15 +223,26 @@ const FaceVerification = () => {
 
               {/* face guide */}
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <div className="w-48 h-64 border-2 border-dashed border-pink-400 rounded-[40px]"></div>
+                <div className={`w-64 h-80 border-2 border-dashed rounded-[50px] transition-all duration-500 ${isUploading ? 'border-pink-500' : 'border-white/20'}`}></div>
               </div>
             </>
           ) : (
-            <img
-              src={capturedImage}
-              alt="Captured"
-              className="w-full h-full object-cover"
-            />
+            <div className="relative w-full h-full">
+              <img
+                src={capturedImage}
+                alt="Captured"
+                className={`w-full h-full object-cover ${detectedGender === 'male' ? 'grayscale opacity-50' : ''}`}
+              />
+              {detectedGender === 'male' && (
+                <div className="absolute inset-0 flex items-center justify-center bg-red-900/40 backdrop-blur-sm">
+                  <div className="text-white text-center p-4">
+                    <span className="text-5xl mb-2 block">🚫</span>
+                    <p className="text-xl font-black uppercase tracking-widest">Male Detected</p>
+                    <p className="text-sm opacity-80">Only female creators allowed</p>
+                  </div>
+                </div>
+              )}
+            </div>
           )}
 
           <canvas ref={canvasRef} className="hidden" />
@@ -190,28 +251,40 @@ const FaceVerification = () => {
         {!capturedImage ? (
           <button
             onClick={capturePhoto}
-            disabled={!cameraActive}
-            className="w-20 h-20 rounded-full bg-white mx-auto flex items-center justify-center"
+            disabled={!cameraActive || !modelsLoaded}
+            className={`w-24 h-24 rounded-full mx-auto flex items-center justify-center transition-all ${!modelsLoaded ? 'opacity-20' : 'bg-white hover:scale-105 active:scale-95 shadow-xl shadow-white/10'}`}
           >
-            <div className="w-16 h-16 rounded-full border-4 border-black"></div>
+            <div className="w-20 h-20 rounded-full border-4 border-black flex items-center justify-center">
+              <div className="w-12 h-12 bg-black/5 rounded-full"></div>
+            </div>
           </button>
         ) : (
-          <div className="flex gap-4">
-            <button
-              onClick={retakePhoto}
-              disabled={isUploading}
-              className="flex-1 py-4 bg-gray-800 rounded-2xl"
-            >
-              Retake
-            </button>
+          <div className="flex flex-col gap-4">
+            {detectedGender === 'male' && (
+              <p className="text-red-400 text-sm font-bold bg-red-400/10 py-3 rounded-xl border border-red-400/20">
+                AI has restricted this account. Only females can apply.
+              </p>
+            )}
+            <div className="flex gap-4 w-full">
+              <button
+                onClick={retakePhoto}
+                disabled={isUploading}
+                className="flex-1 py-4 bg-gray-800 rounded-2xl font-bold hover:bg-gray-700 transition-colors"
+              >
+                Retake
+              </button>
 
-            <button
-              onClick={submitPhoto}
-              disabled={isUploading}
-              className="flex-1 py-4 bg-pink-500 rounded-2xl"
-            >
-              {isUploading ? "Uploading..." : "Looks Good"}
-            </button>
+              <button
+                onClick={submitPhoto}
+                disabled={isUploading || detectedGender === 'male'}
+                className={`flex-1 py-4 rounded-2xl font-bold transition-all ${detectedGender === 'male'
+                  ? 'bg-gray-700 cursor-not-allowed text-gray-400'
+                  : 'bg-pink-500 hover:bg-pink-400 shadow-lg shadow-pink-500/20'
+                  }`}
+              >
+                {isUploading ? "Uploading..." : "Verify Identity"}
+              </button>
+            </div>
           </div>
         )}
       </div>
