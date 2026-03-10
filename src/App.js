@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { useAuth } from './context/AuthContext';
@@ -37,15 +37,23 @@ const AppContent = () => {
   const { checkDailyBonus } = useCoins();
   const navigate = useNavigate();
 
+  const bonusCheckedForUser = useRef(null);
+
   useEffect(() => {
+    // Only check bonus once per login session (not on every profile update)
+    if (!currentUser?.id) {
+      bonusCheckedForUser.current = null;
+      return;
+    }
+    if (bonusCheckedForUser.current === currentUser.id) return;
+    bonusCheckedForUser.current = currentUser.id;
+
     const checkBonus = async () => {
-      if (currentUser) {
-        const hasBonus = await checkDailyBonus();
-        if (hasBonus) setIsBonusOpen(true);
-      }
+      const hasBonus = await checkDailyBonus();
+      if (hasBonus) setIsBonusOpen(true);
     };
     checkBonus();
-  }, [currentUser, checkDailyBonus]);
+  }, [currentUser?.id, checkDailyBonus]);
 
   if (loading) {
     return (

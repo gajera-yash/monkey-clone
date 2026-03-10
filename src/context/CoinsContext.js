@@ -154,19 +154,63 @@ export const CoinsProvider = ({ children }) => {
         });
     };
 
-    // Check for daily bonus
-    const checkDailyBonus = async () => {
-        if (!currentUser?.id) return;
+    const DAILY_REWARDS_COINS = [100, 500, 1000, 5000, 10000, 50000, 100000];
+
+    // Get streak info from localStorage
+    const getDailyStreakInfo = (userId) => {
         const today = new Date().toDateString();
-        const lastBonusDate = localStorage.getItem(`dailyBonus_${currentUser.id}`);
-        return lastBonusDate !== today;
+        const lastClaimDate = localStorage.getItem(`dailyBonus_lastDate_${userId}`);
+        const lastClaimDay = parseInt(localStorage.getItem(`dailyBonus_lastDay_${userId}`) || '0', 10);
+
+        // Calculate streak continuation
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        const isConsecutive = lastClaimDate === yesterday.toDateString();
+
+        let currentDay = 1;
+        if (lastClaimDate && lastClaimDate !== today) {
+            currentDay = isConsecutive ? Math.min(lastClaimDay + 1, 7) : 1;
+        } else if (lastClaimDate === today) {
+            // Already claimed today — show next day as current
+            currentDay = lastClaimDay;
+        }
+
+        // Build list of claimed days (all days before currentDay in this streak cycle)
+        const claimedDays = [];
+        if (lastClaimDate === today) {
+            // Claimed today — mark currentDay as claimed too
+            for (let d = 1; d <= lastClaimDay; d++) claimedDays.push(d);
+        } else {
+            for (let d = 1; d < currentDay; d++) claimedDays.push(d);
+        }
+
+        return { currentDay, claimedDays };
+    };
+
+    // Check if bonus is available today
+    const checkDailyBonus = async () => {
+        if (!currentUser?.id) return false;
+        const today = new Date().toDateString();
+        const lastClaimDate = localStorage.getItem(`dailyBonus_lastDate_${currentUser.id}`);
+        return lastClaimDate !== today;
     };
 
     const claimDailyBonus = async () => {
-        if (!currentUser?.id) return;
-        const success = await addCoins(50, "Daily Login Bonus");
+        if (!currentUser?.id) return false;
+
+        const today = new Date().toDateString();
+        const lastClaimDate = localStorage.getItem(`dailyBonus_lastDate_${currentUser.id}`);
+
+        // Prevent double claim
+        if (lastClaimDate === today) return false;
+
+        const { currentDay } = getDailyStreakInfo(currentUser.id);
+        const reward = DAILY_REWARDS_COINS[currentDay - 1] || 100;
+
+        const success = await addCoins(reward, `Day ${currentDay} Daily Bonus`);
         if (success) {
-            localStorage.setItem(`dailyBonus_${currentUser.id}`, new Date().toDateString());
+            localStorage.setItem(`dailyBonus_lastDate_${currentUser.id}`, today);
+            localStorage.setItem(`dailyBonus_lastDay_${currentUser.id}`, currentDay.toString());
         }
         return success;
     };
