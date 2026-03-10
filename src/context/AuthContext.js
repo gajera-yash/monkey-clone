@@ -228,30 +228,53 @@ export const AuthProvider = ({ children }) => {
     // Auth State Listener
     useEffect(() => {
         const getInitialSession = async () => {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (session?.user) {
-                const profile = await fetchProfile(session.user.id);
-                setCurrentUser({ ...session.user, ...profile });
+            try {
+                const { data: { session }, error } = await supabase.auth.getSession();
+                if (error) {
+                    console.error("Session error:", error);
+                } else if (session?.user) {
+                    try {
+                        const profile = await fetchProfile(session.user.id);
+                        setCurrentUser({ ...session.user, ...profile });
+                    } catch (profileError) {
+                        console.error("Profile fetch error on initial load:", profileError);
+                        // Still set user even if profile fails (they might need to complete onboarding)
+                        setCurrentUser(session.user);
+                    }
+                }
+            } catch (err) {
+                console.error("Unexpected error getting session:", err);
+            } finally {
+                setLoading(false);
             }
-            setLoading(false);
         };
 
         getInitialSession();
 
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-            if (session?.user) {
-                const profile = await fetchProfile(session.user.id);
-                setCurrentUser({ ...session.user, ...profile });
+            try {
+                if (session?.user) {
+                    try {
+                        const profile = await fetchProfile(session.user.id);
+                        setCurrentUser({ ...session.user, ...profile });
 
-                // Check for ban
-                if (profile?.ban_expiry && new Date(profile.ban_expiry) > new Date()) {
-                    logout();
-                    toast.error(`Account banned until ${new Date(profile.ban_expiry).toLocaleDateString()}`);
+                        // Check for ban
+                        if (profile?.ban_expiry && new Date(profile.ban_expiry) > new Date()) {
+                            logout();
+                            toast.error(`Account banned until ${new Date(profile.ban_expiry).toLocaleDateString()}`);
+                        }
+                    } catch (profileError) {
+                        console.error("Profile fetch error on auth state change:", profileError);
+                        setCurrentUser(session.user);
+                    }
+                } else if (!isGuest) {
+                    setCurrentUser(null);
                 }
-            } else if (!isGuest) {
-                setCurrentUser(null);
+            } catch (err) {
+                console.error("Unexpected error in auth state change:", err);
+            } finally {
+                setLoading(false);
             }
-            setLoading(false);
         });
 
         return () => {
