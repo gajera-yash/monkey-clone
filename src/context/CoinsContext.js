@@ -53,11 +53,15 @@ export const CoinsProvider = ({ children }) => {
         if (!currentUser?.id) return;
 
         try {
-            // 1. Update balance in profiles table
-            const { error: updateError } = await supabase.rpc('add_coins', {
-                user_id: currentUser.id,
-                amount_to_add: amount
-            });
+            // 1. Update balance in profiles table manually instead of RPC
+            const currentCoins = currentUser?.coins || 0;
+            const newBalance = currentCoins + amount;
+
+            const { error: updateError } = await supabase
+                .from('profiles')
+                .update({ coins: newBalance })
+                .eq('id', currentUser.id);
+
             if (updateError) throw updateError;
 
             // 2. Add transaction record
@@ -98,11 +102,15 @@ export const CoinsProvider = ({ children }) => {
         }
 
         try {
-            // 1. Deduct balance in profiles table
-            const { error: updateError } = await supabase.rpc('add_coins', {
-                user_id: currentUser.id,
-                amount_to_add: -amount
-            });
+            // 1. Deduct balance in profiles table manually instead of RPC
+            const currentCoins = currentUser?.coins || 0;
+            const newBalance = currentCoins - amount;
+
+            const { error: updateError } = await supabase
+                .from('profiles')
+                .update({ coins: newBalance })
+                .eq('id', currentUser.id);
+
             if (updateError) throw updateError;
 
             // 2. Add transaction record

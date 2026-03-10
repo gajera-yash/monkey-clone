@@ -26,12 +26,12 @@ export const AdminProvider = ({ children }) => {
             }
 
             try {
-                console.log("Checking admin status for UID:", currentUser.uid);
+                console.log("Checking admin status for ID:", currentUser.id);
 
                 const { data, error } = await supabase
                     .from('profiles')
                     .select('role, email')
-                    .eq('id', currentUser.uid)
+                    .eq('id', currentUser.id)
                     .single();
 
                 if (error) {
