@@ -227,48 +227,12 @@ export const AuthProvider = ({ children }) => {
 
     // Auth State Listener
     useEffect(() => {
-        const getInitialSession = async () => {
-            try {
-                const { data: { session }, error } = await supabase.auth.getSession();
-                if (error) {
-                    console.error("Session error:", error);
-                } else if (session?.user) {
-                    try {
-                        let profile = await fetchProfile(session.user.id);
-
-                        // Handle female creator registration logic
-                        const savedGender = localStorage.getItem('userGender');
-                        if (savedGender === 'Female' && profile && !profile.isCreator) {
-                            const { error: updateErr } = await supabase
-                                .from('profiles')
-                                .update({ is_creator: true, gender: 'Female', account_status: 'pending' })
-                                .eq('id', session.user.id);
-
-                            if (!updateErr) {
-                                profile = { ...profile, isCreator: true, gender: 'Female', accountStatus: 'pending' };
-                            }
-                            localStorage.removeItem('userGender');
-                        } else if (savedGender) {
-                            localStorage.removeItem('userGender');
-                        }
-
-                        setCurrentUser({ ...session.user, ...profile });
-                    } catch (profileError) {
-                        console.error("Profile fetch error on initial load:", profileError);
-                        // Still set user even if profile fails (they might need to complete onboarding)
-                        setCurrentUser(session.user);
-                    }
-                }
-            } catch (err) {
-                console.error("Unexpected error getting session:", err);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        getInitialSession();
+        let mounted = true;
 
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+            console.log("[AuthContext] onAuthStateChange event:", event);
+
+            if (!mounted) return;
             try {
                 if (session?.user) {
                     try {
@@ -307,11 +271,12 @@ export const AuthProvider = ({ children }) => {
             } catch (err) {
                 console.error("Unexpected error in auth state change:", err);
             } finally {
-                setLoading(false);
+                if (mounted) setLoading(false);
             }
         });
 
         return () => {
+            mounted = false;
             if (subscription) subscription.unsubscribe();
         };
     }, [isGuest]);
