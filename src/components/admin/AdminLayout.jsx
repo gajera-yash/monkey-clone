@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
-import { Routes, Route, Link, useLocation } from 'react-router-dom';
+import { Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
+import { supabase } from '../../supabase';
 import {
     LayoutDashboard, Users as UsersIcon, MessageSquare, ShieldAlert,
     CreditCard, BarChart3, Palette, Settings,
-    Lock, Bell, LifeBuoy, Menu, X, ChevronRight
+    Lock, Bell, LifeBuoy, Menu, X, ChevronRight, LogOut
 } from 'lucide-react';
 
 // Real Section Imports
@@ -17,14 +19,15 @@ import Revenue from './sections/Revenue';
 import Content from './sections/Content';
 import SystemSettings from './sections/Settings';
 
-// Placeholder Components for remaining sections
-const Analytics = () => <div className="p-8"><h1 className="text-2xl font-black text-slate-800">Analytics & Insights</h1><p className="text-slate-500 mt-2">Coming soon: Advanced growth metrics and engagement tracking.</p></div>;
-const AdminUsers = () => <div className="p-8"><h1 className="text-2xl font-black text-slate-800">Admin Users & Roles</h1><p className="text-slate-500 mt-2">Coming soon: Team permissions and audit logs.</p></div>;
-const Notifications = () => <div className="p-8"><h1 className="text-2xl font-black text-slate-800">Notifications & Alerts</h1><p className="text-slate-500 mt-2">Coming soon: System-wide broadcasts.</p></div>;
-const Support = () => <div className="p-8"><h1 className="text-2xl font-black text-slate-800">Support & Feedback</h1><p className="text-slate-500 mt-2">Coming soon: Ticket management system.</p></div>;
+import Analytics from './sections/Analytics';
+import AdminUsers from './sections/AdminUsers';
+import Support from './sections/Support';
+import Notifications from './sections/Notifications';
 
 const AdminLayout = () => {
     const location = useLocation();
+    const navigate = useNavigate();
+    const { currentUser, logout } = useAuth();
     const [isSidebarOpen, setSidebarOpen] = useState(true);
 
     const menuItems = [
@@ -65,8 +68,8 @@ const AdminLayout = () => {
                                 key={item.path}
                                 to={item.path}
                                 className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all group ${isActive
-                                        ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20'
-                                        : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                                    ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20'
+                                    : 'text-slate-400 hover:text-white hover:bg-slate-800'
                                     }`}
                             >
                                 <span className={`${isActive ? 'text-white' : 'text-slate-500 group-hover:text-indigo-400'}`}>
@@ -81,14 +84,26 @@ const AdminLayout = () => {
 
                 <div className="p-4 mt-auto border-t border-white/5 bg-slate-900/50">
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-slate-800 border border-white/10 flex items-center justify-center text-xs font-bold text-indigo-400">
-                            SA
+                        <div className="w-10 h-10 rounded-full bg-slate-800 border border-white/10 flex items-center justify-center text-xs font-bold text-indigo-400 capitalize overflow-hidden">
+                            {currentUser?.avatar_url ? <img src={currentUser.avatar_url} className="w-full h-full object-cover" alt="" /> : (currentUser?.username?.charAt(0) || 'A')}
                         </div>
                         {isSidebarOpen && (
-                            <div className="truncate">
-                                <p className="font-bold text-sm text-white uppercase tracking-tighter">Super Admin</p>
-                                <p className="text-slate-500 text-[9px] uppercase font-black tracking-widest">Full Access</p>
+                            <div className="truncate flex-1">
+                                <p className="font-bold text-sm text-white uppercase tracking-tighter truncate">{currentUser?.username || 'Admin'}</p>
+                                <p className="text-slate-500 text-[9px] uppercase font-black tracking-widest">{currentUser?.role || 'Full Access'}</p>
                             </div>
+                        )}
+                        {isSidebarOpen && (
+                            <button
+                                onClick={async () => {
+                                    await logout();
+                                    navigate('/login');
+                                }}
+                                className="p-2 text-slate-400 hover:text-white hover:bg-red-500/20 rounded-xl transition-colors"
+                                title="Logout"
+                            >
+                                <LogOut size={16} />
+                            </button>
                         )}
                     </div>
                 </div>

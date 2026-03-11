@@ -27,8 +27,12 @@ const Content = () => {
             data = data.filter(item => item.type === (activeTab === 'backgrounds' ? 'background' : 'gift'));
         }
 
-        if (error) toast.error("Failed to load content");
-        else setItems(data || []);
+        if (error) {
+            console.error("Failed to load content:", error);
+            toast.error("Failed to load content: " + error.message);
+        } else {
+            setItems(data || []);
+        }
         setLoading(false);
     };
 
@@ -39,8 +43,10 @@ const Content = () => {
             : { name: newItem.name, type: activeTab === 'backgrounds' ? 'background' : 'gift', image_url: newItem.value, price: newItem.price };
 
         const { error } = await supabase.from(table).insert([payload]);
-        if (error) toast.error("Failed to add item");
-        else {
+        if (error) {
+            console.error("Add Item Error:", error);
+            toast.error(`Failed to add item: ${error.message}`);
+        } else {
             toast.success("Item added successfully");
             setIsAdding(false);
             setNewItem({ name: '', value: '', type: 'tag', price: 0 });
@@ -84,8 +90,8 @@ const Content = () => {
                         key={tab.id}
                         onClick={() => setActiveTab(tab.id)}
                         className={`flex items-center gap-3 px-8 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === tab.id
-                                ? 'bg-slate-900 text-white shadow-xl shadow-slate-900/10'
-                                : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'
+                            ? 'bg-slate-900 text-white shadow-xl shadow-slate-900/10'
+                            : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'
                             }`}
                     >
                         <tab.icon size={16} />

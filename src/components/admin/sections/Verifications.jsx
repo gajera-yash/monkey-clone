@@ -22,7 +22,8 @@ const Verifications = () => {
             .order('created_at', { ascending: false });
 
         if (error) {
-            toast.error("Failed to load requests");
+            console.error("Failed to load requests:", error);
+            toast.error("Failed to load requests: " + error.message);
         } else {
             setRequests(data);
         }
@@ -65,7 +66,7 @@ const Verifications = () => {
                         <div className="flex-1">
                             <div className="flex items-center gap-2 mb-4">
                                 <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${req.status === 'pending' ? 'bg-yellow-100 text-yellow-600' :
-                                        req.status === 'approved' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'
+                                    req.status === 'approved' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'
                                     }`}>
                                     {req.status}
                                 </span>

@@ -20,7 +20,8 @@ const Creators = () => {
             .order('coins', { ascending: false });
 
         if (error) {
-            toast.error("Failed to load creators");
+            console.error("Failed to load creators:", error);
+            toast.error("Failed to load creators: " + error.message);
         } else {
             setCreators(data);
         }

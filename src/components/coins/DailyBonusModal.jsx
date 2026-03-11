@@ -21,13 +21,14 @@ const DailyBonusModal = ({ isOpen, onClose }) => {
     const [streakInfo, setStreakInfo] = useState({ currentDay: 1, claimedDays: [] });
 
     useEffect(() => {
-        if (isOpen && currentUser?.id) {
+        if (isOpen && currentUser?.id && currentUser?.role !== 'admin') {
             const info = getDailyStreakInfo(currentUser.id);
             setStreakInfo(info);
         }
     }, [isOpen, currentUser, getDailyStreakInfo]);
 
-    if (!isOpen) return null;
+    if (!isOpen || currentUser?.role === 'admin') return null;
+
 
     const handleClaim = async () => {
         setLoading(true);

@@ -22,6 +22,15 @@ const Revenue = () => {
     const [transactions, setTransactions] = useState([]);
     const [chartData, setChartData] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [currency, setCurrency] = useState('USD');
+    const INR_RATE = 83.5;
+
+    const formatCurrency = (amount) => {
+        if (currency === 'INR') {
+            return `₹${(amount * INR_RATE).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
+        }
+        return `$${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    };
 
     useEffect(() => {
         const initRevenue = async () => {
@@ -96,12 +105,16 @@ const Revenue = () => {
             .order('created_at', { ascending: false })
             .limit(50);
 
-        if (error) toast.error("Failed to load transactions");
-        else setTransactions(data || []);
+        if (error) {
+            console.error("Failed to load transactions:", error);
+            toast.error("Failed to load transactions: " + error.message);
+        } else {
+            setTransactions(data || []);
+        }
         setLoading(false);
     };
 
-    const StatCard = ({ title, value, subtext, trend, icon: Icon, color, suffix = "$" }) => (
+    const StatCard = ({ title, value, subtext, trend, icon: Icon, color }) => (
         <div className="bg-white p-8 rounded-[40px] border border-slate-200 shadow-sm relative overflow-hidden group">
             <div className={`absolute top-0 right-0 p-6 opacity-5 group-hover:scale-110 transition-transform duration-500`}>
                 <Icon size={80} className={color.replace('bg-', 'text-')} />
@@ -118,7 +131,9 @@ const Revenue = () => {
                     )}
                 </div>
                 <h3 className="text-slate-400 text-[11px] font-black uppercase tracking-[2px] mb-1">{title}</h3>
-                <div className="text-3xl font-black text-slate-800 tracking-tighter">{suffix}{value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                <div className="text-3xl font-black text-slate-800 tracking-tighter">
+                    {title === 'Premium Users' ? value.toLocaleString() : formatCurrency(value)}
+                </div>
                 <p className="text-[10px] text-slate-400 font-bold uppercase mt-2 tracking-widest">{subtext}</p>
             </div>
         </div>
@@ -132,8 +147,14 @@ const Revenue = () => {
                     <p className="text-slate-500 font-medium tracking-tight">Financial health and monetization insights</p>
                 </div>
                 <div className="flex gap-3">
+                    <button
+                        onClick={() => setCurrency(currency === 'USD' ? 'INR' : 'USD')}
+                        className="px-6 py-3 bg-white border border-slate-200 rounded-2xl text-xs font-black uppercase tracking-widest text-indigo-600 hover:bg-slate-50 transition-all shadow-sm"
+                    >
+                        {currency === 'USD' ? 'Show INR (₹)' : 'Show USD ($)'}
+                    </button>
                     <button className="px-6 py-3 bg-white border border-slate-200 rounded-2xl text-xs font-black uppercase tracking-widest text-slate-600 hover:bg-slate-50 transition-all flex items-center gap-2 shadow-sm">
-                        <Download size={16} /> Export Report
+                        <Download size={16} /> Export
                     </button>
                     <button className="px-6 py-3 bg-indigo-600 rounded-2xl text-xs font-black uppercase tracking-widest text-white shadow-lg shadow-indigo-600/20 hover:bg-indigo-700 transition-all active:scale-95">
                         Update Pricing
@@ -299,8 +320,8 @@ const Revenue = () => {
                                         {tx.coins_amount && <div className="text-[10px] text-indigo-500 font-bold mt-0.5">+{tx.coins_amount} Coins</div>}
                                     </td>
                                     <td className="px-8 py-5">
-                                        <div className="text-sm font-black text-slate-800">${tx.amount}</div>
-                                        <div className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">USD Currency</div>
+                                        <div className="text-sm font-black text-slate-800">{formatCurrency(tx.amount)}</div>
+                                        <div className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">{currency} Currency</div>
                                     </td>
                                     <td className="px-8 py-5">
                                         <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border shadow-sm ${tx.status === 'success'

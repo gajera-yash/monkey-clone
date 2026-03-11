@@ -28,14 +28,18 @@ const Chats = () => {
             .from('chat_logs')
             .select(`
                 *,
-                user1:profiles!chat_logs_user1_id_fkey(username, avatar_url, gender),
-                user2:profiles!chat_logs_user2_id_fkey(username, avatar_url, gender)
+                user1:profiles!chat_logs_user1_id_fkey(username, avatar_url, gender, location),
+                user2:profiles!chat_logs_user2_id_fkey(username, avatar_url, gender, location)
             `)
             .is('end_time', null)
             .order('start_time', { ascending: false });
 
-        if (error) toast.error("Failed to load active chats");
-        else setActiveChats(data || []);
+        if (error) {
+            console.error("Failed to load active chats:", error);
+            toast.error("Failed to load active chats: " + error.message);
+        } else {
+            setActiveChats(data || []);
+        }
         setLoading(false);
     };
 
@@ -45,15 +49,19 @@ const Chats = () => {
             .from('chat_logs')
             .select(`
                 *,
-                user1:profiles!chat_logs_user1_id_fkey(username, avatar_url),
-                user2:profiles!chat_logs_user2_id_fkey(username, avatar_url)
+                user1:profiles!chat_logs_user1_id_fkey(username, avatar_url, gender, location),
+                user2:profiles!chat_logs_user2_id_fkey(username, avatar_url, gender, location)
             `)
             .not('end_time', 'is', null)
             .order('end_time', { ascending: false })
             .limit(50);
 
-        if (error) toast.error("Failed to load history");
-        else setChatHistory(data || []);
+        if (error) {
+            console.error("Failed to load history:", error);
+            toast.error("Failed to load history: " + error.message);
+        } else {
+            setChatHistory(data || []);
+        }
         setLoading(false);
     };
 
@@ -133,7 +141,10 @@ const Chats = () => {
                                             {chat.user1?.avatar_url ? <img src={chat.user1.avatar_url} alt="" className="w-full h-full object-cover rounded-[22px]" /> : <div className="w-full h-full flex items-center justify-center font-black text-slate-400">?</div>}
                                         </div>
                                         <span className="text-sm font-black text-slate-800 truncate w-full text-center">{chat.user1?.username || 'Guest'}</span>
-                                        <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-md ${chat.user1?.gender === 'female' ? 'bg-pink-100 text-pink-600' : 'bg-blue-100 text-blue-600'}`}>{chat.user1?.gender || 'Unknown'}</span>
+                                        <div className="flex gap-2">
+                                            <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-md ${chat.user1?.gender === 'female' ? 'bg-pink-100 text-pink-600' : 'bg-blue-100 text-blue-600'}`}>{chat.user1?.gender || 'Unknown'}</span>
+                                            <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-md bg-slate-100 text-slate-500 overflow-hidden text-ellipsis max-w-[60px]" title={chat.user1?.location}>{chat.user1?.location || 'Unknown'}</span>
+                                        </div>
                                     </div>
 
                                     <div className="flex flex-col items-center gap-2">
@@ -147,7 +158,10 @@ const Chats = () => {
                                             {chat.user2?.avatar_url ? <img src={chat.user2.avatar_url} alt="" className="w-full h-full object-cover rounded-[22px]" /> : <div className="w-full h-full flex items-center justify-center font-black text-slate-400">?</div>}
                                         </div>
                                         <span className="text-sm font-black text-slate-800 truncate w-full text-center">{chat.user2?.username || 'Guest'}</span>
-                                        <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-md ${chat.user2?.gender === 'female' ? 'bg-pink-100 text-pink-600' : 'bg-blue-100 text-blue-600'}`}>{chat.user2?.gender || 'Unknown'}</span>
+                                        <div className="flex gap-2">
+                                            <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-md ${chat.user2?.gender === 'female' ? 'bg-pink-100 text-pink-600' : 'bg-blue-100 text-blue-600'}`}>{chat.user2?.gender || 'Unknown'}</span>
+                                            <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-md bg-slate-100 text-slate-500 overflow-hidden text-ellipsis max-w-[60px]" title={chat.user2?.location}>{chat.user2?.location || 'Unknown'}</span>
+                                        </div>
                                     </div>
                                 </div>
 
@@ -218,6 +232,9 @@ const Chats = () => {
                                                 <div className="truncate">
                                                     <div className="text-[11px] font-black text-slate-700">{log.user1?.username || 'Guest'} ↔ {log.user2?.username || 'Guest'}</div>
                                                     <div className="text-[9px] text-slate-400 font-bold uppercase">{new Date(log.start_time).toLocaleString()}</div>
+                                                    <div className="text-[8px] text-slate-300 font-bold uppercase mt-1">
+                                                        {log.user1?.gender} / {log.user1?.location} ↔ {log.user2?.gender} / {log.user2?.location}
+                                                    </div>
                                                 </div>
                                             </div>
                                         </td>

@@ -27,7 +27,8 @@ const Users = () => {
             .order('created_at', { ascending: false });
 
         if (error) {
-            toast.error("Failed to load users");
+            console.error("Failed to load users:", error);
+            toast.error("Failed to load users: " + error.message);
         } else {
             setUsers(data || []);
         }
@@ -87,12 +88,23 @@ const Users = () => {
         if (!window.confirm("CRITICAL: Are you sure you want to PERMANENTLY delete this user? This action cannot be undone.")) return;
 
         setLoading(true);
-        const { error } = await supabase.from('profiles').delete().eq('id', userId);
-        if (error) toast.error("Delete failed: " + error.message);
-        else {
+        try {
+            // Delete dependent records first to resolve foreign key constraints
+            await supabase.from('transactions').delete().eq('user_id', userId);
+            await supabase.from('notifications').delete().eq('user_id', userId);
+            await supabase.from('messages').delete().or(`sender_id.eq.${userId},receiver_id.eq.${userId}`);
+            await supabase.from('matches').delete().or(`user1_id.eq.${userId},user2_id.eq.${userId}`);
+            await supabase.from('reports').delete().or(`reporter_id.eq.${userId},reported_id.eq.${userId}`);
+
+            const { error } = await supabase.from('profiles').delete().eq('id', userId);
+            if (error) throw error;
+
             toast.success("User permanently removed");
             fetchUsers();
             setIsModalOpen(false);
+        } catch (error) {
+            console.error("Delete Error:", error);
+            toast.error("Delete failed: " + error.message);
         }
         setLoading(false);
     };
@@ -216,6 +228,12 @@ const Users = () => {
                                             <button className="p-2 hover:bg-white hover:shadow-md rounded-xl text-slate-500 hover:text-indigo-600 transition-all border border-transparent hover:border-slate-100">
                                                 <Mail size={18} />
                                             </button>
+                                            <button
+                                                onClick={() => handleDeleteUser(user.id)}
+                                                className="p-2 hover:bg-white hover:shadow-md rounded-xl text-slate-500 hover:text-red-500 transition-all border border-transparent hover:border-red-100"
+                                            >
+                                                <Trash2 size={18} />
+                                            </button>
                                         </div>
                                     </td>
                                 </tr>
@@ -279,6 +297,21 @@ const Users = () => {
                                 <div className="flex items-center justify-between mb-8">
                                     <h4 className="text-xl font-black text-slate-800 uppercase tracking-tight">System Data</h4>
                                     <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-slate-100 rounded-xl transition-colors"><X size={20} /></button>
+                                </div>
+
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-6 mb-8">
+                                    <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                                        <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Gender</div>
+                                        <div className="font-bold text-slate-700">{selectedUser.gender || 'Not Specified'}</div>
+                                    </div>
+                                    <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                                        <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Birth Date</div>
+                                        <div className="font-bold text-slate-700">{selectedUser.dob ? new Date(selectedUser.dob).toLocaleDateString() : 'Unknown'}</div>
+                                    </div>
+                                    <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                                        <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Location</div>
+                                        <div className="font-bold text-slate-700">{selectedUser.location || 'Unknown Location'}</div>
+                                    </div>
                                 </div>
 
                                 <div className="grid grid-cols-2 gap-6 mb-10">
