@@ -28,8 +28,8 @@ const Chats = () => {
             .from('chat_logs')
             .select(`
                 *,
-                user1:profiles!chat_logs_user1_id_fkey(username, avatar_url, gender, location),
-                user2:profiles!chat_logs_user2_id_fkey(username, avatar_url, gender, location)
+                user1:profiles!chat_logs_user1_id_fkey(username, avatar_url, gender),
+                user2:profiles!chat_logs_user2_id_fkey(username, avatar_url, gender)
             `)
             .is('end_time', null)
             .order('start_time', { ascending: false });
@@ -49,8 +49,8 @@ const Chats = () => {
             .from('chat_logs')
             .select(`
                 *,
-                user1:profiles!chat_logs_user1_id_fkey(username, avatar_url, gender, location),
-                user2:profiles!chat_logs_user2_id_fkey(username, avatar_url, gender, location)
+                user1:profiles!chat_logs_user1_id_fkey(username, avatar_url, gender),
+                user2:profiles!chat_logs_user2_id_fkey(username, avatar_url, gender)
             `)
             .not('end_time', 'is', null)
             .order('end_time', { ascending: false })
