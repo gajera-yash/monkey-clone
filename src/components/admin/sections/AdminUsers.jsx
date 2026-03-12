@@ -59,7 +59,7 @@ const AdminUsers = () => {
 
         const toastId = toast.loading('Creating team member account...');
         try {
-            // Sign up the user via Supabase Auth
+            // 1. Sign up the user via Supabase Auth
             const { data: authData, error: signupError } = await supabase.auth.signUp({
                 email: newAdmin.email,
                 password,
@@ -70,10 +70,17 @@ const AdminUsers = () => {
 
             if (signupError) throw signupError;
 
-            // If profile was auto-created, update role; otherwise wait for auth trigger
+            // 2. Insert or Update Profile
             if (authData?.user?.id) {
-                await supabase.from('profiles')
-                    .upsert({ id: authData.user.id, email: newAdmin.email, role: newAdmin.role, username: newAdmin.email.split('@')[0] }, { onConflict: 'id' });
+                const { error: profileError } = await supabase.from('profiles').upsert({ 
+                    id: authData.user.id, 
+                    email: newAdmin.email, 
+                    role: newAdmin.role, 
+                    username: newAdmin.email.split('@')[0],
+                    permissions: newAdmin.permissions 
+                }, { onConflict: 'id' });
+
+                if (profileError) throw profileError;
             }
 
             toast.dismiss(toastId);
@@ -84,12 +91,14 @@ const AdminUsers = () => {
             setIsAdding(false);
             fetchAdmins();
 
+            // Reset form
             setNewAdmin({
                 email: '', password: '', role: 'moderator',
                 permissions: { users: true, content: false, revenue: false, chats: true, reports: true, settings: false }
             });
         } catch (err) {
             toast.dismiss(toastId);
+            console.error("Failed to create admin:", err);
             toast.error('Failed: ' + (err.message || 'Unknown error'));
         }
     };

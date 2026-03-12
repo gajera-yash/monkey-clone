@@ -12,6 +12,7 @@ export const AuthProvider = ({ children }) => {
     const [loading, setLoading] = useState(true);
     const [isGuest, setIsGuest] = useState(false);
     const [blockedUsers, setBlockedUsers] = useState([]);
+    const [matchHistory, setMatchHistory] = useState([]);
     const [userLocation, setUserLocation] = useState(null);
 
     // Fetch Profile from Supabase
@@ -173,6 +174,57 @@ export const AuthProvider = ({ children }) => {
             clearInterval(interval);
         };
     }, [currentUser]);
+
+    // Fetch Match History
+    useEffect(() => {
+        if (!currentUser?.id || isGuest) {
+            setMatchHistory([]);
+            return;
+        }
+
+        const fetchHistory = async () => {
+            try {
+                const { data, error } = await supabase
+                    .from('chat_logs')
+                    .select(`
+                        id,
+                        start_time,
+                        duration,
+                        user1_id,
+                        user2_id,
+                        partner1:profiles!chat_logs_user1_id_fkey(username, avatar_url, location),
+                        partner2:profiles!chat_logs_user2_id_fkey(username, avatar_url, location)
+                    `)
+                    .or(`user1_id.eq.${currentUser.id},user2_id.eq.${currentUser.id}`)
+                    .order('start_time', { ascending: false })
+                    .limit(50);
+
+                if (error) throw error;
+
+                const formatted = data.map(item => {
+                    // Identify the partner by checking which ID is NOT the current user
+                    const isUser1 = item.user1_id === currentUser.id;
+                    const partner = isUser1 ? item.partner2 : item.partner1;
+
+                    return {
+                        id: item.id,
+                        name: partner?.username || 'Guest User',
+                        avatar: partner?.avatar_url,
+                        location: partner?.location || 'Global',
+                        timestamp: item.start_time,
+                        duration: item.duration ? `${Math.floor(item.duration / 60)}m ${item.duration % 60}s` : null,
+                        hasRecording: false // Change if UI supports recordings
+                    };
+                });
+                
+                setMatchHistory(formatted);
+            } catch (error) {
+                console.error("Error fetching match history for mobile:", error);
+            }
+        };
+
+        fetchHistory();
+    }, [currentUser, isGuest]);
 
     // Update Profile Info
     const updateProfileInfo = async (updates) => {
@@ -339,20 +391,49 @@ export const AuthProvider = ({ children }) => {
 
     // Save match to history
     const saveMatchToHistory = async (partnerData) => {
-        if (!currentUser?.id || isGuest) return;
+        if (!currentUser?.id || isGuest || !partnerData.uid) return;
         try {
-            await supabase
+            const { data, error } = await supabase
                 .from('chat_logs')
                 .insert({
                     user1_id: currentUser.id,
                     user2_id: partnerData.uid,
-                    start_time: new Date().toISOString()
-                });
+                    start_time: partnerData.startTimeIso || new Date().toISOString(),
+                    end_time: new Date().toISOString(),
+                    duration: partnerData.durationSec || 0
+                }).select().single();
+
+            if (error) {
+                console.error("Supabase insert error:", error);
+                throw error;
+            }
+
+            // Immediately update local state
+            const newMatch = {
+                id: data.id,
+                name: partnerData.name || 'Guest User',
+                avatar: partnerData.avatar,
+                location: partnerData.location || 'Global',
+                timestamp: data.start_time,
+                duration: partnerData.durationSec ? `${Math.floor(partnerData.durationSec / 60)}m ${partnerData.durationSec % 60}s` : '0m 0s',
+                hasRecording: false
+            };
+            setMatchHistory(prev => [newMatch, ...prev]);
 
             // Update total chats
             await supabase.rpc('increment_chats', { user_id: currentUser.id });
         } catch (error) {
             console.error("Error saving match history:", error);
+        }
+    };
+
+    // Remove from history locally
+    const removeFromHistory = async (id) => {
+        try {
+            await supabase.from('chat_logs').delete().eq('id', id);
+            setMatchHistory(prev => prev.filter(item => item.id !== id));
+        } catch(e) {
+            console.error('Failed to remove from history');
         }
     };
 
@@ -403,6 +484,8 @@ export const AuthProvider = ({ children }) => {
         updateSafetySettings,
         updateMatchPreferences,
         saveMatchToHistory,
+        removeFromHistory,
+        matchHistory,
         logCreatorEarnings,
         refreshProfile
     };

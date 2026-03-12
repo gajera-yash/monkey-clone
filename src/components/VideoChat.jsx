@@ -320,9 +320,10 @@ const VideoChat = ({ onEndChat }) => {
     }
   }, [messages, isPartnerTyping]);
 
-  useEffect(() => {
-    const handleMatched = async ({ roomId, initiator, partnerName, partnerLocation, partnerIsPremium }) => {
+    useEffect(() => {
+    const handleMatched = async ({ roomId, initiator, partnerId, partnerName, partnerLocation, partnerIsPremium }) => {
       roomIdRef.current = roomId;
+      partnerIdRef.current = partnerId;
       setPartnerName(partnerName || 'Stranger');
       setPartnerLocation(partnerLocation || null);
       setPartnerIsPremium(partnerIsPremium || false);
@@ -439,9 +440,11 @@ const VideoChat = ({ onEndChat }) => {
       const durationStr = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
 
       saveMatchToHistory({
+        uid: partnerIdRef.current,
         name: partnerName,
         location: partnerLocation ? getLocationDisplay(partnerLocation, true) : 'Unknown',
-        duration: durationStr,
+        durationSec: durationSec,
+        startTimeIso: startTime ? new Date(startTime).toISOString() : new Date().toISOString(),
         avatar: partnerName.charAt(0).toUpperCase(),
         hasRecording: false
       });
