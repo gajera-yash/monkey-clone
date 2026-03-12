@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../../../supabase';
 import {
-    Shield, UserPlus, Key, Eye, Edit3, Trash2,
-    Check, X, Search, Lock, Activity, User
+    Shield, UserPlus, Key, Edit3, Trash2,
+    Check, X, Search, Lock
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 

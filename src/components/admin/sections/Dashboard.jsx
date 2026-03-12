@@ -99,7 +99,7 @@ const Dashboard = () => {
 
     const fetchRecentActivities = async () => {
         // Fetch combined recent events
-        const { data: users } = await supabase.from('profiles').select('username, created_at, is_premium').order('created_at', { ascending: false }).limit(5);
+        const { data: users } = await supabase.from('profiles').select('id, username, created_at, is_premium').order('created_at', { ascending: false }).limit(5);
         const activityList = users?.map(u => ({
             id: u.id || Math.random(),
             type: u.is_premium ? 'Premium User Joined' : 'New User Joined',

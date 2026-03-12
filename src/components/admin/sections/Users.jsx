@@ -1,9 +1,9 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { supabase } from '../../../supabase';
 import {
-    Search, Filter, MoreVertical, UserMinus, UserCheck,
+    Search, Filter, UserMinus,
     ShieldCheck, Eye, Mail, Trash2, Calendar,
-    Clock, MessageCircle, Crown, Info, X
+    Clock, Crown, X
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
