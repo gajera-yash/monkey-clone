@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { useAuth } from './context/AuthContext';
 import { AdminProvider } from './context/AdminContext';
@@ -122,7 +122,9 @@ const AppContent = () => {
         onSelect={handleGenderSelect}
         onClose={() => setIsGenderModalOpen(false)}
       />
-      <DailyBonusModal isOpen={isBonusOpen} onClose={() => setIsBonusOpen(false)} />
+      {!useLocation().pathname.startsWith('/admin') && (
+        <DailyBonusModal isOpen={isBonusOpen} onClose={() => setIsBonusOpen(false)} />
+      )}
 
       <Routes>
         <Route path="/" element={

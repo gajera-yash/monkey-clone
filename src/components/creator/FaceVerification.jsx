@@ -211,41 +211,42 @@ const FaceVerification = () => {
             </div>
           )}
 
-          {!capturedImage ? (
-            <>
-              <video
-                ref={videoRef}
-                autoPlay
-                playsInline
-                muted
-                className="w-full h-full object-cover transform -scale-x-100"
-              />
+          <div className="relative w-full h-full">
+            {!capturedImage ? (
+              <>
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  className="w-full h-full object-cover transform -scale-x-100"
+                />
 
-              {/* face guide */}
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <div className={`w-64 h-80 border-2 border-dashed rounded-[50px] transition-all duration-500 ${isUploading ? 'border-pink-500' : 'border-white/20'}`}></div>
-              </div>
-            </>
-          ) : (
-            <div className="relative w-full h-full">
-              <img
-                src={capturedImage}
-                alt="Captured"
-                className={`w-full h-full object-cover ${detectedGender === 'male' ? 'grayscale opacity-50' : ''}`}
-              />
-              {detectedGender === 'male' && (
-                <div className="absolute inset-0 flex items-center justify-center bg-red-900/40 backdrop-blur-sm">
-                  <div className="text-white text-center p-4">
-                    <span className="text-5xl mb-2 block">🚫</span>
-                    <p className="text-xl font-black uppercase tracking-widest">Male Detected</p>
-                    <p className="text-sm opacity-80">Only female creators allowed</p>
-                  </div>
+                {/* face guide */}
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <div className={`w-64 h-80 border-2 border-dashed rounded-[50px] transition-all duration-500 ${isUploading ? 'border-pink-500' : 'border-white/20'}`}></div>
                 </div>
-              )}
-            </div>
-          )}
-
-          <canvas ref={canvasRef} className="hidden" />
+              </>
+            ) : (
+              <div className="relative w-full h-full">
+                <img
+                  src={capturedImage}
+                  alt="Captured"
+                  className={`w-full h-full object-cover ${detectedGender === 'male' ? 'grayscale opacity-50' : ''}`}
+                />
+                {detectedGender === 'male' && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-red-900/40 backdrop-blur-sm">
+                    <div className="text-white text-center p-4">
+                      <span className="text-5xl mb-2 block">🚫</span>
+                      <p className="text-xl font-black uppercase tracking-widest">Male Detected</p>
+                      <p className="text-sm opacity-80">Only female creators allowed</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+            <canvas ref={canvasRef} className="hidden" />
+          </div>
         </div>
 
         {!capturedImage ? (

@@ -29,6 +29,26 @@ const AdminLayout = () => {
     const navigate = useNavigate();
     const { currentUser, logout } = useAuth();
     const [isSidebarOpen, setSidebarOpen] = useState(true);
+    const [showNotifications, setShowNotifications] = useState(false);
+    const [notifications, setNotifications] = useState([]);
+    const [unreadCount, setUnreadCount] = useState(0);
+
+    useEffect(() => {
+        fetchNotifications();
+    }, []);
+
+    const fetchNotifications = async () => {
+        const { data } = await supabase
+            .from('notifications')
+            .select('*')
+            .order('created_at', { ascending: false })
+            .limit(5);
+        if (data) {
+            setNotifications(data);
+            setUnreadCount(data.filter(n => !n.is_read).length);
+        }
+    };
+
 
     const menuItems = [
         { name: 'Dashboard', path: '/admin', icon: <LayoutDashboard size={18} /> },
@@ -97,7 +117,7 @@ const AdminLayout = () => {
                             <button
                                 onClick={async () => {
                                     await logout();
-                                    navigate('/login');
+                                    window.location.href = '/';
                                 }}
                                 className="p-2 text-slate-400 hover:text-white hover:bg-red-500/20 rounded-xl transition-colors"
                                 title="Logout"
@@ -128,11 +148,44 @@ const AdminLayout = () => {
                     </div>
 
                     <div className="flex items-center gap-4">
-                        <div className="relative group mr-4">
-                            <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full border-2 border-white flex items-center justify-center text-[8px] font-bold text-white">
-                                4
-                            </div>
-                            <Bell size={20} className="text-slate-400 cursor-pointer hover:text-indigo-600 transition-colors" />
+                        <div className="relative mr-4">
+                            <button
+                                onClick={() => setShowNotifications(!showNotifications)}
+                                className="relative p-2 hover:bg-slate-100 rounded-xl transition-colors"
+                            >
+                                <Bell size={20} className="text-slate-400 hover:text-indigo-600 transition-colors" />
+                                {unreadCount > 0 && (
+                                    <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full border-2 border-white flex items-center justify-center text-[8px] font-bold text-white">
+                                        {unreadCount > 9 ? '9+' : unreadCount}
+                                    </div>
+                                )}
+                            </button>
+                            {showNotifications && (
+                                <div className="absolute right-0 top-12 w-80 bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 overflow-hidden">
+                                    <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+                                        <h4 className="font-black text-slate-800 text-sm uppercase tracking-widest">Notifications</h4>
+                                        <span className="text-[10px] font-black text-indigo-500 bg-indigo-50 px-2 py-1 rounded-full">{unreadCount} NEW</span>
+                                    </div>
+                                    <div className="divide-y divide-slate-50 max-h-64 overflow-y-auto">
+                                        {notifications.length === 0 ? (
+                                            <div className="p-6 text-center text-slate-400 font-bold text-xs uppercase tracking-widest">No notifications</div>
+                                        ) : notifications.map((n) => (
+                                            <div key={n.id} className={`px-5 py-3 hover:bg-slate-50 transition-colors ${!n.is_read ? 'bg-indigo-50/30' : ''}`}>
+                                                <p className="text-sm font-bold text-slate-700 truncate">{n.message || n.type || 'System Notification'}</p>
+                                                <p className="text-[10px] text-slate-400 mt-0.5">{new Date(n.created_at).toLocaleString()}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <div className="p-3 border-t border-slate-100">
+                                        <button
+                                            onClick={() => { navigate('/admin/alerts'); setShowNotifications(false); }}
+                                            className="w-full py-2.5 text-xs font-black text-indigo-600 hover:bg-indigo-50 rounded-xl transition-colors uppercase tracking-widest"
+                                        >
+                                            View All Notifications
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                         <div className="h-8 w-[1px] bg-slate-200 mx-2"></div>
                         <button className="flex items-center gap-2 px-4 py-2 bg-slate-50 hover:bg-slate-100 rounded-xl border border-slate-200 text-slate-600 font-black text-[10px] tracking-widest transition-all">

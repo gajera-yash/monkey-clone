@@ -10,10 +10,12 @@ const AdminUsers = () => {
     const [admins, setAdmins] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isAdding, setIsAdding] = useState(false);
+    const [generatedCreds, setGeneratedCreds] = useState(null);
 
     // New Admin Form State
     const [newAdmin, setNewAdmin] = useState({
         email: '',
+        password: '',
         role: 'moderator', // admin, moderator, support
         permissions: {
             users: true,
@@ -24,6 +26,11 @@ const AdminUsers = () => {
             settings: false
         }
     });
+
+    const generatePassword = () => {
+        const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789@#!';
+        return Array.from({ length: 12 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+    };
 
     useEffect(() => {
         fetchAdmins();
@@ -47,37 +54,44 @@ const AdminUsers = () => {
     };
 
     const handleCreateAdmin = async () => {
-        // Due to Supabase Auth restrictions, creating a user with a password directly from the client requires them to sign up,
-        // or using an Edge Function to bypass email confirmation (if enabled). 
-        // For this UI, we will simulate the invitation process by creating a profile record directly, 
-        // but normally this triggers a Supabase Auth invite.
+        if (!newAdmin.email) return toast.error('Email is required');
+        const password = newAdmin.password || generatePassword();
 
-        if (!newAdmin.email) return toast.error("Email is required");
-
-        toast.loading("Sending invitation link...");
-
-        // Mock successful invite for UI demonstration
-        setTimeout(() => {
-            toast.dismiss();
-            toast.success(`Invite sent securely to ${newAdmin.email}`);
-            setIsAdding(false);
-
-            // Add to list locally to show progress
-            setAdmins([{
-                id: `temp-${Date.now()}`,
+        const toastId = toast.loading('Creating team member account...');
+        try {
+            // Sign up the user via Supabase Auth
+            const { data: authData, error: signupError } = await supabase.auth.signUp({
                 email: newAdmin.email,
-                username: newAdmin.email.split('@')[0],
-                role: newAdmin.role,
-                created_at: new Date().toISOString(),
-                is_pending: true // custom flag for UI
-            }, ...admins]);
+                password,
+                options: {
+                    data: { role: newAdmin.role, username: newAdmin.email.split('@')[0] }
+                }
+            });
+
+            if (signupError) throw signupError;
+
+            // If profile was auto-created, update role; otherwise wait for auth trigger
+            if (authData?.user?.id) {
+                await supabase.from('profiles')
+                    .upsert({ id: authData.user.id, email: newAdmin.email, role: newAdmin.role, username: newAdmin.email.split('@')[0] }, { onConflict: 'id' });
+            }
+
+            toast.dismiss(toastId);
+            toast.success('Team member created successfully!');
+
+            // Show generated credentials
+            setGeneratedCreds({ email: newAdmin.email, password });
+            setIsAdding(false);
+            fetchAdmins();
 
             setNewAdmin({
-                email: '',
-                role: 'moderator',
+                email: '', password: '', role: 'moderator',
                 permissions: { users: true, content: false, revenue: false, chats: true, reports: true, settings: false }
             });
-        }, 1500);
+        } catch (err) {
+            toast.dismiss(toastId);
+            toast.error('Failed: ' + (err.message || 'Unknown error'));
+        }
     };
 
     const togglePermission = (key) => {
@@ -135,9 +149,27 @@ const AdminUsers = () => {
                             : 'bg-indigo-600 text-white shadow-indigo-600/20 hover:bg-indigo-700'
                         }`}
                 >
-                    {isAdding ? <><X size={16} /> Cancel</> : <><UserPlus size={16} /> Invite Member</>}
+                    {isAdding ? <><X size={16} /> Cancel</> : <><UserPlus size={16} /> Add Member</>}
                 </button>
             </div>
+
+            {/* Show generated credentials after creation */}
+            {generatedCreds && (
+                <div className="bg-green-50 border-2 border-green-200 rounded-[32px] p-8 flex items-start gap-6">
+                    <div className="p-3 bg-green-100 text-green-600 rounded-2xl shrink-0"><Key size={24} /></div>
+                    <div className="flex-1">
+                        <h4 className="font-black text-green-800 text-lg mb-2">✅ Account Created! Share these credentials securely:</h4>
+                        <div className="font-mono text-sm bg-white border border-green-200 rounded-xl p-4 space-y-1">
+                            <p><span className="font-black text-slate-500">Email:</span> {generatedCreds.email}</p>
+                            <p><span className="font-black text-slate-500">Password:</span> {generatedCreds.password}</p>
+                        </div>
+                        <div className="flex gap-3 mt-4">
+                            <button onClick={() => { navigator.clipboard.writeText(`Email: ${generatedCreds.email}\nPassword: ${generatedCreds.password}`); toast.success('Copied!'); }} className="px-4 py-2 bg-green-600 text-white rounded-xl font-black text-xs uppercase tracking-wider">Copy Credentials</button>
+                            <button onClick={() => setGeneratedCreds(null)} className="px-4 py-2 bg-slate-100 text-slate-600 rounded-xl font-black text-xs uppercase tracking-wider">Dismiss</button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {isAdding && (
                 <div className="bg-white border border-slate-200 rounded-[40px] p-10 shadow-xl shadow-slate-200/50 animate-in slide-in-from-top-4 duration-300 relative overflow-hidden">
@@ -161,6 +193,22 @@ const AdminUsers = () => {
                                     value={newAdmin.email}
                                     onChange={(e) => setNewAdmin({ ...newAdmin, email: e.target.value })}
                                 />
+                            </div>
+
+                            <div>
+                                <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Password (leave blank to auto-generate)</label>
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        placeholder="Leave blank for auto-generated"
+                                        className="flex-1 bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10 transition-all font-mono"
+                                        value={newAdmin.password}
+                                        onChange={(e) => setNewAdmin({ ...newAdmin, password: e.target.value })}
+                                    />
+                                    <button onClick={() => setNewAdmin({ ...newAdmin, password: generatePassword() })} className="px-4 py-3 bg-slate-100 hover:bg-slate-200 rounded-2xl text-xs font-black text-slate-500 uppercase tracking-wider transition-colors whitespace-nowrap">
+                                        Generate
+                                    </button>
+                                </div>
                             </div>
 
                             <div>

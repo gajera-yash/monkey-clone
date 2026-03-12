@@ -375,13 +375,22 @@ const VideoChat = ({ onEndChat }) => {
         peerConnection.current.close();
         peerConnection.current = null;
       }
+      // Leave the old room cleanly
+      if (roomIdRef.current) {
+        socket.emit('leave-room', { roomId: roomIdRef.current });
+        roomIdRef.current = null;
+      }
       setRemoteStream(null);
       setPartnerName(null);
+      setPartnerLocation(null);
+      setPartnerIsPremium(false);
       setMessages([]);
       setChatTimer(0);
       setIsPartnerTyping(false);
       partnerIdRef.current = null;
       hasEmittedJoin.current = false;
+      setStatus('Searching for partner...');
+      // Re-join the waiting queue automatically
       performJoin();
     };
 

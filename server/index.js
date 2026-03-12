@@ -21,9 +21,12 @@ const io = new Server(server, {
 
 // Queue for users waiting to be matched [{id, name}]
 let waitingUsers = [];
+// Track which room each socket is in so we can notify partners on disconnect
+const socketRooms = new Map(); // socketId -> roomId
 
 io.on('connection', (socket) => {
     console.log(`User connected: ${socket.id}`);
+
 
     // User wants to find a match
     socket.on('join-waiting', (userData) => {
@@ -114,6 +117,10 @@ io.on('connection', (socket) => {
                 io.to(user1.id).socketsJoin(roomId);
                 io.to(user2.id).socketsJoin(roomId);
 
+                // Track which room each socket is in
+                socketRooms.set(user1.id, roomId);
+                socketRooms.set(user2.id, roomId);
+
                 // Notify users they are matched
                 // Match found!
                 io.to(user1.id).emit('matched', {
@@ -158,22 +165,19 @@ io.on('connection', (socket) => {
         // Remove from waiting list if there
         waitingUsers = waitingUsers.filter(u => u.id !== socket.id);
 
-        // Notify partner in any active rooms (simplified: broadcast to all rooms user was in)
-        // In a real app, track user rooms more explicitly
-        // For this simple version, socket.io handles room cleanup, but we need to tell the partner.
-        // We can't easily know who the partner was without tracking, but socket.rooms is empty on disconnect.
-        // Setup: Client handles "partner-disconnected" if the peer connection fails or we can track matches server-side.
-        // Better approach: When matching, store the pair.
-        // For now, let's rely on WebRTC connection state changes on client, 
-        // OR broadcast a 'partner-disconnected' to the room if we knew it.
-        // Since we don't track rooms persistently here, let's just let the client handle connection failure/closure.
-        // IMPROVEMENT: Let's actually track matches to notify gracefully.
+        // Notify partner in active room
+        const roomId = socketRooms.get(socket.id);
+        if (roomId) {
+            socket.to(roomId).emit('partner-disconnected');
+            socketRooms.delete(socket.id);
+        }
     });
 
     // Explicit leave/next
     socket.on('leave-room', ({ roomId }) => {
         socket.leave(roomId);
         socket.to(roomId).emit('partner-disconnected');
+        socketRooms.delete(socket.id);
     });
 
     // Text Chat: Send message to room

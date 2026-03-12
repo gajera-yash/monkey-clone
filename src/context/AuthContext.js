@@ -275,9 +275,17 @@ export const AuthProvider = ({ children }) => {
                         localStorage.setItem('lastLoggedUser', JSON.stringify(lastUserInfo));
 
                         // Check for ban
-                        if (profile?.ban_expiry && new Date(profile.ban_expiry) > new Date()) {
-                            logout();
-                            toast.error(`Account banned until ${new Date(profile.ban_expiry).toLocaleDateString()}`);
+                        if (profile?.is_blocked && profile?.ban_expiry && new Date(profile.ban_expiry) > new Date()) {
+                            const daysRemaining = Math.ceil((new Date(profile.ban_expiry) - new Date()) / (1000 * 60 * 60 * 24));
+                            const reason = profile.ban_reason || 'Administrative Decision';
+                            setCurrentUser(null);
+                            await supabase.auth.signOut();
+                            toast.error(`Your profile is banned for ${daysRemaining} day(s). Reason: ${reason}`, { duration: 8000 });
+                        } else if (profile?.is_blocked && !profile?.ban_expiry) {
+                            setCurrentUser(null);
+                            await supabase.auth.signOut();
+                            const reason = profile.ban_reason || 'Administrative Decision';
+                            toast.error(`Your profile has been permanently banned. Reason: ${reason}`, { duration: 8000 });
                         }
                     } catch (profileError) {
                         console.error("Profile fetch error on auth state change:", profileError);

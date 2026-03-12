@@ -14,6 +14,8 @@ const Users = () => {
     const [filterStatus, setFilterStatus] = useState('all'); // all, active, banned, premium
     const [selectedUser, setSelectedUser] = useState(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [banReason, setBanReason] = useState('');
+    const [banDuration, setBanDuration] = useState('5');
 
     useEffect(() => {
         fetchUsers();
@@ -35,7 +37,9 @@ const Users = () => {
         setLoading(false);
     };
 
-    const handleBanUser = async (user, duration, reason) => {
+    const handleBanUser = async (user) => {
+        if (!banReason.trim()) { toast.error('Please enter a ban reason'); return; }
+        const duration = banDuration;
         const expiry = duration === 'permanent' ? null : new Date();
         if (duration !== 'permanent') expiry.setDate(expiry.getDate() + parseInt(duration));
 
@@ -43,7 +47,7 @@ const Users = () => {
             .from('profiles')
             .update({
                 is_blocked: true,
-                ban_reason: reason,
+                ban_reason: banReason,
                 ban_expiry: expiry ? expiry.toISOString() : null
             })
             .eq('id', user.id);
@@ -51,6 +55,8 @@ const Users = () => {
         if (error) toast.error("Ban failed");
         else {
             toast.success("User banned successfully");
+            setBanReason('');
+            setBanDuration('5');
             fetchUsers();
             setIsModalOpen(false);
         }
@@ -93,7 +99,7 @@ const Users = () => {
             await supabase.from('transactions').delete().eq('user_id', userId);
             await supabase.from('notifications').delete().eq('user_id', userId);
             await supabase.from('messages').delete().or(`sender_id.eq.${userId},receiver_id.eq.${userId}`);
-            await supabase.from('matches').delete().or(`user1_id.eq.${userId},user2_id.eq.${userId}`);
+            await supabase.from('chat_logs').delete().or(`user1_id.eq.${userId},user2_id.eq.${userId}`);
             await supabase.from('reports').delete().or(`reporter_id.eq.${userId},reported_id.eq.${userId}`);
 
             const { error } = await supabase.from('profiles').delete().eq('id', userId);
@@ -352,19 +358,39 @@ const Users = () => {
                                             </button>
                                         </div>
                                     ) : (
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div className="space-y-4">
+                                            <div>
+                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Ban Reason</label>
+                                                <input
+                                                    type="text"
+                                                    value={banReason}
+                                                    onChange={(e) => setBanReason(e.target.value)}
+                                                    placeholder="e.g. Violated terms of service"
+                                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium outline-none focus:ring-4 focus:ring-red-500/10 focus:border-red-400"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Ban Duration</label>
+                                                <select
+                                                    value={banDuration}
+                                                    onChange={(e) => setBanDuration(e.target.value)}
+                                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold outline-none"
+                                                >
+                                                    <option value="1">1 Day</option>
+                                                    <option value="3">3 Days</option>
+                                                    <option value="5">5 Days</option>
+                                                    <option value="7">7 Days</option>
+                                                    <option value="14">14 Days</option>
+                                                    <option value="30">30 Days</option>
+                                                    <option value="permanent">Permanent</option>
+                                                </select>
+                                            </div>
                                             <button
-                                                onClick={() => handleBanUser(selectedUser, 'permanent', 'Violated terms of service')}
-                                                className="p-6 bg-slate-900 hover:bg-red-600 transition-all rounded-[32px] text-white flex flex-col items-center gap-2 group border-4 border-transparent hover:border-red-500/20"
+                                                onClick={() => handleBanUser(selectedUser)}
+                                                className="w-full p-4 bg-slate-900 hover:bg-red-600 transition-all rounded-2xl text-white flex items-center justify-center gap-2 group border-4 border-transparent hover:border-red-500/20"
                                             >
-                                                <UserMinus size={24} className="text-red-400 group-hover:text-white transition-colors" />
-                                                <span className="font-black text-xs uppercase tracking-widest mt-2">PERMANENT BAN</span>
-                                            </button>
-                                            <button
-                                                className="p-6 bg-white hover:bg-slate-50 transition-all rounded-[32px] text-slate-800 flex flex-col items-center gap-2 border-2 border-slate-100 shadow-sm"
-                                            >
-                                                <ShieldCheck size={24} className="text-indigo-500" />
-                                                <span className="font-black text-xs uppercase tracking-widest mt-2">VERIFY IDENTITY</span>
+                                                <UserMinus size={20} className="text-red-400 group-hover:text-white transition-colors" />
+                                                <span className="font-black text-xs uppercase tracking-widest">Apply Ban</span>
                                             </button>
                                         </div>
                                     )}
