@@ -36,6 +36,7 @@ const AppContent = () => {
   const { currentUser, loading } = useAuth();
   const { checkDailyBonus } = useCoins();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const bonusCheckedForUser = useRef(null);
 
@@ -122,7 +123,7 @@ const AppContent = () => {
         onSelect={handleGenderSelect}
         onClose={() => setIsGenderModalOpen(false)}
       />
-      {!useLocation().pathname.startsWith('/admin') && (
+      {!location.pathname.startsWith('/admin') && (
         <DailyBonusModal isOpen={isBonusOpen} onClose={() => setIsBonusOpen(false)} />
       )}
 
