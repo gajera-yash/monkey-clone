@@ -1,12 +1,20 @@
+require('dotenv').config();
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
-
 const path = require('path');
+
+const coinsRoutes = require('./routes/coins');
+const subscriptionsRoutes = require('./routes/subscriptions');
 
 const app = express();
 app.use(cors());
+app.use(express.json()); // Add this to handle JSON payloads
+
+// Monetization Routes
+app.use('/api/coins', coinsRoutes);
+app.use('/api/subscriptions', subscriptionsRoutes);
 
 // Serve static files from the React app
 app.use(express.static(path.join(__dirname, '../build')));

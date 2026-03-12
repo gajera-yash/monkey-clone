@@ -19,6 +19,8 @@ import AgeGate from './components/safety/AgeGate';
 import SafetyGuidelines from './components/safety/SafetyGuidelines';
 import GenderModal from './components/auth/GenderModal';
 import DailyBonusModal from './components/coins/DailyBonusModal';
+import CoinStore from './components/monetization/CoinStore';
+import SubscriptionPlans from './components/monetization/SubscriptionPlans';
 
 // Creator Components
 import CreatorRoute from './components/creator/CreatorRoute';
@@ -33,12 +35,23 @@ const AppContent = () => {
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [isGenderModalOpen, setIsGenderModalOpen] = useState(false);
   const [isBonusOpen, setIsBonusOpen] = useState(false);
+  const [isCoinStoreOpen, setIsCoinStoreOpen] = useState(false);
+  const [isSubscriptionOpen, setIsSubscriptionOpen] = useState(false);
   const { currentUser, loading } = useAuth();
-  const { checkDailyBonus } = useCoins();
+  const { checkDailyBonus, registerModalCallbacks } = useCoins();
   const navigate = useNavigate();
   const location = useLocation();
 
   const bonusCheckedForUser = useRef(null);
+
+  // Register modal openers into CoinsContext so any component can trigger them
+  useEffect(() => {
+    registerModalCallbacks(
+      () => setIsCoinStoreOpen(true),
+      () => setIsSubscriptionOpen(true)
+    );
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     // Only check bonus once per login session (not on every profile update)
@@ -125,6 +138,12 @@ const AppContent = () => {
       />
       {!location.pathname.startsWith('/admin') && (
         <DailyBonusModal isOpen={isBonusOpen} onClose={() => setIsBonusOpen(false)} />
+      )}
+      {isCoinStoreOpen && currentUser && (
+        <CoinStore userId={currentUser.id} onClose={() => setIsCoinStoreOpen(false)} />
+      )}
+      {isSubscriptionOpen && currentUser && (
+        <SubscriptionPlans userId={currentUser.id} onClose={() => setIsSubscriptionOpen(false)} />
       )}
 
       <Routes>

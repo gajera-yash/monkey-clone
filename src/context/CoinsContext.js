@@ -12,6 +12,8 @@ export const CoinsProvider = ({ children }) => {
     const [coins, setCoins] = useState(0);
     const [transactions, setTransactions] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [onOpenCoinStore, setOnOpenCoinStore] = useState(null);
+    const [onOpenSubscription, setOnOpenSubscription] = useState(null);
 
     // Sync coins with currentUser from AuthContext
     useEffect(() => {
@@ -133,25 +135,48 @@ export const CoinsProvider = ({ children }) => {
         }
     };
 
-    // Purchase function
+    // Purchase function (triggers modal via callback registered from App.js)
     const purchaseCoins = async (packageId) => {
-        const packages = {
-            'pkg_100': { coins: 50, price: 99 },
-            'pkg_500': { coins: 500, price: 449 },
-            'pkg_1000': { coins: 1000, price: 799 },
-            'pkg_5000': { coins: 5000, price: 3499 }
-        };
+        if (onOpenCoinStore) {
+            onOpenCoinStore();
+        } else {
+            // Fallback: old hardcoded packages
+            const packages = {
+                'pkg_100': { coins: 50, price: 99 },
+                'pkg_500': { coins: 500, price: 449 },
+                'pkg_1000': { coins: 1000, price: 799 },
+                'pkg_5000': { coins: 5000, price: 3499 }
+            };
+            const selectedPkg = packages[packageId];
+            if (!selectedPkg) return false;
+            return new Promise((resolve) => {
+                setTimeout(async () => {
+                    const success = await addCoins(selectedPkg.coins, `Purchased ${selectedPkg.coins} Coins`, 'purchase');
+                    resolve(success);
+                }, 1000);
+            });
+        }
+    };
 
-        const selectedPkg = packages[packageId];
-        if (!selectedPkg) return false;
+    // Open CoinStore modal
+    const openCoinStore = () => {
+        if (onOpenCoinStore) onOpenCoinStore();
+    };
 
-        // Simulate API call / Payment Gateway
-        return new Promise((resolve) => {
-            setTimeout(async () => {
-                const success = await addCoins(selectedPkg.coins, `Purchased ${selectedPkg.coins} Coins`, 'purchase');
-                resolve(success);
-            }, 1000);
-        });
+    // Open SubscriptionPlans modal
+    const openSubscription = () => {
+        if (onOpenSubscription) onOpenSubscription();
+    };
+
+    // Register modal callbacks from App.js
+    const registerModalCallbacks = (coinStoreFn, subscriptionFn) => {
+        setOnOpenCoinStore(() => coinStoreFn);
+        setOnOpenSubscription(() => subscriptionFn);
+    };
+
+    // Refresh coin balance from Supabase
+    const refreshCoins = async () => {
+        await refreshProfile();
     };
 
     const DAILY_REWARDS_COINS = [100, 500, 1000, 5000, 10000, 50000, 100000];
@@ -222,6 +247,10 @@ export const CoinsProvider = ({ children }) => {
         addCoins,
         spendCoins,
         purchaseCoins,
+        openCoinStore,
+        openSubscription,
+        registerModalCallbacks,
+        refreshCoins,
         checkDailyBonus,
         claimDailyBonus,
         getDailyStreakInfo
