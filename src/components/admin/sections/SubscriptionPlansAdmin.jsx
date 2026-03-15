@@ -12,7 +12,7 @@ const SubscriptionPlansAdmin = () => {
     const [plansLoading, setPlansLoading] = useState(true);
     const [showAddPlan, setShowAddPlan] = useState(false);
     const [editingPlan, setEditingPlan] = useState(null);
-    const [newPlan, setNewPlan] = useState({ name: '', duration_days: 7, price: 0, coins: 0, features: '' });
+    const [newPlan, setNewPlan] = useState({ name: '', tier: 'standard', price_monthly_inr: 0, price_yearly_inr: 0, coins_per_month: 0, features: '' });
 
     const [filters, setFilters] = useState([]);
     const [filtersLoading, setFiltersLoading] = useState(true);
@@ -31,7 +31,7 @@ const SubscriptionPlansAdmin = () => {
         const { data, error } = await supabase
             .from('subscription_plans')
             .select('*')
-            .order('price', { ascending: true });
+            .order('price_monthly_inr', { ascending: true });
         if (!error && data) setPlans(data);
         else if (error) toast.error('Failed to load plans: ' + error.message);
         setPlansLoading(false);
@@ -46,9 +46,10 @@ const SubscriptionPlansAdmin = () => {
             const { error } = await supabase.from('subscription_plans')
                 .update({
                     name: plan.name,
-                    duration_days: plan.duration_days,
-                    price: plan.price,
-                    coins: plan.coins,
+                    tier: plan.tier,
+                    price_monthly_inr: plan.price_monthly_inr,
+                    price_yearly_inr: plan.price_yearly_inr,
+                    coins_per_month: plan.coins_per_month,
                     features: featuresArr
                 })
                 .eq('id', plan.id);
@@ -58,16 +59,18 @@ const SubscriptionPlansAdmin = () => {
             const { error } = await supabase.from('subscription_plans')
                 .insert({
                     name: plan.name,
-                    duration_days: plan.duration_days,
-                    price: plan.price,
-                    coins: plan.coins,
-                    features: featuresArr
+                    tier: plan.tier,
+                    price_monthly_inr: plan.price_monthly_inr,
+                    price_yearly_inr: plan.price_yearly_inr,
+                    coins_per_month: plan.coins_per_month,
+                    features: featuresArr,
+                    is_active: true
                 });
             if (error) toast.error('Create failed: ' + error.message);
             else {
                 toast.success('Plan created!');
                 setShowAddPlan(false);
-                setNewPlan({ name: '', duration_days: 7, price: 0, coins: 0, features: '' });
+                setNewPlan({ name: '', tier: 'standard', price_monthly_inr: 0, price_yearly_inr: 0, coins_per_month: 0, features: '' });
                 fetchPlans();
             }
         }
@@ -131,12 +134,19 @@ const SubscriptionPlansAdmin = () => {
             return (
                 <div className="bg-white border-2 border-indigo-300 rounded-[28px] p-6 shadow-lg">
                     <div className="space-y-3">
-                        <input className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-300" placeholder="Plan Name" value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} />
                         <div className="grid grid-cols-2 gap-2">
-                            <input type="number" className="border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-300" placeholder="Duration (days)" value={form.duration_days} onChange={e => setForm(p => ({ ...p, duration_days: parseInt(e.target.value) }))} />
-                            <input type="number" className="border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-300" placeholder="Price (₹)" value={form.price} onChange={e => setForm(p => ({ ...p, price: parseFloat(e.target.value) }))} />
+                            <input className="border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-300" placeholder="Plan Name" value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} />
+                            <select className="border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-300" value={form.tier || 'standard'} onChange={e => setForm(p => ({ ...p, tier: e.target.value }))}>
+                                <option value="standard">Standard</option>
+                                <option value="plus">Plus</option>
+                                <option value="premium">Premium</option>
+                            </select>
                         </div>
-                        <input type="number" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-300" placeholder="Coins Included" value={form.coins} onChange={e => setForm(p => ({ ...p, coins: parseInt(e.target.value) }))} />
+                        <div className="grid grid-cols-2 gap-2">
+                            <input type="number" className="border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-300" placeholder="Monthly Price (₹)" value={form.price_monthly_inr ?? ''} onChange={e => setForm(p => ({ ...p, price_monthly_inr: parseFloat(e.target.value) }))} />
+                            <input type="number" className="border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-300" placeholder="Yearly Price (₹)" value={form.price_yearly_inr ?? ''} onChange={e => setForm(p => ({ ...p, price_yearly_inr: parseFloat(e.target.value) }))} />
+                        </div>
+                        <input type="number" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-300" placeholder="Coins Included Per Month" value={form.coins_per_month ?? ''} onChange={e => setForm(p => ({ ...p, coins_per_month: parseInt(e.target.value) }))} />
                         <textarea className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-medium outline-none h-24 resize-none focus:ring-2 focus:ring-indigo-300" placeholder="Features (one per line)" value={form.features} onChange={e => setForm(p => ({ ...p, features: e.target.value }))} />
                         <div className="flex gap-2">
                             <button onClick={() => handleSavePlan(form)} className="flex-1 py-2.5 bg-indigo-600 text-white rounded-xl font-black text-xs uppercase tracking-widest">Save</button>
@@ -151,14 +161,18 @@ const SubscriptionPlansAdmin = () => {
             <div className="bg-white border border-slate-200 rounded-[28px] p-6 shadow-sm hover:shadow-lg transition-all group">
                 <div className="flex items-start justify-between mb-3">
                     <div>
-                        <h4 className="font-black text-slate-800 text-lg">{plan.name}</h4>
+                        <div className="flex items-center gap-2">
+                            <h4 className="font-black text-slate-800 text-lg">{plan.name}</h4>
+                            <span className="px-2 py-0.5 bg-slate-100 text-[10px] font-black uppercase rounded text-slate-500">{plan.tier}</span>
+                        </div>
                         <p className="text-indigo-600 font-black text-2xl mt-1">
-                            ₹{plan.price}<span className="text-sm text-slate-400 font-medium"> / {plan.duration_days}d</span>
+                            ₹{plan.price_monthly_inr ?? 0}<span className="text-sm text-slate-400 font-medium"> / mo</span>
                         </p>
-                        {plan.coins > 0 && (
-                            <div className="flex items-center gap-1 mt-1">
+                        <p className="text-emerald-600 font-bold text-xs mt-0.5">₹{plan.price_yearly_inr ?? 0} / year</p>
+                        {(plan.coins_per_month > 0) && (
+                            <div className="flex items-center gap-1 mt-2">
                                 <Coins size={14} className="text-yellow-500" />
-                                <span className="text-sm font-black text-yellow-600">{plan.coins} Coins Included</span>
+                                <span className="text-sm font-black text-yellow-600">{plan.coins_per_month} Coins / month</span>
                             </div>
                         )}
                     </div>
@@ -277,12 +291,19 @@ const SubscriptionPlansAdmin = () => {
                         <div className="bg-white border-2 border-indigo-200 rounded-[28px] p-6 shadow-lg mb-6">
                             <h4 className="font-black text-slate-800 mb-4 uppercase tracking-widest text-sm">New Plan</h4>
                             <div className="space-y-3">
-                                <input className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-300" placeholder="Plan Name (e.g. Monkey Plus)" value={newPlan.name} onChange={e => setNewPlan(p => ({ ...p, name: e.target.value }))} />
                                 <div className="grid grid-cols-2 gap-2">
-                                    <input type="number" className="border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-300" placeholder="Duration (days)" value={newPlan.duration_days} onChange={e => setNewPlan(p => ({ ...p, duration_days: parseInt(e.target.value) }))} />
-                                    <input type="number" className="border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-300" placeholder="Price (₹)" value={newPlan.price} onChange={e => setNewPlan(p => ({ ...p, price: parseFloat(e.target.value) }))} />
+                                    <input className="border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-300" placeholder="Plan Name (e.g. Plus)" value={newPlan.name} onChange={e => setNewPlan(p => ({ ...p, name: e.target.value }))} />
+                                    <select className="border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-300" value={newPlan.tier || 'standard'} onChange={e => setNewPlan(p => ({ ...p, tier: e.target.value }))}>
+                                        <option value="standard">Standard</option>
+                                        <option value="plus">Plus</option>
+                                        <option value="premium">Premium</option>
+                                    </select>
                                 </div>
-                                <input type="number" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-300" placeholder="Coins Included (0 = none)" value={newPlan.coins} onChange={e => setNewPlan(p => ({ ...p, coins: parseInt(e.target.value) }))} />
+                                <div className="grid grid-cols-2 gap-2">
+                                    <input type="number" className="border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-300" placeholder="Monthly Price (₹)" value={newPlan.price_monthly_inr} onChange={e => setNewPlan(p => ({ ...p, price_monthly_inr: parseFloat(e.target.value) }))} />
+                                    <input type="number" className="border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-300" placeholder="Yearly Price (₹)" value={newPlan.price_yearly_inr} onChange={e => setNewPlan(p => ({ ...p, price_yearly_inr: parseFloat(e.target.value) }))} />
+                                </div>
+                                <input type="number" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-300" placeholder="Coins Per Month (0 = none)" value={newPlan.coins_per_month} onChange={e => setNewPlan(p => ({ ...p, coins_per_month: parseInt(e.target.value) }))} />
                                 <textarea className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-medium outline-none h-24 resize-none focus:ring-2 focus:ring-indigo-300" placeholder="Features (one per line)" value={newPlan.features} onChange={e => setNewPlan(p => ({ ...p, features: e.target.value }))} />
                                 <div className="flex gap-2">
                                     <button onClick={() => handleSavePlan(newPlan)} className="flex-1 py-2.5 bg-indigo-600 text-white rounded-xl font-black text-xs uppercase tracking-widest">Create Plan</button>

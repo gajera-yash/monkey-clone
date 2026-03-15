@@ -11,6 +11,7 @@ import Hero from './components/Hero';
 import Features from './components/Features';
 import FAQ from './components/FAQ';
 import Footer from './components/Footer';
+import LandingPage from './components/LandingPage';
 import VideoChat from './components/VideoChat';
 import LoginModal from './components/auth/LoginModal';
 import PrivateRoute from './components/auth/PrivateRoute';
@@ -40,7 +41,7 @@ const AppContent = () => {
   const [isCoinStoreOpen, setIsCoinStoreOpen] = useState(false);
   const [isSubscriptionOpen, setIsSubscriptionOpen] = useState(false);
   const [maintenanceMode, setMaintenanceMode] = useState(false);
-  const { currentUser, loading } = useAuth();
+  const { currentUser, loading, logout } = useAuth();
   const { checkDailyBonus, registerModalCallbacks } = useCoins();
   const navigate = useNavigate();
   const location = useLocation();
@@ -49,24 +50,33 @@ const AppContent = () => {
 
   // Check maintenance mode from database
   useEffect(() => {
-    const checkMaintenance = async () => {
-      const { data } = await supabase
-        .from('system_settings')
-        .select('value')
-        .eq('key', 'maintenance_mode')
-        .single();
-      if (data?.value === 'true' || data?.value === true) {
-        setMaintenanceMode(true);
-      } else {
-        setMaintenanceMode(false);
+      const checkMaintenance = async () => {
+        const { data } = await supabase
+          .from('system_settings')
+          .select('value')
+          .eq('key', 'maintenance_mode')
+          .single();
+        if (data && (data.value === 'true' || data.value === true)) {
+          setMaintenanceMode(true);
+        } else {
+          setMaintenanceMode(false);
+        }
+      };
+      
+      checkMaintenance();
+  
+      // Re-check every 60 seconds
+      const interval = setInterval(checkMaintenance, 60000);
+      return () => clearInterval(interval);
+    }, []);
+  
+    // Enforce logout if Maintenance mode is active and user is not admin
+    useEffect(() => {
+      const isAdminUser = currentUser?.role === 'admin' || currentUser?.role === 'moderator' || currentUser?.role === 'support';
+      if (maintenanceMode && currentUser && !isAdminUser) {
+        logout();
       }
-    };
-    checkMaintenance();
-
-    // Re-check every 60 seconds
-    const interval = setInterval(checkMaintenance, 60000);
-    return () => clearInterval(interval);
-  }, []);
+    }, [maintenanceMode, currentUser, logout]);
 
   // Register modal openers into CoinsContext so any component can trigger them
   useEffect(() => {
@@ -182,13 +192,7 @@ const AppContent = () => {
           (() => {
             if (!currentUser) {
               return (
-                <>
-                  <Header onStartChat={handleStartChat} />
-                  <Hero onStartChat={handleStartChat} />
-                  <Features />
-                  <FAQ />
-                  <Footer />
-                </>
+                <LandingPage onStartChat={handleStartChat} />
               );
             }
             // Creator redirect from root

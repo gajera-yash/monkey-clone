@@ -3,19 +3,8 @@ import { useCoins } from '../../context/CoinsContext';
 import { useAuth } from '../../context/AuthContext';
 import toast from 'react-hot-toast';
 
-// 7-day reward plan
-const DAILY_REWARDS = [
-    { day: 1, coins: 100 },
-    { day: 2, coins: 500 },
-    { day: 3, coins: 1000 },
-    { day: 4, coins: 5000 },
-    { day: 5, coins: 10000 },
-    { day: 6, coins: 50000 },
-    { day: 7, coins: 100000 },
-];
-
 const DailyBonusModal = ({ isOpen, onClose }) => {
-    const { claimDailyBonus, getDailyStreakInfo } = useCoins();
+    const { claimDailyBonus, getDailyStreakInfo, streakRewards } = useCoins();
     const { currentUser } = useAuth();
     const [loading, setLoading] = useState(false);
     const [streakInfo, setStreakInfo] = useState({ currentDay: 1, claimedDays: [] });
@@ -72,7 +61,8 @@ const DailyBonusModal = ({ isOpen, onClose }) => {
                 {/* 7-Day Grid */}
                 <div className="mx-4 mb-4 rounded-2xl p-4" style={{ background: 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)' }}>
                     <div className="grid grid-cols-7 gap-2">
-                        {DAILY_REWARDS.map(({ day, coins }) => {
+                        {streakRewards.map((coins, index) => {
+                            const day = index + 1;
                             const isClaimed = claimedDays.includes(day);
                             const isCurrent = day === currentDay;
                             const isLocked = !isClaimed && !isCurrent;

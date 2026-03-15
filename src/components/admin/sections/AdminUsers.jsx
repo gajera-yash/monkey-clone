@@ -63,19 +63,8 @@ const AdminUsers = () => {
             .order('created_at', { ascending: false });
 
         if (error) {
-            // Fallback to profiles table if admin_team_members doesn't exist yet
-            console.warn('admin_team_members table not found, falling back to profiles:', error.message);
-            const { data: profileData, error: profileError } = await supabase
-                .from('profiles')
-                .select('*')
-                .in('role', ['admin', 'moderator', 'support'])
-                .order('created_at', { ascending: false });
-
-            if (profileError) {
-                toast.error('Failed to load admin list');
-            } else {
-                setAdmins(profileData || []);
-            }
+            console.error('Failed to load team members:', error.message);
+            toast.error('Failed to load admin list');
         } else {
             setAdmins(data || []);
         }
@@ -97,12 +86,8 @@ const AdminUsers = () => {
                     })
                     .eq('id', editingId);
 
-                if (teamError && teamError.code !== 'PGRST116') {
-                    // Fallback to profiles if table fails
-                    await supabase.from('profiles').update({
-                        role: newAdmin.role,
-                        permissions: newAdmin.permissions
-                    }).eq('id', editingId);
+                if (teamError) {
+                    throw teamError;
                 }
 
                 toast.dismiss(toastId);
@@ -147,15 +132,7 @@ const AdminUsers = () => {
                         });
 
                     if (teamError) {
-                        console.warn('admin_team_members insert failed, falling back to profiles:', teamError.message);
-                        // Fallback: update profiles table. Must bypass RLS trigger!
-                        await supabase.from('profiles').upsert({
-                            id: authData.user.id,
-                            email: newAdmin.email,
-                            role: newAdmin.role,
-                            username: newAdmin.email.split('@')[0],
-                            permissions: newAdmin.permissions
-                        }, { onConflict: 'id' });
+                        throw teamError;
                     }
                 }
 
@@ -194,15 +171,15 @@ const AdminUsers = () => {
     const handleRevokeAccess = async (adminId) => {
         if (!window.confirm("Revoke this team member's admin access?")) return;
 
-        // Try admin_team_members first, then profiles
+        // Try admin_team_members first
         const { error } = await supabase
             .from('admin_team_members')
             .update({ is_active: false })
             .eq('id', adminId);
 
         if (error) {
-            // Fallback to profiles
-            await supabase.from('profiles').update({ role: 'user' }).eq('id', adminId);
+            toast.error('Failed to revoke access: ' + error.message);
+            return;
         }
 
         toast.success('Access revoked.');

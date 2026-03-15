@@ -14,6 +14,8 @@ export const CoinsProvider = ({ children }) => {
     const [loading, setLoading] = useState(true);
     const [onOpenCoinStore, setOnOpenCoinStore] = useState(null);
     const [onOpenSubscription, setOnOpenSubscription] = useState(null);
+    const [streakRewards, setStreakRewards] = useState([100, 500, 1000, 5000, 10000, 50000, 100000]); // default fallback
+    const [dailyCoinsBase, setDailyCoinsBase] = useState(10);
 
     // Sync coins with currentUser from AuthContext
     useEffect(() => {
@@ -27,27 +29,50 @@ export const CoinsProvider = ({ children }) => {
         }
     }, [currentUser]);
 
-    // Fetch transaction history
-    const fetchTransactions = async () => {
+    // Fetch initial data (transactions & settings)
+    const fetchInitialData = async () => {
         if (!currentUser?.id) return;
 
         try {
-            const { data, error } = await supabase
-                .from('transactions')
+            // 1. Fetch Transactions
+            const { data: txData, error: txError } = await supabase
+                .from('coin_transactions')
                 .select('*')
                 .eq('user_id', currentUser.id)
                 .order('created_at', { ascending: false })
                 .limit(20);
 
-            if (error) throw error;
-            setTransactions(data);
+            if (!txError && txData) {
+                setTransactions(txData);
+            }
+
+            // 2. Fetch System Settings (Streak Rewards)
+            const { data: settingsData, error: settingsError } = await supabase
+                .from('system_settings')
+                .select('*')
+                .in('key', ['daily_coins', 'streak_rewards']);
+            
+            if (!settingsError && settingsData) {
+                settingsData.forEach(row => {
+                    if (row.key === 'daily_coins') {
+                        setDailyCoinsBase(parseInt(row.value) || 10);
+                    }
+                    if (row.key === 'streak_rewards') {
+                        try {
+                            const parsed = JSON.parse(row.value);
+                            if (Array.isArray(parsed)) setStreakRewards(parsed);
+                        } catch (_) {}
+                    }
+                });
+            }
+
         } catch (error) {
-            console.error("Error fetching transactions:", error);
+            console.error("Error fetching initial data:", error);
         }
     };
 
     useEffect(() => {
-        fetchTransactions();
+        fetchInitialData();
     }, [currentUser]);
 
     // Add coins (earn/purchase)
@@ -68,13 +93,14 @@ export const CoinsProvider = ({ children }) => {
 
             // 2. Add transaction record
             const { error: txError } = await supabase
-                .from('transactions')
+                .from('coin_transactions')
                 .insert({
                     user_id: currentUser.id,
-                    amount: amount,
+                    transaction_type: type === 'purchase' ? 'purchase' : 'earned',
                     coins_amount: amount,
-                    type,
-                    description: reason
+                    coins_balance_after: newBalance,
+                    description: reason,
+                    payment_status: 'completed'
                 });
             if (txError) {
                 console.error("Error creating transaction record:", txError.message);
@@ -117,12 +143,14 @@ export const CoinsProvider = ({ children }) => {
 
             // 2. Add transaction record
             const { error: txError } = await supabase
-                .from('transactions')
+                .from('coin_transactions')
                 .insert({
                     user_id: currentUser.id,
-                    amount: -amount,
-                    type: 'spend',
-                    description: reason
+                    transaction_type: 'spent',
+                    coins_amount: -amount,
+                    coins_balance_after: newBalance,
+                    description: reason,
+                    payment_status: 'completed'
                 });
             if (txError) throw txError;
 
@@ -179,8 +207,6 @@ export const CoinsProvider = ({ children }) => {
         await refreshProfile();
     };
 
-    const DAILY_REWARDS_COINS = [100, 500, 1000, 5000, 10000, 50000, 100000];
-
     // Get streak info from localStorage
     const getDailyStreakInfo = (userId) => {
         const today = new Date().toDateString();
@@ -230,7 +256,7 @@ export const CoinsProvider = ({ children }) => {
         if (lastClaimDate === today) return false;
 
         const { currentDay } = getDailyStreakInfo(currentUser.id);
-        const reward = DAILY_REWARDS_COINS[currentDay - 1] || 100;
+        const reward = streakRewards[currentDay - 1] || dailyCoinsBase;
 
         const success = await addCoins(reward, `Day ${currentDay} Daily Bonus`);
         if (success) {
@@ -253,7 +279,8 @@ export const CoinsProvider = ({ children }) => {
         refreshCoins,
         checkDailyBonus,
         claimDailyBonus,
-        getDailyStreakInfo
+        getDailyStreakInfo,
+        streakRewards // Export this so the modal can use it
     };
 
     return (

@@ -12,7 +12,7 @@ const MaintenancePage = () => {
 
                 {/* Logo */}
                 <div className="mb-6">
-                    <span className="text-4xl font-black tracking-tighter text-white">MONKEY</span>
+                    <span className="text-4xl font-black tracking-tighter text-white">STRANGY</span>
                     <div className="text-[10px] font-black text-indigo-400 uppercase tracking-[6px] mt-1">Video Chat</div>
                 </div>
 
@@ -32,9 +32,7 @@ const MaintenancePage = () => {
                     <span className="text-sm font-bold">Check back soon</span>
                 </div>
 
-                <p className="text-slate-600 text-xs mt-8 font-medium">
-                    If you're an admin, please <a href="/admin" className="text-indigo-400 underline hover:text-indigo-300">login here</a> to manage maintenance mode.
-                </p>
+              
             </div>
         </div>
     );
