@@ -7,6 +7,8 @@ const AdminContext = createContext();
 export const AdminProvider = ({ children }) => {
     const { currentUser, loading: authLoading } = useAuth();
     const [isAdmin, setIsAdmin] = useState(false);
+    const [adminRole, setAdminRole] = useState(null);
+    const [adminPermissions, setAdminPermissions] = useState(null);
     // loading is true as long as auth is loading OR we haven't checked admin yet
     const [loading, setLoading] = useState(true);
 
@@ -21,6 +23,8 @@ export const AdminProvider = ({ children }) => {
         const checkAdminRole = async () => {
             if (!currentUser) {
                 setIsAdmin(false);
+                setAdminRole(null);
+                setAdminPermissions(null);
                 setLoading(false);
                 return;
             }
@@ -28,19 +32,34 @@ export const AdminProvider = ({ children }) => {
             try {
                 console.log("Checking admin status for ID:", currentUser.id);
 
-                const { data, error } = await supabase
-                    .from('profiles')
-                    .select('role, email')
-                    .eq('id', currentUser.id)
+                // Check admin_team_members first
+                let { data, error } = await supabase
+                    .from('admin_team_members')
+                    .select('role, permissions, is_active')
+                    .eq('user_id', currentUser.id)
                     .single();
 
-                if (error) {
-                    console.error("Supabase error checking admin:", error.message);
+                if (error || !data) {
+                    // Fallback to profiles
+                    console.warn("Not in admin_team_members, checking profiles...", error?.message);
+                    const { data: pData } = await supabase
+                        .from('profiles')
+                        .select('role, permissions')
+                        .eq('id', currentUser.id)
+                        .single();
+                    data = pData;
                 }
 
-                if (data && data.role === 'admin') {
-                    console.log("Admin access granted!");
-                    setIsAdmin(true);
+                if (data && ['admin', 'moderator', 'support'].includes(data.role)) {
+                    if (data.is_active === false) {
+                        console.log("Admin access revoked.");
+                        setIsAdmin(false);
+                    } else {
+                        console.log("Admin access granted! Role:", data.role);
+                        setIsAdmin(true);
+                        setAdminRole(data.role);
+                        setAdminPermissions(data.permissions || {});
+                    }
                 } else {
                     console.log("Admin access denied. Role:", data?.role);
                     setIsAdmin(false);
@@ -57,7 +76,7 @@ export const AdminProvider = ({ children }) => {
     }, [currentUser, authLoading]);
 
     return (
-        <AdminContext.Provider value={{ isAdmin, loading }}>
+        <AdminContext.Provider value={{ isAdmin, loading, adminRole, adminPermissions }}>
             {children}
         </AdminContext.Provider>
     );

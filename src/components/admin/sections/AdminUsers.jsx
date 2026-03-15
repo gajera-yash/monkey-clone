@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../../../supabase';
+import { createClient } from '@supabase/supabase-js';
 import {
     Shield, UserPlus, Key, Edit3, Trash2,
     Check, X, Lock
@@ -69,8 +70,15 @@ const AdminUsers = () => {
 
         const toastId = toast.loading('Creating team member account...');
         try {
-            // 1. Sign up via Supabase Auth
-            const { data: authData, error: signupError } = await supabase.auth.signUp({
+            // 1. Sign up via Temp Supabase client so it doesn't log out current admin
+            const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL || 'https://xzveyvqflkzqzthmnnud.supabase.co';
+            const SUPABASE_ANON_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh6dmV5dnFmbGt6cXp0aG1ubnVkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI4OTA5MzYsImV4cCI6MjA4ODQ2NjkzNn0.wQY31c5BoqwegIeqx86CevsIiAUhbNIw6QlWu7LjO2s';
+            
+            const tempClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+                auth: { persistSession: false, autoRefreshToken: false }
+            });
+
+            const { data: authData, error: signupError } = await tempClient.auth.signUp({
                 email: newAdmin.email,
                 password,
                 options: {

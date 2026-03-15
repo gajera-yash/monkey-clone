@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useAdmin } from '../../context/AdminContext';
 import { supabase } from '../../supabase';
 import {
     LayoutDashboard, Users as UsersIcon, MessageSquare, ShieldAlert,
@@ -30,6 +31,7 @@ const AdminLayout = () => {
     const location = useLocation();
     const navigate = useNavigate();
     const { currentUser, logout } = useAuth();
+    const { adminPermissions, adminRole } = useAdmin();
     const [isSidebarOpen, setSidebarOpen] = useState(true);
     const [showNotifications, setShowNotifications] = useState(false);
     const [notifications, setNotifications] = useState([]);
@@ -52,21 +54,29 @@ const AdminLayout = () => {
     };
 
 
-    const menuItems = [
-        { name: 'Dashboard', path: '/admin', icon: <LayoutDashboard size={18} /> },
-        { name: 'Users', path: '/admin/users', icon: <UsersIcon size={18} /> },
-        { name: 'Chat Monitoring', path: '/admin/chats', icon: <MessageSquare size={18} /> },
-        { name: 'Reports', path: '/admin/reports', icon: <ShieldAlert size={18} /> },
-        { name: 'Revenue', path: '/admin/revenue', icon: <CreditCard size={18} /> },
-        { name: 'Analytics', path: '/admin/analytics', icon: <BarChart3 size={18} /> },
-        { name: 'Content', path: '/admin/content', icon: <Palette size={18} /> },
-        { name: 'Plans', path: '/admin/plans', icon: <CreditCard size={18} /> },
-        { name: 'Coin Rewards', path: '/admin/coin-rewards', icon: <Coins size={18} /> },
-        { name: 'Settings', path: '/admin/settings', icon: <Settings size={18} /> },
-        { name: 'Admins', path: '/admin/roles', icon: <Lock size={18} /> },
-        { name: 'Notifications', path: '/admin/alerts', icon: <Bell size={18} /> },
-        { name: 'Support', path: '/admin/support', icon: <LifeBuoy size={18} /> },
+    const allMenuItems = [
+        { name: 'Dashboard', path: '/admin', id: 'dashboard', icon: <LayoutDashboard size={18} /> },
+        { name: 'Users', path: '/admin/users', id: 'users', icon: <UsersIcon size={18} /> },
+        { name: 'Chat Monitoring', path: '/admin/chats', id: 'chats', icon: <MessageSquare size={18} /> },
+        { name: 'Reports', path: '/admin/reports', id: 'reports', icon: <ShieldAlert size={18} /> },
+        { name: 'Revenue', path: '/admin/revenue', id: 'revenue', icon: <CreditCard size={18} /> },
+        { name: 'Analytics', path: '/admin/analytics', id: 'revenue', icon: <BarChart3 size={18} /> },
+        { name: 'Content', path: '/admin/content', id: 'content', icon: <Palette size={18} /> },
+        { name: 'Plans', path: '/admin/plans', id: 'revenue', icon: <CreditCard size={18} /> },
+        { name: 'Coin Rewards', path: '/admin/coin-rewards', id: 'revenue', icon: <Coins size={18} /> },
+        { name: 'Settings', path: '/admin/settings', id: 'settings', icon: <Settings size={18} /> },
+        { name: 'Admins', path: '/admin/roles', id: 'settings', icon: <Lock size={18} /> },
+        { name: 'Notifications', path: '/admin/alerts', id: 'reports', icon: <Bell size={18} /> },
+        { name: 'Support', path: '/admin/support', id: 'reports', icon: <LifeBuoy size={18} /> },
     ];
+
+    const menuItems = adminRole === 'admin' 
+        ? allMenuItems 
+        : allMenuItems.filter(item => {
+            if (item.id === 'dashboard') return true; // Always show dashboard
+            if (adminPermissions) return adminPermissions[item.id];
+            return false;
+        });
 
     return (
         <div className="flex h-screen bg-[#F1F5F9] text-[#1E293B] font-sans overflow-hidden">
