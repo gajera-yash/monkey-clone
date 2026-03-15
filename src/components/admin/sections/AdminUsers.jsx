@@ -11,7 +11,25 @@ const AdminUsers = () => {
     const [admins, setAdmins] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isAdding, setIsAdding] = useState(false);
+    const [editingId, setEditingId] = useState(null); // track edit state
     const [generatedCreds, setGeneratedCreds] = useState(null);
+
+    const resetForm = () => {
+        setNewAdmin({
+            email: '',
+            password: '',
+            role: 'moderator',
+            permissions: {
+                users: true,
+                content: false,
+                revenue: false,
+                chats: true,
+                reports: true,
+                settings: false
+            }
+        });
+        setEditingId(null);
+    };
 
     const [newAdmin, setNewAdmin] = useState({
         email: '',
@@ -64,71 +82,106 @@ const AdminUsers = () => {
         setLoading(false);
     };
 
-    const handleCreateAdmin = async () => {
+    const handleSaveAdmin = async () => {
         if (!newAdmin.email) return toast.error('Email is required');
-        const password = newAdmin.password || generatePassword();
 
-        const toastId = toast.loading('Creating team member account...');
+        const toastId = toast.loading(editingId ? 'Updating team member...' : 'Creating team member account...');
         try {
-            // 1. Sign up via Temp Supabase client so it doesn't log out current admin
-            const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL || 'https://xzveyvqflkzqzthmnnud.supabase.co';
-            const SUPABASE_ANON_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh6dmV5dnFmbGt6cXp0aG1ubnVkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI4OTA5MzYsImV4cCI6MjA4ODQ2NjkzNn0.wQY31c5BoqwegIeqx86CevsIiAUhbNIw6QlWu7LjO2s';
-            
-            const tempClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-                auth: { persistSession: false, autoRefreshToken: false }
-            });
-
-            const { data: authData, error: signupError } = await tempClient.auth.signUp({
-                email: newAdmin.email,
-                password,
-                options: {
-                    data: { role: newAdmin.role, username: newAdmin.email.split('@')[0] }
-                }
-            });
-
-            if (signupError) throw signupError;
-
-            // 2. Insert into admin_team_members table (not profiles)
-            if (authData?.user?.id) {
+            if (editingId) {
+                // UPDATE EXISTING
                 const { error: teamError } = await supabase
                     .from('admin_team_members')
-                    .insert({
-                        user_id: authData.user.id,
-                        email: newAdmin.email,
-                        username: newAdmin.email.split('@')[0],
+                    .update({
                         role: newAdmin.role,
-                        permissions: newAdmin.permissions,
-                        is_active: true
-                    });
-
-                if (teamError) {
-                    console.warn('admin_team_members insert failed, falling back to profiles:', teamError.message);
-                    // Fallback: update profiles table
-                    await supabase.from('profiles').upsert({
-                        id: authData.user.id,
-                        email: newAdmin.email,
-                        role: newAdmin.role,
-                        username: newAdmin.email.split('@')[0],
                         permissions: newAdmin.permissions
-                    }, { onConflict: 'id' });
+                    })
+                    .eq('id', editingId);
+
+                if (teamError && teamError.code !== 'PGRST116') {
+                    // Fallback to profiles if table fails
+                    await supabase.from('profiles').update({
+                        role: newAdmin.role,
+                        permissions: newAdmin.permissions
+                    }).eq('id', editingId);
                 }
+
+                toast.dismiss(toastId);
+                toast.success('Team member updated successfully!');
+                setIsAdding(false);
+                fetchAdmins();
+                resetForm();
+
+            } else {
+                // CREATE NEW
+                const password = newAdmin.password || generatePassword();
+                
+                // 1. Sign up via Temp Supabase client so it doesn't log out current admin
+                const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL || 'https://xzveyvqflkzqzthmnnud.supabase.co';
+                const SUPABASE_ANON_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh6dmV5dnFmbGt6cXp0aG1ubnVkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI4OTA5MzYsImV4cCI6MjA4ODQ2NjkzNn0.wQY31c5BoqwegIeqx86CevsIiAUhbNIw6QlWu7LjO2s';
+                
+                const tempClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+                    auth: { persistSession: false, autoRefreshToken: false }
+                });
+
+                const { data: authData, error: signupError } = await tempClient.auth.signUp({
+                    email: newAdmin.email,
+                    password,
+                    options: {
+                        data: { role: newAdmin.role, username: newAdmin.email.split('@')[0] }
+                    }
+                });
+
+                if (signupError) throw signupError;
+
+                // 2. Insert into admin_team_members table (not profiles)
+                if (authData?.user?.id) {
+                    const { error: teamError } = await supabase
+                        .from('admin_team_members')
+                        .insert({
+                            user_id: authData.user.id,
+                            email: newAdmin.email,
+                            username: newAdmin.email.split('@')[0],
+                            role: newAdmin.role,
+                            permissions: newAdmin.permissions,
+                            is_active: true
+                        });
+
+                    if (teamError) {
+                        console.warn('admin_team_members insert failed, falling back to profiles:', teamError.message);
+                        // Fallback: update profiles table. Must bypass RLS trigger!
+                        await supabase.from('profiles').upsert({
+                            id: authData.user.id,
+                            email: newAdmin.email,
+                            role: newAdmin.role,
+                            username: newAdmin.email.split('@')[0],
+                            permissions: newAdmin.permissions
+                        }, { onConflict: 'id' });
+                    }
+                }
+
+                toast.dismiss(toastId);
+                toast.success('Team member created successfully!');
+                setGeneratedCreds({ email: newAdmin.email, password });
+                setIsAdding(false);
+                fetchAdmins();
+                resetForm();
             }
-
-            toast.dismiss(toastId);
-            toast.success('Team member created successfully!');
-            setGeneratedCreds({ email: newAdmin.email, password });
-            setIsAdding(false);
-            fetchAdmins();
-
-            setNewAdmin({
-                email: '', password: '', role: 'moderator',
-                permissions: { users: true, content: false, revenue: false, chats: true, reports: true, settings: false }
-            });
         } catch (err) {
             toast.dismiss(toastId);
-            console.error('Failed to create admin:', err);
+            console.error('Failed to save admin:', err);
             toast.error('Failed: ' + (err.message || 'Unknown error'));
         }
+    };
+
+    const handleEditClick = (admin) => {
+        setNewAdmin({
+            email: admin.email,
+            password: '', // do not populate password
+            role: admin.role,
+            permissions: admin.permissions || { users: true, content: false, revenue: false, chats: true, reports: true, settings: false }
+        });
+        setEditingId(admin.id);
+        setIsAdding(true);
     };
 
     const togglePermission = (key) => {
@@ -176,7 +229,10 @@ const AdminUsers = () => {
                     <p className="text-slate-500 font-medium tracking-tight">Manage administrative access and feature permissions</p>
                 </div>
                 <button
-                    onClick={() => setIsAdding(!isAdding)}
+                    onClick={() => {
+                        if (isAdding) resetForm();
+                        setIsAdding(!isAdding);
+                    }}
                     className={`px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-lg active:scale-95 flex items-center gap-2 ${isAdding
                         ? 'bg-slate-200 text-slate-600 shadow-none hover:bg-slate-300'
                         : 'bg-indigo-600 text-white shadow-indigo-600/20 hover:bg-indigo-700'}`}
@@ -209,7 +265,7 @@ const AdminUsers = () => {
                     <div className="absolute top-0 right-0 p-10 opacity-5 scale-150 rotate-12 pointer-events-none"><Lock size={200} /></div>
                     <h3 className="text-xl font-black text-slate-800 mb-8 tracking-tight flex items-center gap-3">
                         <div className="p-3 bg-indigo-50 text-indigo-500 rounded-xl"><Key size={20} /></div>
-                        Grant Secure Access
+                        {editingId ? "Edit Secure Access" : "Grant Secure Access"}
                     </h3>
 
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 relative z-10">
@@ -219,24 +275,27 @@ const AdminUsers = () => {
                                 <input
                                     type="email"
                                     placeholder="colleague@monkeyapp.com"
-                                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10 transition-all font-mono"
+                                    disabled={!!editingId}
+                                    className={`w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold outline-none font-mono ${editingId ? 'opacity-50 cursor-not-allowed' : 'focus:ring-4 focus:ring-indigo-500/10 transition-all'}`}
                                     value={newAdmin.email}
-                                    onChange={(e) => setNewAdmin({ ...newAdmin, email: e.target.value })}
+                                    onChange={(e) => !editingId && setNewAdmin({ ...newAdmin, email: e.target.value })}
                                 />
                             </div>
-                            <div>
-                                <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Password (leave blank to auto-generate)</label>
-                                <div className="flex gap-2">
-                                    <input
-                                        type="text"
-                                        placeholder="Leave blank for auto-generated"
-                                        className="flex-1 bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10 transition-all font-mono"
-                                        value={newAdmin.password}
-                                        onChange={(e) => setNewAdmin({ ...newAdmin, password: e.target.value })}
-                                    />
-                                    <button onClick={() => setNewAdmin({ ...newAdmin, password: generatePassword() })} className="px-4 py-3 bg-slate-100 hover:bg-slate-200 rounded-2xl text-xs font-black text-slate-500 uppercase tracking-wider transition-colors whitespace-nowrap">Generate</button>
+                            {!editingId && (
+                                <div>
+                                    <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Password (leave blank to auto-generate)</label>
+                                    <div className="flex gap-2">
+                                        <input
+                                            type="text"
+                                            placeholder="Leave blank for auto-generated"
+                                            className="flex-1 bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10 transition-all font-mono"
+                                            value={newAdmin.password}
+                                            onChange={(e) => setNewAdmin({ ...newAdmin, password: e.target.value })}
+                                        />
+                                        <button onClick={() => setNewAdmin({ ...newAdmin, password: generatePassword() })} className="px-4 py-3 bg-slate-100 hover:bg-slate-200 rounded-2xl text-xs font-black text-slate-500 uppercase tracking-wider transition-colors whitespace-nowrap">Generate</button>
+                                    </div>
                                 </div>
-                            </div>
+                            )}
                             <div>
                                 <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">System Role</label>
                                 <div className="grid grid-cols-3 gap-3">
@@ -252,10 +311,10 @@ const AdminUsers = () => {
                                 </div>
                             </div>
                             <button
-                                onClick={handleCreateAdmin}
+                                onClick={handleSaveAdmin}
                                 className="w-full py-5 mt-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black text-xs uppercase tracking-[3px] shadow-xl shadow-indigo-600/20 transition-all active:scale-95 flex items-center justify-center gap-2"
                             >
-                                <UserPlus size={16} /> Create Team Member
+                                {editingId ? <><Check size={16} /> Save Changes</> : <><UserPlus size={16} /> Create Team Member</>}
                             </button>
                         </div>
 
@@ -322,7 +381,9 @@ const AdminUsers = () => {
                                     </td>
                                     <td className="px-8 py-5 text-right">
                                         <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <button className="p-2 hover:bg-white hover:shadow-md rounded-xl text-slate-400 hover:text-indigo-600 transition-all border border-transparent hover:border-slate-100" title="Edit Permissions">
+                                            <button 
+                                                onClick={() => handleEditClick(admin)}
+                                                className="p-2 hover:bg-white hover:shadow-md rounded-xl text-slate-400 hover:text-indigo-600 transition-all border border-transparent hover:border-slate-100" title="Edit Permissions">
                                                 <Edit3 size={18} />
                                             </button>
                                             <button

@@ -12,8 +12,8 @@ const puppeteer = require('puppeteer');
         console.error('[PAGE ERROR]', err.toString());
     });
 
-    console.log("Navigating to http://localhost:3000/admin ...");
-    await page.goto('http://localhost:3000/admin');
+    console.log("Navigating to http://192.168.1.5:3000/admin ...");
+    await page.goto('http://192.168.1.5:3000/admin');
 
     // Wait to capture sufficient logs
     await new Promise(r => setTimeout(r, 6000));
