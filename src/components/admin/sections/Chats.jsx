@@ -1,8 +1,8 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState } from 'react';
 import { supabase } from '../../../supabase';
 import {
     Video, MessageSquare, Clock, ShieldAlert,
-    XCircle, Play, Users, Globe, Filter, Search, Eye
+    XCircle, Play, Users, Globe, Search, Eye, RefreshCw
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -21,22 +21,50 @@ const Chats = () => {
         }
     }, [activeView]);
 
+    // Real-time subscription for live updates without manual refresh
+    useEffect(() => {
+        const channel = supabase
+            .channel('chats-realtime')
+            .on('postgres_changes', {
+                event: '*',
+                schema: 'public',
+                table: 'chat_logs'
+            }, () => {
+                if (activeView === 'active') {
+                    fetchActiveChats();
+                } else {
+                    fetchChatHistory();
+                }
+            })
+            .subscribe();
+
+        // Also poll every 20s to prevent data freeze
+        const pollInterval = setInterval(() => {
+            if (activeView === 'active') fetchActiveChats();
+        }, 20000);
+
+        return () => {
+            supabase.removeChannel(channel);
+            clearInterval(pollInterval);
+        };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [activeView]);
+
     const fetchActiveChats = async () => {
         setLoading(true);
-        // In a real app, this would use Supabase Presence or a 'rooms' table with status='active'
         const { data, error } = await supabase
             .from('chat_logs')
             .select(`
                 *,
-                user1:profiles!chat_logs_user1_id_fkey(username, avatar_url, gender),
-                user2:profiles!chat_logs_user2_id_fkey(username, avatar_url, gender)
+                user1:profiles!chat_logs_user1_id_fkey(username, avatar_url, gender, location_city, location_country),
+                user2:profiles!chat_logs_user2_id_fkey(username, avatar_url, gender, location_city, location_country)
             `)
             .is('end_time', null)
             .order('start_time', { ascending: false });
 
         if (error) {
-            console.error("Failed to load active chats:", error);
-            toast.error("Failed to load active chats: " + error.message);
+            console.error('Failed to load active chats:', error);
+            toast.error('Failed to load active chats: ' + error.message);
         } else {
             setActiveChats(data || []);
         }
@@ -49,16 +77,16 @@ const Chats = () => {
             .from('chat_logs')
             .select(`
                 *,
-                user1:profiles!chat_logs_user1_id_fkey(username, avatar_url, gender),
-                user2:profiles!chat_logs_user2_id_fkey(username, avatar_url, gender)
+                user1:profiles!chat_logs_user1_id_fkey(username, avatar_url, gender, location_city, location_country),
+                user2:profiles!chat_logs_user2_id_fkey(username, avatar_url, gender, location_city, location_country)
             `)
             .not('end_time', 'is', null)
             .order('end_time', { ascending: false })
             .limit(50);
 
         if (error) {
-            console.error("Failed to load history:", error);
-            toast.error("Failed to load history: " + error.message);
+            console.error('Failed to load history:', error);
+            toast.error('Failed to load history: ' + error.message);
         } else {
             setChatHistory(data || []);
         }
@@ -66,16 +94,42 @@ const Chats = () => {
     };
 
     const handleTerminate = async (chatId) => {
+        const now = new Date().toISOString();
+        const chat = activeChats.find(c => c.id === chatId);
+        const durationSec = chat
+            ? Math.floor((new Date(now) - new Date(chat.start_time)) / 1000)
+            : 0;
+
         const { error } = await supabase
             .from('chat_logs')
-            .update({ end_time: new Date().toISOString() })
+            .update({
+                end_time: now,
+                duration: durationSec
+            })
             .eq('id', chatId);
 
-        if (error) toast.error("Termination failed");
+        if (error) toast.error('Termination failed: ' + error.message);
         else {
-            toast.success("Chat terminated");
+            toast.success('Chat terminated');
             fetchActiveChats();
         }
+    };
+
+    const filteredHistory = chatHistory.filter(log => {
+        if (!searchTerm) return true;
+        const term = searchTerm.toLowerCase();
+        return (
+            log.user1?.username?.toLowerCase().includes(term) ||
+            log.user2?.username?.toLowerCase().includes(term) ||
+            log.room_id?.toLowerCase().includes(term)
+        );
+    });
+
+    const formatLocation = (profile) => {
+        if (profile?.location_city && profile?.location_country)
+            return `${profile.location_city}, ${profile.location_country}`;
+        if (profile?.location_country) return profile.location_country;
+        return 'Unknown';
     };
 
     return (
@@ -86,33 +140,43 @@ const Chats = () => {
                     <p className="text-slate-500 font-medium tracking-tight">Real-time surveillance of platform interactions</p>
                 </div>
 
-                <div className="flex bg-white p-1.5 rounded-2xl border border-slate-200 shadow-sm shrink-0">
+                <div className="flex items-center gap-3">
                     <button
-                        onClick={() => setActiveView('active')}
-                        className={`px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2 ${activeView === 'active'
-                            ? 'bg-indigo-600 text-white shadow-lg'
-                            : 'text-slate-400 hover:text-slate-600'
-                            }`}
+                        onClick={() => activeView === 'active' ? fetchActiveChats() : fetchChatHistory()}
+                        className="p-2.5 bg-white border border-slate-200 rounded-xl text-slate-400 hover:text-indigo-600 transition-colors"
+                        title="Refresh"
                     >
-                        <div className={`w-2 h-2 rounded-full ${activeView === 'active' ? 'bg-white animate-pulse' : 'bg-slate-300'}`}></div>
-                        Live Now ({activeChats.length})
+                        <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
                     </button>
-                    <button
-                        onClick={() => setActiveView('history')}
-                        className={`px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeView === 'history'
-                            ? 'bg-indigo-600 text-white shadow-lg'
-                            : 'text-slate-400 hover:text-slate-600'
-                            }`}
-                    >
-                        Chat Logs
-                    </button>
+
+                    <div className="flex bg-white p-1.5 rounded-2xl border border-slate-200 shadow-sm shrink-0">
+                        <button
+                            onClick={() => setActiveView('active')}
+                            className={`px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2 ${activeView === 'active'
+                                ? 'bg-indigo-600 text-white shadow-lg'
+                                : 'text-slate-400 hover:text-slate-600'
+                                }`}
+                        >
+                            <div className={`w-2 h-2 rounded-full ${activeView === 'active' ? 'bg-white animate-pulse' : 'bg-slate-300'}`}></div>
+                            Live Now ({activeChats.length})
+                        </button>
+                        <button
+                            onClick={() => setActiveView('history')}
+                            className={`px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeView === 'history'
+                                ? 'bg-indigo-600 text-white shadow-lg'
+                                : 'text-slate-400 hover:text-slate-600'
+                                }`}
+                        >
+                            Chat Logs
+                        </button>
+                    </div>
                 </div>
             </div>
 
             {activeView === 'active' ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
                     {loading ? (
-                        <div className="col-span-full p-20 text-center bg-white rounded-[40px] border border-slate-100 italic-none">
+                        <div className="col-span-full p-20 text-center bg-white rounded-[40px] border border-slate-100">
                             <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
                             <p className="text-slate-400 font-black uppercase tracking-widest text-xs">Connecting to streams...</p>
                         </div>
@@ -126,7 +190,9 @@ const Chats = () => {
                             <div className="p-6 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
                                 <div className="flex items-center gap-2">
                                     <Globe size={14} className="text-indigo-500" />
-                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Global Room</span>
+                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                                        {chat.room_id ? `Room: ${chat.room_id.slice(0, 12)}...` : 'Global Room'}
+                                    </span>
                                 </div>
                                 <div className="flex items-center gap-2 px-3 py-1 bg-green-100 rounded-full">
                                     <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></div>
@@ -138,12 +204,14 @@ const Chats = () => {
                                 <div className="flex items-center justify-between gap-4 mb-8">
                                     <div className="flex flex-col items-center gap-3 flex-1 min-w-0">
                                         <div className="w-16 h-16 rounded-[24px] bg-slate-100 p-0.5 border border-slate-200 shadow-sm overflow-hidden">
-                                            {chat.user1?.avatar_url ? <img src={chat.user1.avatar_url} alt="" className="w-full h-full object-cover rounded-[22px]" /> : <div className="w-full h-full flex items-center justify-center font-black text-slate-400">?</div>}
+                                            {chat.user1?.avatar_url
+                                                ? <img src={chat.user1.avatar_url} alt="" className="w-full h-full object-cover rounded-[22px]" />
+                                                : <div className="w-full h-full flex items-center justify-center font-black text-slate-400">?</div>}
                                         </div>
                                         <span className="text-sm font-black text-slate-800 truncate w-full text-center">{chat.user1?.username || 'Guest'}</span>
-                                        <div className="flex gap-2">
+                                        <div className="flex gap-2 flex-wrap justify-center">
                                             <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-md ${chat.user1?.gender === 'female' ? 'bg-pink-100 text-pink-600' : 'bg-blue-100 text-blue-600'}`}>{chat.user1?.gender || 'Unknown'}</span>
-                                            <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-md bg-slate-100 text-slate-500 overflow-hidden text-ellipsis max-w-[60px]" title={chat.user1?.location}>{chat.user1?.location || 'Unknown'}</span>
+                                            <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-md bg-slate-100 text-slate-500 max-w-[80px] truncate" title={formatLocation(chat.user1)}>{formatLocation(chat.user1)}</span>
                                         </div>
                                     </div>
 
@@ -155,12 +223,14 @@ const Chats = () => {
 
                                     <div className="flex flex-col items-center gap-3 flex-1 min-w-0">
                                         <div className="w-16 h-16 rounded-[24px] bg-slate-100 p-0.5 border border-slate-200 shadow-sm overflow-hidden">
-                                            {chat.user2?.avatar_url ? <img src={chat.user2.avatar_url} alt="" className="w-full h-full object-cover rounded-[22px]" /> : <div className="w-full h-full flex items-center justify-center font-black text-slate-400">?</div>}
+                                            {chat.user2?.avatar_url
+                                                ? <img src={chat.user2.avatar_url} alt="" className="w-full h-full object-cover rounded-[22px]" />
+                                                : <div className="w-full h-full flex items-center justify-center font-black text-slate-400">?</div>}
                                         </div>
                                         <span className="text-sm font-black text-slate-800 truncate w-full text-center">{chat.user2?.username || 'Guest'}</span>
-                                        <div className="flex gap-2">
+                                        <div className="flex gap-2 flex-wrap justify-center">
                                             <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-md ${chat.user2?.gender === 'female' ? 'bg-pink-100 text-pink-600' : 'bg-blue-100 text-blue-600'}`}>{chat.user2?.gender || 'Unknown'}</span>
-                                            <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-md bg-slate-100 text-slate-500 overflow-hidden text-ellipsis max-w-[60px]" title={chat.user2?.location}>{chat.user2?.location || 'Unknown'}</span>
+                                            <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-md bg-slate-100 text-slate-500 max-w-[80px] truncate" title={formatLocation(chat.user2)}>{formatLocation(chat.user2)}</span>
                                         </div>
                                     </div>
                                 </div>
@@ -194,7 +264,7 @@ const Chats = () => {
                             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500 transition-colors" size={16} />
                             <input
                                 type="text"
-                                placeholder="Filter by user ID or name..."
+                                placeholder="Filter by user name or room ID..."
                                 className="bg-white border border-slate-200 pl-11 pr-6 py-2.5 rounded-xl w-80 focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all font-medium text-sm"
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -206,10 +276,10 @@ const Chats = () => {
                     <div className="overflow-x-auto">
                         <table className="w-full text-left border-collapse">
                             <thead>
-                                <tr className="border-b border-slate-50 italic-none">
+                                <tr className="border-b border-slate-50">
                                     <th className="px-8 py-5 text-[10px] font-black uppercase text-slate-400 tracking-widest">Participants</th>
                                     <th className="px-8 py-5 text-[10px] font-black uppercase text-slate-400 tracking-widest">Duration</th>
-                                    <th className="px-8 py-5 text-[10px] font-black uppercase text-slate-400 tracking-widest">Ended By</th>
+                                    <th className="px-8 py-5 text-[10px] font-black uppercase text-slate-400 tracking-widest">Messages</th>
                                     <th className="px-8 py-5 text-[10px] font-black uppercase text-slate-400 tracking-widest">Status</th>
                                     <th className="px-8 py-5 text-[10px] font-black uppercase text-slate-400 tracking-widest text-right">Actions</th>
                                 </tr>
@@ -217,35 +287,36 @@ const Chats = () => {
                             <tbody className="divide-y divide-slate-50">
                                 {loading ? (
                                     <tr><td colSpan="5" className="p-20 text-center"><div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto"></div></td></tr>
-                                ) : chatHistory.map((log) => (
+                                ) : filteredHistory.length === 0 ? (
+                                    <tr><td colSpan="5" className="p-16 text-center text-slate-400 font-bold text-xs uppercase tracking-widest">No chat history found</td></tr>
+                                ) : filteredHistory.map((log) => (
                                     <tr key={log.id} className="hover:bg-slate-50/50 transition-colors group">
                                         <td className="px-8 py-5">
                                             <div className="flex items-center gap-3">
                                                 <div className="flex -space-x-4">
                                                     <div className="w-9 h-9 rounded-xl bg-slate-100 border-2 border-white shadow-sm overflow-hidden shrink-0">
-                                                        {log.user1?.avatar_url && <img src={log.user1.avatar_url} className="w-full h-full object-cover" />}
+                                                        {log.user1?.avatar_url && <img src={log.user1.avatar_url} className="w-full h-full object-cover" alt="" />}
                                                     </div>
                                                     <div className="w-9 h-9 rounded-xl bg-slate-200 border-2 border-white shadow-sm overflow-hidden shrink-0">
-                                                        {log.user2?.avatar_url && <img src={log.user2.avatar_url} className="w-full h-full object-cover" />}
+                                                        {log.user2?.avatar_url && <img src={log.user2.avatar_url} className="w-full h-full object-cover" alt="" />}
                                                     </div>
                                                 </div>
                                                 <div className="truncate">
                                                     <div className="text-[11px] font-black text-slate-700">{log.user1?.username || 'Guest'} ↔ {log.user2?.username || 'Guest'}</div>
                                                     <div className="text-[9px] text-slate-400 font-bold uppercase">{new Date(log.start_time).toLocaleString()}</div>
                                                     <div className="text-[8px] text-slate-300 font-bold uppercase mt-1">
-                                                        {log.user1?.gender} / {log.user1?.location} ↔ {log.user2?.gender} / {log.user2?.location}
+                                                        {log.user1?.gender} / {formatLocation(log.user1)} ↔ {log.user2?.gender} / {formatLocation(log.user2)}
                                                     </div>
                                                 </div>
                                             </div>
                                         </td>
                                         <td className="px-8 py-5 capitalize">
-                                            <div className="text-sm font-black text-slate-700">{log.duration ? `${Math.floor(log.duration / 60)}m ${log.duration % 60}s` : 'Short'}</div>
-                                            <div className="text-[9px] text-slate-400 font-bold uppercase tracking-tighter">{log.messages_count || 0} messages</div>
+                                            <div className="text-sm font-black text-slate-700">
+                                                {log.duration ? `${Math.floor(log.duration / 60)}m ${log.duration % 60}s` : '< 1m'}
+                                            </div>
                                         </td>
                                         <td className="px-8 py-5">
-                                            <div className="text-xs font-bold text-slate-500">
-                                                {log.ended_by === log.user1_id ? 'User 1' : log.ended_by === log.user2_id ? 'User 2' : 'System'}
-                                            </div>
+                                            <div className="text-[11px] font-black text-slate-500">{log.messages_count || 0} msgs</div>
                                         </td>
                                         <td className="px-8 py-5">
                                             {log.was_reported ? (

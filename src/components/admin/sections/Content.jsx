@@ -1,9 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { supabase } from '../../../supabase';
 import {
     Palette, Image as ImageIcon, Gift, Hash,
     Plus, Trash2, Edit3, Check, X,
-    Tag, Download, Eye, Sparkles
+    Tag, Eye, Sparkles
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -14,29 +14,40 @@ const Content = () => {
     const [isAdding, setIsAdding] = useState(false);
     const [newItem, setNewItem] = useState({ name: '', value: '', type: 'tag', price: 0 });
 
+    // Cache data per tab to fix disappearing bug
+    const dataCache = useRef({ tags: null, backgrounds: null, gifts: null });
+
     useEffect(() => {
+        // Use cached data instantly if available, then refresh
+        if (dataCache.current[activeTab]) {
+            setItems(dataCache.current[activeTab]);
+            setLoading(false);
+        } else {
+            setLoading(true);
+        }
         fetchContent();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [activeTab]);
 
     const fetchContent = async () => {
-        setLoading(true);
         let table = activeTab === 'tags' ? 'interest_tags' : 'virtual_assets';
         let { data, error } = await supabase.from(table).select('*').order('id', { ascending: false });
 
-        if (activeTab !== 'tags') {
-            data = data.filter(item => item.type === (activeTab === 'backgrounds' ? 'background' : 'gift'));
-        }
-
-        if (error) {
-            console.error("Failed to load content:", error);
-            toast.error("Failed to load content: " + error.message);
-        } else {
-            setItems(data || []);
+        if (!error && data) {
+            if (activeTab !== 'tags') {
+                data = data.filter(item => item.type === (activeTab === 'backgrounds' ? 'background' : 'gift'));
+            }
+            dataCache.current[activeTab] = data;
+            setItems(data);
+        } else if (error) {
+            console.error('Failed to load content:', error);
+            toast.error('Failed to load content: ' + error.message);
         }
         setLoading(false);
     };
 
     const handleAddItem = async () => {
+        if (!newItem.name.trim()) return toast.error('Name is required');
         let table = activeTab === 'tags' ? 'interest_tags' : 'virtual_assets';
         let payload = activeTab === 'tags'
             ? { name: newItem.name }
@@ -45,17 +56,14 @@ const Content = () => {
         const { data, error } = await supabase.from(table).insert([payload]).select();
 
         if (error) {
-            console.warn(`Simulating add for ${table} due to error:`, error.message);
-            // Fallback: Simulate adding visually if table doesn't exist
-            setItems([{ id: Date.now(), ...payload }, ...items]);
-            toast.success("Item added (Simulated - table missing)");
+            toast.error('Failed to add: ' + error.message);
         } else {
-            toast.success("Item added successfully");
-            if (data && data[0]) {
-                setItems([data[0], ...items]);
-            } else {
-                fetchContent();
-            }
+            toast.success('Item added successfully');
+            const added = (data && data[0]) ? data[0] : { id: Date.now(), ...payload };
+            // Update cache and state
+            const updated = [added, ...items];
+            dataCache.current[activeTab] = updated;
+            setItems(updated);
         }
         setIsAdding(false);
         setNewItem({ name: '', value: '', type: 'tag', price: 0 });
@@ -64,10 +72,12 @@ const Content = () => {
     const handleDelete = async (id) => {
         let table = activeTab === 'tags' ? 'interest_tags' : 'virtual_assets';
         const { error } = await supabase.from(table).delete().eq('id', id);
-        if (error) toast.error("Delete failed");
+        if (error) toast.error('Delete failed: ' + error.message);
         else {
-            toast.success("Item removed");
-            fetchContent();
+            toast.success('Item removed');
+            const updated = items.filter(i => i.id !== id);
+            dataCache.current[activeTab] = updated;
+            setItems(updated);
         }
     };
 
@@ -95,7 +105,7 @@ const Content = () => {
                 ].map((tab) => (
                     <button
                         key={tab.id}
-                        onClick={() => setActiveTab(tab.id)}
+                        onClick={() => { setIsAdding(false); setActiveTab(tab.id); }}
                         className={`flex items-center gap-3 px-8 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === tab.id
                             ? 'bg-slate-900 text-white shadow-xl shadow-slate-900/10'
                             : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'
@@ -111,7 +121,7 @@ const Content = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
                 {isAdding && (
                     <div className="bg-indigo-50/50 border-2 border-dashed border-indigo-200 rounded-[32px] p-8 flex flex-col gap-4 animate-in slide-in-from-top-4 duration-300">
-                        <h4 className="font-black text-indigo-600 uppercase text-[10px] tracking-widest">Add New {activeTab}</h4>
+                        <h4 className="font-black text-indigo-600 uppercase text-[10px] tracking-widest">Add New {activeTab.slice(0, -1)}</h4>
                         <input
                             type="text"
                             placeholder="Display Name"
@@ -182,7 +192,7 @@ const Content = () => {
 
                         <div className="mt-auto pt-4 border-t border-slate-100 flex gap-2">
                             <button className="flex-1 py-3 bg-slate-50 hover:bg-slate-100 rounded-xl font-bold text-[10px] uppercase text-slate-500 transition-all">Edit Details</button>
-                            <button className="p-3 bg-slate-50 hover:bg-slate-100 rounded-xl text-slate-400 transition-all"><X size={14} /></button>
+                            <button onClick={() => handleDelete(item.id)} className="p-3 bg-slate-50 hover:bg-red-50 hover:text-red-500 rounded-xl text-slate-400 transition-all"><X size={14} /></button>
                         </div>
                     </div>
                 ))}

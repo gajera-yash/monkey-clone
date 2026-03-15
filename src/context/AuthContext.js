@@ -182,6 +182,17 @@ export const AuthProvider = ({ children }) => {
             return;
         }
 
+        // --- Active Now Ping (last_seen heartbeat) ---
+        const updateLastSeen = async () => {
+            if (currentUser?.id && !isGuest) {
+                try {
+                    await supabase.from('profiles').update({ last_seen: new Date().toISOString() }).eq('id', currentUser.id);
+                } catch (e) { } // silent fail
+            }
+        };
+        updateLastSeen();
+        const heartbeat = setInterval(updateLastSeen, 60000); // exactly every 1 min
+
         const fetchHistory = async () => {
             try {
                 const { data, error } = await supabase
@@ -192,8 +203,8 @@ export const AuthProvider = ({ children }) => {
                         duration,
                         user1_id,
                         user2_id,
-                        partner1:profiles!chat_logs_user1_id_fkey(username, avatar_url, location),
-                        partner2:profiles!chat_logs_user2_id_fkey(username, avatar_url, location)
+                        partner1:profiles!chat_logs_user1_id_fkey(username, avatar_url, location_country),
+                        partner2:profiles!chat_logs_user2_id_fkey(username, avatar_url, location_country)
                     `)
                     .or(`user1_id.eq.${currentUser.id},user2_id.eq.${currentUser.id}`)
                     .order('start_time', { ascending: false })
@@ -202,7 +213,6 @@ export const AuthProvider = ({ children }) => {
                 if (error) throw error;
 
                 const formatted = data.map(item => {
-                    // Identify the partner by checking which ID is NOT the current user
                     const isUser1 = item.user1_id === currentUser.id;
                     const partner = isUser1 ? item.partner2 : item.partner1;
 
@@ -210,20 +220,22 @@ export const AuthProvider = ({ children }) => {
                         id: item.id,
                         name: partner?.username || 'Guest User',
                         avatar: partner?.avatar_url,
-                        location: partner?.location || 'Global',
+                        location: partner?.location_country || 'Global',
                         timestamp: item.start_time,
                         duration: item.duration ? `${Math.floor(item.duration / 60)}m ${item.duration % 60}s` : null,
-                        hasRecording: false // Change if UI supports recordings
+                        hasRecording: false
                     };
                 });
                 
                 setMatchHistory(formatted);
             } catch (error) {
-                console.error("Error fetching match history for mobile:", error);
+                console.error("Error fetching match history:", error);
             }
         };
 
         fetchHistory();
+
+        return () => clearInterval(heartbeat);
     }, [currentUser, isGuest]);
 
     // Update Profile Info
@@ -315,6 +327,34 @@ export const AuthProvider = ({ children }) => {
                             localStorage.removeItem('userGender');
                         }
 
+                        // Check Google Profile data for first-time population
+                        if (session.user.app_metadata?.provider === 'google' && (!profile.location_country || !profile.birthdate)) {
+                            const updates = {};
+                            const meta = session.user.user_metadata || {};
+                            
+                            // Map locale to country (e.g. en-GB -> GB, en-US -> US)
+                            if (!profile.location_country && meta.locale) {
+                                const localeParts = meta.locale.split('-');
+                                if (localeParts.length > 1) {
+                                    const code = localeParts[1].toUpperCase();
+                                    const regions = new Intl.DisplayNames(['en'], { type: 'region' });
+                                    try {
+                                        updates.location_country = regions.of(code) || code;
+                                    } catch(e) { updates.location_country = code; }
+                                }
+                            }
+                            
+                            // Check birthdate if available (rare from default oauth, but if requested)
+                            if (!profile.birthdate && meta.birthdate) {
+                                updates.birthdate = meta.birthdate;
+                            }
+
+                            if (Object.keys(updates).length > 0) {
+                                await supabase.from('profiles').update(updates).eq('id', session.user.id);
+                                profile = { ...profile, ...updates };
+                            }
+                        }
+
                         setCurrentUser({ ...session.user, ...profile });
 
                         // Update last user info OR clear if it's a new login
@@ -390,7 +430,7 @@ export const AuthProvider = ({ children }) => {
     };
 
     // Save match to history
-    const saveMatchToHistory = async (partnerData) => {
+    const saveMatchToHistory = async (partnerData, roomData = {}) => {
         if (!currentUser?.id || isGuest || !partnerData.uid) return;
         try {
             const { data, error } = await supabase
@@ -398,9 +438,11 @@ export const AuthProvider = ({ children }) => {
                 .insert({
                     user1_id: currentUser.id,
                     user2_id: partnerData.uid,
+                    room_id: roomData.roomId || null,
                     start_time: partnerData.startTimeIso || new Date().toISOString(),
                     end_time: new Date().toISOString(),
-                    duration: partnerData.durationSec || 0
+                    duration: partnerData.durationSec || 0,
+                    messages_count: roomData.messagesCount || 0
                 }).select().single();
 
             if (error) {

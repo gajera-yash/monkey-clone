@@ -5,7 +5,7 @@ import { supabase } from '../../supabase';
 import {
     LayoutDashboard, Users as UsersIcon, MessageSquare, ShieldAlert,
     CreditCard, BarChart3, Palette, Settings,
-    Lock, Bell, LifeBuoy, Menu, X, ChevronRight, LogOut
+    Lock, Bell, LifeBuoy, Menu, X, ChevronRight, LogOut, Coins
 } from 'lucide-react';
 
 // Real Section Imports
@@ -18,6 +18,8 @@ import Chats from './sections/Chats';
 import Revenue from './sections/Revenue';
 import Content from './sections/Content';
 import SystemSettings from './sections/Settings';
+import SubscriptionPlansAdmin from './sections/SubscriptionPlansAdmin';
+import CoinRewards from './sections/CoinRewards';
 
 import Analytics from './sections/Analytics';
 import AdminUsers from './sections/AdminUsers';
@@ -58,6 +60,8 @@ const AdminLayout = () => {
         { name: 'Revenue', path: '/admin/revenue', icon: <CreditCard size={18} /> },
         { name: 'Analytics', path: '/admin/analytics', icon: <BarChart3 size={18} /> },
         { name: 'Content', path: '/admin/content', icon: <Palette size={18} /> },
+        { name: 'Plans', path: '/admin/plans', icon: <CreditCard size={18} /> },
+        { name: 'Coin Rewards', path: '/admin/coin-rewards', icon: <Coins size={18} /> },
         { name: 'Settings', path: '/admin/settings', icon: <Settings size={18} /> },
         { name: 'Admins', path: '/admin/roles', icon: <Lock size={18} /> },
         { name: 'Notifications', path: '/admin/alerts', icon: <Bell size={18} /> },
@@ -204,12 +208,14 @@ const AdminLayout = () => {
                         <Route path="revenue" element={<Revenue />} />
                         <Route path="analytics" element={<Analytics />} />
                         <Route path="content" element={<Content />} />
+                        <Route path="plans" element={<SubscriptionPlansAdmin />} />
+                        <Route path="coin-rewards" element={<CoinRewards />} />
                         <Route path="settings" element={<SystemSettings />} />
                         <Route path="roles" element={<AdminUsers />} />
                         <Route path="alerts" element={<Notifications />} />
                         <Route path="support" element={<Support />} />
 
-                        {/* Verifications & Creators Nested inside Content logic or direct access */}
+                        {/* Verifications & Creators */}
                         <Route path="verifications" element={<Verifications />} />
                         <Route path="creators" element={<Creators />} />
                     </Routes>

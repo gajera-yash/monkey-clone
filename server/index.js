@@ -75,29 +75,19 @@ io.on('connection', (socket) => {
 
         // Check if we can match
         if (waitingUsers.length >= 2) {
-            // Try to find a match for the first user
-            // We iterate to find a compatible pair that doesn't block each other
-
-            // Loop through waitingUsers to find a pair
             let matchFound = false;
             let user1Index = 0;
             let user2Index = -1;
 
-            // Simple greedy match with blocking check
-            // We take the first user and try to find the first compatible partner
-            // If user1 has no compatible partners, we move to user2 and try to match them, etc.
+            // Optional: Premium Priority Matching
+            // Find the highest priority user (premium first)
+            let primaryUserIndex = waitingUsers.findIndex(u => u.isPremium);
+            if (primaryUserIndex === -1) primaryUserIndex = 0; // fallback to first in queue
+            
+            const user1 = waitingUsers[primaryUserIndex];
 
-            // Note: This is an O(n) scan for the head of queue. 
-            // Better scalable approach needed for production, but fine for <100 users.
-
-            // We can't just shift user1 because they might find a match deeper in queue if user2 was blocked.
-            // But for simplicity/fairness FIFO:
-            // We try to match waitingUsers[0] with anyone. 
-            // If they match waitingUsers[1], great. If blocked, try waitingUsers[2].
-
-            const user1 = waitingUsers[0];
-
-            for (let i = 1; i < waitingUsers.length; i++) {
+            for (let i = 0; i < waitingUsers.length; i++) {
+                if (i === primaryUserIndex) continue;
                 const potentialPartner = waitingUsers[i];
 
                 // Check blocks
@@ -105,6 +95,7 @@ io.on('connection', (socket) => {
                 const partnerBlockedUser1 = potentialPartner.blockedUsers.includes(user1.uid) || (potentialPartner.uid && user1.blockedUsers.includes(potentialPartner.uid));
 
                 if (!user1BlockedPartner && !partnerBlockedUser1) {
+                    user1Index = primaryUserIndex;
                     user2Index = i;
                     matchFound = true;
                     break;
@@ -112,11 +103,15 @@ io.on('connection', (socket) => {
             }
 
             if (matchFound) {
-                // Remove both from queue
-                // Be careful with indices since spliced
+                // Remove both from queue, safely handling indexes
+                const maxIdx = Math.max(user1Index, user2Index);
+                const minIdx = Math.min(user1Index, user2Index);
+                
+                const user1 = waitingUsers[user1Index];
                 const user2 = waitingUsers[user2Index];
-                waitingUsers.splice(user2Index, 1); // Remove user2 first (higher index)
-                waitingUsers.splice(0, 1); // Remove user1 (index 0)
+
+                waitingUsers.splice(maxIdx, 1);
+                waitingUsers.splice(minIdx, 1);
 
                 // Create a unique room ID
                 const roomId = `${user1.id}-${user2.id}`;

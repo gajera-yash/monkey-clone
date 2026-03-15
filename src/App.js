@@ -5,6 +5,7 @@ import { useAuth } from './context/AuthContext';
 import { AdminProvider } from './context/AdminContext';
 import { CoinsProvider, useCoins } from './context/CoinsContext';
 import { PremiumProvider } from './context/PremiumContext';
+import { supabase } from './supabase';
 import Header from './components/Header';
 import Hero from './components/Hero';
 import Features from './components/Features';
@@ -21,6 +22,7 @@ import GenderModal from './components/auth/GenderModal';
 import DailyBonusModal from './components/coins/DailyBonusModal';
 import CoinStore from './components/monetization/CoinStore';
 import SubscriptionPlans from './components/monetization/SubscriptionPlans';
+import MaintenancePage from './components/MaintenancePage';
 
 // Creator Components
 import CreatorRoute from './components/creator/CreatorRoute';
@@ -37,12 +39,34 @@ const AppContent = () => {
   const [isBonusOpen, setIsBonusOpen] = useState(false);
   const [isCoinStoreOpen, setIsCoinStoreOpen] = useState(false);
   const [isSubscriptionOpen, setIsSubscriptionOpen] = useState(false);
+  const [maintenanceMode, setMaintenanceMode] = useState(false);
   const { currentUser, loading } = useAuth();
   const { checkDailyBonus, registerModalCallbacks } = useCoins();
   const navigate = useNavigate();
   const location = useLocation();
 
   const bonusCheckedForUser = useRef(null);
+
+  // Check maintenance mode from database
+  useEffect(() => {
+    const checkMaintenance = async () => {
+      const { data } = await supabase
+        .from('system_settings')
+        .select('value')
+        .eq('key', 'maintenance_mode')
+        .single();
+      if (data?.value === 'true' || data?.value === true) {
+        setMaintenanceMode(true);
+      } else {
+        setMaintenanceMode(false);
+      }
+    };
+    checkMaintenance();
+
+    // Re-check every 60 seconds
+    const interval = setInterval(checkMaintenance, 60000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Register modal openers into CoinsContext so any component can trigger them
   useEffect(() => {
@@ -88,6 +112,13 @@ const AppContent = () => {
         <div className="w-12 h-12 rounded-full border-4 border-t-accent-purple border-white/10 animate-spin"></div>
       </div>
     );
+  }
+
+  // Maintenance mode: show for non-admin users only (not on /admin routes)
+  const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'moderator' || currentUser?.role === 'support';
+  const isAdminRoute = location.pathname.startsWith('/admin');
+  if (maintenanceMode && !isAdmin && !isAdminRoute) {
+    return <MaintenancePage />;
   }
 
   // Improved start chat handler with Gender Selection
