@@ -10,7 +10,7 @@ import { useCoins } from '../../context/CoinsContext';
 
 const DesktopHeader = ({ onShowSubscription }) => {
     const { currentUser } = useAuth();
-    const { coins } = useCoins();
+    const { coins, openDailyBonus } = useCoins();
     const [activeModal, setActiveModal] = useState(null);
 
     const toggleModal = (name) => {
