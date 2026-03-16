@@ -19,19 +19,23 @@ const DailyBonusModal = ({ isOpen, onClose }) => {
     if (!isOpen || currentUser?.role === 'admin') return null;
 
 
+    const { currentDay, claimedDays, canClaim, nextClaimTime } = streakInfo;
+
     const handleClaim = async () => {
         if (currentUser?.isAnonymous) {
             toast.error('Please login with Google to claim daily coins!');
             return;
         }
+        if (!canClaim) return;
+
         setLoading(true);
         try {
             const success = await claimDailyBonus();
             if (success) {
                 toast.success('Daily Bonus Claimed! 🎉');
-                onClose();
-            } else {
-                toast.error('Failed to claim. You might have already claimed today or check your connection.');
+                // Refresh local streak info
+                const info = getDailyStreakInfo(currentUser.id);
+                setStreakInfo(info);
             }
         } catch (error) {
             toast.error('Error claiming bonus. Try again.');
@@ -46,7 +50,7 @@ const DailyBonusModal = ({ isOpen, onClose }) => {
         return `${n}`;
     };
 
-    const { currentDay, claimedDays } = streakInfo;
+    const isAlreadyClaimed = !canClaim && claimedDays.includes(currentDay);
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
@@ -64,7 +68,11 @@ const DailyBonusModal = ({ isOpen, onClose }) => {
                 {/* Header */}
                 <div className="text-center py-6 px-6">
                     <h2 className="text-3xl font-black text-white drop-shadow-md tracking-wide">Daily Reward</h2>
-                    <p className="text-yellow-100 text-sm mt-1 font-medium">Come back every day to get better rewards!</p>
+                    <p className="text-yellow-100 text-sm mt-1 font-medium">
+                        {isAlreadyClaimed 
+                            ? `Next reward available at ${new Date(nextClaimTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` 
+                            : 'Come back every day to get better rewards!'}
+                    </p>
                 </div>
 
                 {/* 7-Day Grid */}
@@ -80,12 +88,12 @@ const DailyBonusModal = ({ isOpen, onClose }) => {
                                 <div
                                     key={day}
                                     className={`relative flex flex-col items-center justify-between rounded-xl p-2 min-h-[90px] transition-all
-                                        ${isCurrent
-                                            ? 'border-2 border-yellow-300 shadow-lg shadow-yellow-400/30'
+                                        ${isCurrent && !isClaimed
+                                            ? 'border-2 border-yellow-300 shadow-lg shadow-yellow-400/30 scale-105 z-10'
                                             : 'border border-white/10'
                                         }`}
                                     style={{
-                                        background: isCurrent
+                                        background: isCurrent && !isClaimed
                                             ? 'linear-gradient(160deg, #f59e0b, #d97706)'
                                             : isClaimed
                                                 ? 'rgba(255,255,255,0.08)'
@@ -93,7 +101,7 @@ const DailyBonusModal = ({ isOpen, onClose }) => {
                                     }}
                                 >
                                     {/* Burst rays for current */}
-                                    {isCurrent && (
+                                    {isCurrent && !isClaimed && (
                                         <div className="absolute inset-0 rounded-xl pointer-events-none"
                                             style={{
                                                 background: 'radial-gradient(circle, rgba(255,255,255,0.3) 0%, transparent 70%)',
@@ -131,10 +139,14 @@ const DailyBonusModal = ({ isOpen, onClose }) => {
                 <div className="pb-6 px-4 flex justify-center">
                     <button
                         onClick={handleClaim}
-                        disabled={loading}
-                        className="px-24 py-3.5 bg-gradient-to-b from-yellow-300 to-yellow-500 hover:from-yellow-200 hover:to-yellow-400 text-yellow-950 font-black text-xl rounded-2xl transition-all shadow-lg shadow-yellow-600/40 hover:-translate-y-0.5 active:scale-95 disabled:opacity-60 tracking-widest border-b-4 border-yellow-600"
+                        disabled={loading || isAlreadyClaimed}
+                        className={`px-24 py-3.5 font-black text-xl rounded-2xl transition-all shadow-lg tracking-widest border-b-4 
+                            ${isAlreadyClaimed 
+                                ? 'bg-gray-400 text-gray-700 border-gray-500 cursor-not-allowed' 
+                                : 'bg-gradient-to-b from-yellow-300 to-yellow-500 hover:from-yellow-200 hover:to-yellow-400 text-yellow-950 shadow-yellow-600/40 hover:-translate-y-0.5 active:scale-95 border-yellow-600'
+                            }`}
                     >
-                        {loading ? 'Claiming...' : 'CLAIM'}
+                        {loading ? 'Claiming...' : isAlreadyClaimed ? 'CLAIMED' : 'CLAIM'}
                     </button>
                 </div>
             </div>

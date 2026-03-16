@@ -311,6 +311,36 @@ export const AuthProvider = ({ children }) => {
                     try {
                         let profile = await fetchProfile(session.user.id);
 
+                        // If profile doesn't exist, create it (important for new Google users)
+                        if (!profile) {
+                            console.log("Creating missing profile for user:", session.user.id);
+                            const { data: newProfile, error: createError } = await supabase
+                                .from('profiles')
+                                .insert({
+                                    id: session.user.id,
+                                    username: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'User',
+                                    avatar_url: session.user.user_metadata?.avatar_url,
+                                    coins: 0,
+                                    is_creator: false,
+                                    account_status: 'active'
+                                })
+                                .select()
+                                .single();
+
+                            if (createError) {
+                                console.error("Error creating profile:", createError);
+                            } else {
+                                profile = {
+                                    ...newProfile,
+                                    uid: newProfile.id,
+                                    displayName: newProfile.username,
+                                    photoURL: newProfile.avatar_url,
+                                    isCreator: newProfile.is_creator,
+                                    accountStatus: newProfile.account_status
+                                };
+                            }
+                        }
+
                         // Handle female creator registration logic
                         const savedGender = localStorage.getItem('userGender');
                         if (savedGender === 'Female' && profile && !profile.isCreator) {
@@ -328,7 +358,7 @@ export const AuthProvider = ({ children }) => {
                         }
 
                         // Check Google Profile data for first-time population
-                        if (session.user.app_metadata?.provider === 'google' && (!profile.location_country || !profile.birthdate)) {
+                        if (session.user.app_metadata?.provider === 'google' && profile && (!profile.location_country || !profile.birthdate)) {
                             const updates = {};
                             const meta = session.user.user_metadata || {};
                             

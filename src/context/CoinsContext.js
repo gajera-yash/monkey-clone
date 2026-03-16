@@ -85,12 +85,27 @@ export const CoinsProvider = ({ children }) => {
             const currentCoins = currentUser?.coins || 0;
             const newBalance = currentCoins + amount;
 
-            const { error: updateError } = await supabase
+            const { data, error: updateError, count } = await supabase
                 .from('profiles')
                 .update({ coins: newBalance })
-                .eq('id', currentUser.id);
+                .eq('id', currentUser.id)
+                .select(); // select allows us to check if any row was affected
 
             if (updateError) throw updateError;
+
+            // If profile doesn't exist, create it first
+            if (!data || data.length === 0) {
+                console.log("Profile not found in addCoins, attempting to create one...");
+                const { error: insertError } = await supabase
+                    .from('profiles')
+                    .insert({
+                        id: currentUser.id,
+                        username: currentUser.displayName || 'User',
+                        avatar_url: currentUser.photoURL,
+                        coins: newBalance
+                    });
+                if (insertError) throw insertError;
+            }
 
             // 2. Add transaction record
             const { error: txError } = await supabase
@@ -216,58 +231,62 @@ export const CoinsProvider = ({ children }) => {
 
     // Get streak info from localStorage
     const getDailyStreakInfo = (userId) => {
-        const today = new Date().toDateString();
-        const lastClaimDate = localStorage.getItem(`dailyBonus_lastDate_${userId}`);
+        const now = Date.now();
+        const lastClaimTime = parseInt(localStorage.getItem(`dailyBonus_lastTime_${userId}`) || '0', 10);
         const lastClaimDay = parseInt(localStorage.getItem(`dailyBonus_lastDay_${userId}`) || '0', 10);
 
-        // Calculate streak continuation
-        const yesterday = new Date();
-        yesterday.setDate(yesterday.getDate() - 1);
-        const isConsecutive = lastClaimDate === yesterday.toDateString();
+        // Check if 24 hours have passed since last claim
+        const MS_IN_DAY = 24 * 60 * 60 * 1000;
+        const timeSinceLastClaim = now - lastClaimTime;
+        const canClaim = timeSinceLastClaim >= MS_IN_DAY || lastClaimTime === 0;
+
+        // Reset streak if more than 48 hours have passed
+        const isMissed = timeSinceLastClaim > (MS_IN_DAY * 2) && lastClaimTime !== 0;
 
         let currentDay = 1;
-        if (lastClaimDate && lastClaimDate !== today) {
-            currentDay = isConsecutive ? Math.min(lastClaimDay + 1, 7) : 1;
-        } else if (lastClaimDate === today) {
-            // Already claimed today — show next day as current
+        if (lastClaimTime === 0 || isMissed) {
+            currentDay = 1;
+        } else if (canClaim) {
+            currentDay = Math.min(lastClaimDay + 1, 7);
+        } else {
             currentDay = lastClaimDay;
         }
 
-        // Build list of claimed days (all days before currentDay in this streak cycle)
+        // Build list of claimed days
         const claimedDays = [];
-        if (lastClaimDate === today) {
-            // Claimed today — mark currentDay as claimed too
+        if (!canClaim && lastClaimTime !== 0) {
+            // If already claimed in last 24h, mark days up to lastClaimDay as claimed
             for (let d = 1; d <= lastClaimDay; d++) claimedDays.push(d);
         } else {
+            // Otherwise mark days before currentDay as claimed
             for (let d = 1; d < currentDay; d++) claimedDays.push(d);
         }
 
-        return { currentDay, claimedDays };
+        return { currentDay, claimedDays, canClaim, nextClaimTime: lastClaimTime + MS_IN_DAY };
     };
 
     // Check if bonus is available today
     const checkDailyBonus = async () => {
         if (!currentUser?.id) return false;
-        const today = new Date().toDateString();
-        const lastClaimDate = localStorage.getItem(`dailyBonus_lastDate_${currentUser.id}`);
-        return lastClaimDate !== today;
+        const { canClaim } = getDailyStreakInfo(currentUser.id);
+        return canClaim;
     };
 
     const claimDailyBonus = async () => {
         if (!currentUser?.id) return false;
 
-        const today = new Date().toDateString();
-        const lastClaimDate = localStorage.getItem(`dailyBonus_lastDate_${currentUser.id}`);
+        const { currentDay, canClaim } = getDailyStreakInfo(currentUser.id);
 
-        // Prevent double claim
-        if (lastClaimDate === today) return false;
+        if (!canClaim) {
+            toast.error("Reward already claimed. Come back later!");
+            return false;
+        }
 
-        const { currentDay } = getDailyStreakInfo(currentUser.id);
         const reward = streakRewards[currentDay - 1] || dailyCoinsBase;
 
         const success = await addCoins(reward, `Day ${currentDay} Daily Bonus`);
         if (success) {
-            localStorage.setItem(`dailyBonus_lastDate_${currentUser.id}`, today);
+            localStorage.setItem(`dailyBonus_lastTime_${currentUser.id}`, Date.now().toString());
             localStorage.setItem(`dailyBonus_lastDay_${currentUser.id}`, currentDay.toString());
         }
         return success;
