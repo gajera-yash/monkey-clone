@@ -49,7 +49,7 @@ const DesktopHeader = ({ onShowSubscription }) => {
                         )}
                     </div>
                     <button
-                        onClick={onShowSubscription}
+                        onClick={openDailyBonus}
                         className="px-5 py-2 rounded-full bg-purple-800/80 text-yellow-400 text-sm font-semibold border border-purple-600/50 hover:bg-purple-700/80 transition-colors"
                     >
                         Free Coins

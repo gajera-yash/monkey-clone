@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+
 import { useCoins } from '../context/CoinsContext';
 import { usePremium } from '../context/PremiumContext';
 import CoinBalance from './coins/CoinBalance';
@@ -33,7 +35,8 @@ const Header = ({ onStartChat }) => {
         >
             <div className="container mx-auto px-6 flex justify-between items-center">
                 {/* Logo */}
-                <div
+                <Link
+                    to="/"
                     className="flex items-center space-x-3 cursor-pointer group"
                     onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
                 >
@@ -49,7 +52,8 @@ const Header = ({ onStartChat }) => {
                         </h1>
                         {isPremium && <span className="text-[10px] text-yellow-400 font-bold tracking-widest uppercase">Premium</span>}
                     </div>
-                </div>
+                </Link>
+
 
                 {/* Navigation */}
                 <nav className="flex items-center space-x-4 md:space-x-6">
@@ -119,11 +123,13 @@ const Header = ({ onStartChat }) => {
                         </>
                     ) : (
                         <>
-                            <button
+                            <Link
+                                to="/about"
                                 className="text-gray-300 hover:text-white font-medium transition-colors duration-200 text-sm hidden md:block"
                             >
                                 About
-                            </button>
+                            </Link>
+
                             <button
                                 onClick={onStartChat}
                                 className="bg-white/10 hover:bg-white/20 text-white border border-white/10 px-6 py-2 rounded-full font-medium transition-all duration-200 hover:scale-105 backdrop-blur-sm"

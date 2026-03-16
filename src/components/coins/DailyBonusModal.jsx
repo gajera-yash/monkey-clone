@@ -20,14 +20,23 @@ const DailyBonusModal = ({ isOpen, onClose }) => {
 
 
     const handleClaim = async () => {
+        if (currentUser?.isAnonymous) {
+            toast.error('Please login with Google to claim daily coins!');
+            return;
+        }
         setLoading(true);
-        const success = await claimDailyBonus();
-        setLoading(false);
-        if (success) {
-            toast.success('Daily Bonus Claimed! 🎉');
-            onClose();
-        } else {
-            toast.error('Failed to claim. Try again later.');
+        try {
+            const success = await claimDailyBonus();
+            if (success) {
+                toast.success('Daily Bonus Claimed! 🎉');
+                onClose();
+            } else {
+                toast.error('Failed to claim. You might have already claimed today or check your connection.');
+            }
+        } catch (error) {
+            toast.error('Error claiming bonus. Try again.');
+        } finally {
+            setLoading(false);
         }
     };
 

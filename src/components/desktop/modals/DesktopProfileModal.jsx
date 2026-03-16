@@ -157,13 +157,25 @@ const DesktopProfileModal = ({ onClose }) => {
                             </button>
                         </div>
                         <div className="flex items-center gap-2 mt-1">
-                            <span className="text-white/40 text-sm">ID: {currentUser?.uid?.slice(0, 8) || '280826743'}</span>
+                            <span className="text-white/40 text-sm">ID: {currentUser?.uid?.slice(0, 8) || '28082674'}</span>
                             <button
                                 onClick={() => {
-                                    navigator.clipboard.writeText(currentUser?.uid || '');
-                                    toast.success("ID copied!");
+                                    const idToCopy = currentUser?.uid?.slice(0, 8) || '';
+                                    if (navigator.clipboard && window.isSecureContext) {
+                                        navigator.clipboard.writeText(idToCopy);
+                                        toast.success("ID copied!");
+                                    } else {
+                                        const textArea = document.createElement("textarea");
+                                        textArea.value = idToCopy;
+                                        document.body.appendChild(textArea);
+                                        textArea.select();
+                                        document.execCommand("copy");
+                                        document.body.removeChild(textArea);
+                                        toast.success("ID copied!");
+                                    }
                                 }}
-                                className="text-white/40 hover:text-white/60"
+                                className="text-white/40 hover:text-white/60 p-1"
+                                title="Copy ID"
                             >
                                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />

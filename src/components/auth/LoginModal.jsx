@@ -138,7 +138,8 @@ const LoginModal = ({ isOpen, onClose }) => {
                                 {[
                                     { icon: 'https://www.svgrepo.com/show/475647/facebook-color.svg', label: 'FB' },
                                     { icon: 'https://www.svgrepo.com/show/442911/apple-logo.svg', label: 'Apple', filter: 'brightness(0) invert(1)' },
-                                    { icon: 'https://www.svgrepo.com/show/361343/tiktok-logo.svg', label: 'TikTok', filter: 'brightness(0) invert(1)' },
+                                    { icon: 'https://www.svgrepo.com/show/475647/facebook-color.svg', label: 'FB' },
+                                    { icon: 'https://www.svgrepo.com/show/442911/apple-logo.svg', label: 'Apple', filter: 'brightness(0) invert(1)' },
                                     { icon: 'https://www.svgrepo.com/show/349340/email-fill.svg', label: 'Email', filter: 'brightness(0) invert(1)' }
                                 ].map((item, idx) => (
                                     <button
@@ -184,15 +185,8 @@ const LoginModal = ({ isOpen, onClose }) => {
                         </div>
                     )}
 
-                    {/* Back to Home / Guest Link */}
-                    <div className="mt-12">
-                        <button
-                            onClick={handleGuest}
-                            className="text-white/40 hover:text-white text-sm font-bold tracking-wide uppercase transition-colors"
-                        >
-                            Continue as Guest &rarr;
-                        </button>
-                    </div>
+                    {/* Footer Spacer */}
+                    <div className="mt-12"></div>
                 </div>
             </div>
 

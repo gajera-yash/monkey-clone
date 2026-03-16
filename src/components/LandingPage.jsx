@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import '../styles/LandingPage.css';
+
 
 const LandingPage = ({ onStartChat }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -137,15 +139,17 @@ const LandingPage = ({ onStartChat }) => {
 
       {/* NAV */}
       <nav className="main-nav-landing">
-        <a href="#" className="nav-logo-landing">
+        <Link to="/" className="nav-logo-landing">
           <div className="nav-logo-box-landing">🐵</div>
           <span className="grad-text">Strangy</span>
-        </a>
+        </Link>
+
         <ul className="nav-links-landing">
           <li><a href="#features">Features</a></li>
           <li><a href="#how">How It Works</a></li>
           <li><a href="#faq">FAQ</a></li>
-          <li><a href="#">About</a></li>
+          <li><Link to="/about">About</Link></li>
+
           <li><button className="btn-nav-landing" onClick={onStartChat}>Login</button></li>
         </ul>
         <button 
@@ -161,7 +165,8 @@ const LandingPage = ({ onStartChat }) => {
         <a href="#features" className="dlink" onClick={() => setIsMenuOpen(false)}>Features</a>
         <a href="#how" className="dlink" onClick={() => setIsMenuOpen(false)}>How It Works</a>
         <a href="#faq" className="dlink" onClick={() => setIsMenuOpen(false)}>FAQ</a>
-        <a href="#" className="dlink" onClick={() => setIsMenuOpen(false)}>About</a>
+        <Link to="/about" className="dlink" onClick={() => setIsMenuOpen(false)}>About</Link>
+
         <button className="btn-nav-landing" onClick={onStartChat}>Login</button>
       </div>
 
@@ -313,29 +318,32 @@ const LandingPage = ({ onStartChat }) => {
       <footer className="main-footer-landing">
         <div className="footer-top-landing">
           <div className="fbrand-landing">
-            <a href="#" className="nav-logo-landing">
+            <Link to="/" className="nav-logo-landing">
               <div className="nav-logo-box-landing">🐵</div>
               <span className="grad-text">Strangy</span>
-            </a>
+            </Link>
+
             <p>Connecting people globally through spontaneous video chat.</p>
           </div>
           <div className="flinks-landing">
             <h4>Company</h4>
             <ul>
-              <li><a href="#">About</a></li>
-              <li><a href="#">Safety Guidelines</a></li>
-              <li><a href="#">Terms of Service</a></li>
-              <li><a href="#">Privacy Policy</a></li>
+              <li><Link to="/about">About</Link></li>
+              <li><Link to="/safety">Safety Guidelines</Link></li>
+              <li><Link to="/terms">Terms of Service</Link></li>
+              <li><Link to="/privacy">Privacy Policy</Link></li>
             </ul>
+
           </div>
           <div className="flinks-landing">
             <h4>Support</h4>
             <ul>
-              <li><a href="#">Help Center</a></li>
-              <li><a href="#">Contact Us</a></li>
-              <li><a href="#">Report a Bug</a></li>
-              <li><a href="#">Community</a></li>
+              <li><Link to="/help">Help Center</Link></li>
+              <li><Link to="/contact">Contact Us</Link></li>
+              <li><Link to="/report-bug">Report a Bug</Link></li>
+              <li><Link to="/community">Community</Link></li>
             </ul>
+
           </div>
           <div className="flinks-landing">
             <h4>Get The App</h4>
@@ -353,9 +361,10 @@ const LandingPage = ({ onStartChat }) => {
         </div>
         <div className="footer-bottom-landing">
           <p>© 2026 Strangy. All rights reserved. &nbsp;·&nbsp;
-            <a href="#" style={{ color: 'inherit', opacity: .65 }}>Safety Guidelines</a> &nbsp;·&nbsp;
-            <a href="#" style={{ color: 'inherit', opacity: .65 }}>Terms of Service</a>
+            <Link to="/safety" style={{ color: 'inherit', opacity: .65 }}>Safety Guidelines</Link> &nbsp;·&nbsp;
+            <Link to="/terms" style={{ color: 'inherit', opacity: .65 }}>Terms of Service</Link>
           </p>
+
           <div className="socials-landing">
             <a href="#" className="soci-landing">𝕏</a>
             <a href="#" className="soci-landing">in</a>

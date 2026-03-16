@@ -34,6 +34,16 @@ import CreatorDashboard from './components/creator/CreatorDashboard';
 import CreatorWithdraw from './components/creator/CreatorWithdraw';
 import CreatorSettings from './components/creator/CreatorSettings';
 
+// Static Pages
+import About from './components/pages/About';
+import TermsOfService from './components/pages/TermsOfService';
+import PrivacyPolicy from './components/pages/PrivacyPolicy';
+import HelpCenter from './components/pages/HelpCenter';
+import ContactUs from './components/pages/ContactUs';
+import ReportBug from './components/pages/ReportBug';
+import Community from './components/pages/Community';
+
+
 const AppContent = () => {
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [isGenderModalOpen, setIsGenderModalOpen] = useState(false);
@@ -82,7 +92,8 @@ const AppContent = () => {
   useEffect(() => {
     registerModalCallbacks(
       () => setIsCoinStoreOpen(true),
-      () => setIsSubscriptionOpen(true)
+      () => setIsSubscriptionOpen(true),
+      () => setIsBonusOpen(true)
     );
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -263,7 +274,59 @@ const AppContent = () => {
             <CreatorSettings />
           </CreatorRoute>
         } />
+
+        {/* Static Pages Routes */}
+        <Route path="/about" element={
+          <>
+            <Header onStartChat={handleStartChat} />
+            <About />
+            <Footer />
+          </>
+        } />
+        <Route path="/terms" element={
+          <>
+            <Header onStartChat={handleStartChat} />
+            <TermsOfService />
+            <Footer />
+          </>
+        } />
+        <Route path="/privacy" element={
+          <>
+            <Header onStartChat={handleStartChat} />
+            <PrivacyPolicy />
+            <Footer />
+          </>
+        } />
+        <Route path="/help" element={
+          <>
+            <Header onStartChat={handleStartChat} />
+            <HelpCenter />
+            <Footer />
+          </>
+        } />
+        <Route path="/contact" element={
+          <>
+            <Header onStartChat={handleStartChat} />
+            <ContactUs />
+            <Footer />
+          </>
+        } />
+        <Route path="/report-bug" element={
+          <>
+            <Header onStartChat={handleStartChat} />
+            <ReportBug />
+            <Footer />
+          </>
+        } />
+        <Route path="/community" element={
+          <>
+            <Header onStartChat={handleStartChat} />
+            <Community />
+            <Footer />
+          </>
+        } />
       </Routes>
+
     </div>
   );
 };

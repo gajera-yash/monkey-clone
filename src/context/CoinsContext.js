@@ -14,6 +14,7 @@ export const CoinsProvider = ({ children }) => {
     const [loading, setLoading] = useState(true);
     const [onOpenCoinStore, setOnOpenCoinStore] = useState(null);
     const [onOpenSubscription, setOnOpenSubscription] = useState(null);
+    const [onOpenDailyBonus, setOnOpenDailyBonus] = useState(null);
     const [streakRewards, setStreakRewards] = useState([100, 500, 1000, 5000, 10000, 50000, 100000]); // default fallback
     const [dailyCoinsBase, setDailyCoinsBase] = useState(10);
 
@@ -111,8 +112,8 @@ export const CoinsProvider = ({ children }) => {
             toast.success(`+${amount} Coins! ${reason}`);
             return true;
         } catch (error) {
-            console.error("Error adding coins:", error);
-            toast.error("Failed to add coins");
+            console.error("Error adding coins:", error.message || error);
+            toast.error(`Failed to add coins: ${error.message || "Unknown error"}`);
             return false;
         }
     };
@@ -196,10 +197,16 @@ export const CoinsProvider = ({ children }) => {
         if (onOpenSubscription) onOpenSubscription();
     };
 
+    // Open Daily Bonus modal
+    const openDailyBonus = () => {
+        if (onOpenDailyBonus) onOpenDailyBonus();
+    };
+
     // Register modal callbacks from App.js
-    const registerModalCallbacks = (coinStoreFn, subscriptionFn) => {
+    const registerModalCallbacks = (coinStoreFn, subscriptionFn, dailyBonusFn) => {
         setOnOpenCoinStore(() => coinStoreFn);
         setOnOpenSubscription(() => subscriptionFn);
+        setOnOpenDailyBonus(() => dailyBonusFn);
     };
 
     // Refresh coin balance from Supabase
@@ -275,6 +282,7 @@ export const CoinsProvider = ({ children }) => {
         purchaseCoins,
         openCoinStore,
         openSubscription,
+        openDailyBonus,
         registerModalCallbacks,
         refreshCoins,
         checkDailyBonus,

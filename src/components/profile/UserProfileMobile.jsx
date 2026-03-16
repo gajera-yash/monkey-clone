@@ -18,7 +18,7 @@ const UserProfileMobile = ({ onClose }) => {
     });
 
     const userInitial = currentUser?.displayName?.charAt(0)?.toUpperCase() || 'U';
-    const userId = currentUser?.uid?.slice(-9) || '000000000';
+    const displayId = currentUser?.uid?.slice(0, 8) || '00000000';
 
     const handleSave = async () => {
         await updateProfileInfo(editData);
@@ -166,13 +166,25 @@ const UserProfileMobile = ({ onClose }) => {
                                 </button>
                             </div>
                             <div className="flex items-center gap-1.5 text-gray-400 text-sm mt-0.5">
-                                <span>ID: {userId}</span>
+                                <span>ID: {displayId}</span>
                                 <button
                                     onClick={() => {
-                                        navigator.clipboard.writeText(currentUser?.uid || '');
-                                        toast.success("ID copied!");
+                                        if (navigator.clipboard && window.isSecureContext) {
+                                            navigator.clipboard.writeText(displayId);
+                                            toast.success("ID copied!");
+                                        } else {
+                                            // Fallback for non-https/unsupported environments
+                                            const textArea = document.createElement("textarea");
+                                            textArea.value = displayId;
+                                            document.body.appendChild(textArea);
+                                            textArea.select();
+                                            document.execCommand("copy");
+                                            document.body.removeChild(textArea);
+                                            toast.success("ID copied!");
+                                        }
                                     }}
-                                    className="text-gray-500 hover:text-white transition-colors"
+                                    className="text-gray-500 hover:text-white transition-colors p-1"
+                                    title="Copy ID"
                                 >
                                     📋
                                 </button>

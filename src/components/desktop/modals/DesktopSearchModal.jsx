@@ -12,24 +12,31 @@ const DesktopSearchModal = ({ onClose }) => {
             setIsSearching(true);
             setSearchResult(null);
             try {
-                const { data, error } = await supabase
-                    .from('profiles')
-                    .select('*')
-                    .eq('id', searchId.trim())
-                    .single();
+                const term = searchId.trim();
+                let query = supabase.from('profiles').select('*');
 
-                if (error) {
-                    if (error.code === 'PGRST116') {
-                        toast.error("User not found");
-                    } else {
-                        throw error;
-                    }
+                // If term looks like a full UUID (36 chars with hyphens)
+                if (term.length === 36 && term.includes('-')) {
+                    query = query.eq('id', term);
                 } else {
+                    // Otherwise try prefix search (short ID)
+                    query = query.ilike('id', `${term}%`);
+                }
+
+                const { data, error } = await query;
+
+                if (error) throw error;
+
+                if (!data || data.length === 0) {
+                    toast.error("User not found");
+                } else {
+                    // If multiple found, take the first one or exact match if possible
+                    const user = data.find(u => u.id === term) || data[0];
                     setSearchResult({
-                        ...data,
-                        displayName: data.username,
-                        photoURL: data.avatar_url,
-                        uid: data.id
+                        ...user,
+                        displayName: user.username,
+                        photoURL: user.avatar_url,
+                        uid: user.id
                     });
                 }
             } catch (error) {
