@@ -6,11 +6,13 @@ import DesktopSubscriptionModal from './modals/DesktopSubscriptionModal';
 import DesktopSearchModal from './modals/DesktopSearchModal';
 import DesktopSafetyModal from './modals/DesktopSafetyModal';
 import DesktopMatchPreferenceModal from './modals/DesktopMatchPreferenceModal';
+import PremiumModal from '../premium/PremiumModal';
 import { useCoins } from '../../context/CoinsContext';
+import SafetyInfoModal from '../safety/SafetyInfoModal';
 
 const DesktopHeader = ({ onShowSubscription }) => {
     const { currentUser } = useAuth();
-    const { coins, openDailyBonus } = useCoins();
+    const { coins, openDailyBonus, openCoinStore } = useCoins();
     const [activeModal, setActiveModal] = useState(null);
 
     const toggleModal = (name) => {
@@ -40,12 +42,24 @@ const DesktopHeader = ({ onShowSubscription }) => {
                             onClick={() => toggleModal('safety')}
                             className={`px-5 py-2 rounded-full text-sm font-medium transition-colors ${activeModal === 'safety' ? 'bg-yellow-400 text-black' : 'text-white/80 hover:bg-white/10'}`}
                         >
-                            Safety Center
+                            Safety Settings
                         </button>
                         {activeModal === 'safety' && (
                             <div className="absolute top-14 left-0 z-[110]">
                                 <DesktopSafetyModal onClose={() => setActiveModal(null)} />
                             </div>
+                        )}
+                    </div>
+                    {/* Guidelines */}
+                    <div className="relative">
+                        <button
+                            onClick={() => toggleModal('guidelines')}
+                            className={`px-5 py-2 rounded-full text-sm font-medium transition-colors flex items-center gap-2 ${activeModal === 'guidelines' ? 'bg-yellow-400 text-black' : 'text-white/80 hover:bg-white/10'}`}
+                        >
+                            <span className="text-green-400 text-sm">✅</span> Guidelines
+                        </button>
+                        {activeModal === 'guidelines' && (
+                            <SafetyInfoModal onClose={() => setActiveModal(null)} />
                         )}
                     </div>
                     <button
@@ -61,7 +75,7 @@ const DesktopHeader = ({ onShowSubscription }) => {
                     {/* Coin Balance */}
                     <div className="relative">
                         <button
-                            onClick={onShowSubscription}
+                            onClick={openCoinStore}
                             className="flex items-center gap-2 bg-purple-800/60 border border-purple-600/40 rounded-full px-4 py-2 hover:bg-purple-700/60 transition-colors"
                         >
                             <span className="text-base">🪙</span>
@@ -134,6 +148,7 @@ const DesktopHeader = ({ onShowSubscription }) => {
                     )}
                 </div>
             </header>
+
         </>
     );
 };

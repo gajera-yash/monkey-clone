@@ -31,7 +31,7 @@ const Notifications = () => {
             const [usersRes, txsRes, reportsRes] = await Promise.all([
                 supabase.from('profiles').select('id, username, created_at').order('created_at', { ascending: false }).limit(10),
                 supabase.from('transactions').select('id, amount, type, created_at, user:profiles(username)').eq('status', 'success').order('created_at', { ascending: false }).limit(10),
-                supabase.from('reports').select('id, reason, created_at, reporter:profiles!reports_reporter_id_fkey(username), reported:profiles!reports_reported_id_fkey(username)').order('created_at', { ascending: false }).limit(10)
+                supabase.from('reports').select('id, reason, created_at, reporter:profiles!reports_reporter_id_fkey(username), reported:profiles!reports_reported_user_id_fkey(username)').order('created_at', { ascending: false }).limit(10)
             ]);
 
             let merged = [];
@@ -115,7 +115,7 @@ const Notifications = () => {
     });
 
     return (
-        <div className="p-10 max-w-[1200px] mx-auto space-y-10">
+        <div className="p-10 max-w-[1600px] mx-auto space-y-10">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
                 <div>
                     <h1 className="text-3xl font-black tracking-tight text-slate-800">Notifications Engine</h1>

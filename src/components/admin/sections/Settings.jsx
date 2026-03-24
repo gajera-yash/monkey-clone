@@ -98,7 +98,7 @@ const SystemSettings = () => {
     );
 
     return (
-        <div className="p-10 max-w-[1200px] mx-auto space-y-10">
+        <div className="p-10 max-w-[1600px] mx-auto space-y-10">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
                 <div>
                     <h1 className="text-3xl font-black tracking-tight text-slate-800">System Settings</h1>

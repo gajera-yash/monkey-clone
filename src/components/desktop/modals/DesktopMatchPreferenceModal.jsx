@@ -39,22 +39,6 @@ const DesktopMatchPreferenceModal = ({ onClose }) => {
             </div>
 
             <div className="p-4 space-y-4">
-                {/* Monkey Plus Banner */}
-                <div className="bg-[#f0f2ff] rounded-xl p-3 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <div className="relative">
-                            <span className="text-3xl">👑</span>
-                            <div className="absolute -top-1 -right-1 w-3 h-3 bg-blue-400 rounded-full border-2 border-white"></div>
-                        </div>
-                        <div>
-                            <h4 className="text-gray-900 font-bold">Strangy Plus+</h4>
-                            <p className="text-gray-500 text-xs">Set your preferences, meet someone who's right for you.</p>
-                        </div>
-                    </div>
-                    <button className="bg-black text-white font-bold px-6 py-2 rounded-full text-sm hover:opacity-80 transition-opacity">
-                        Join
-                    </button>
-                </div>
 
                 {/* Age Preference */}
                 <div className="space-y-4">

@@ -1,21 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-
 import { useCoins } from '../context/CoinsContext';
 import { usePremium } from '../context/PremiumContext';
 import CoinBalance from './coins/CoinBalance';
-import CoinStoreModal from './coins/CoinStoreModal';
 import PremiumModal from './premium/PremiumModal';
 import PremiumBadge from './premium/PremiumBadge';
+import { RiVipCrown2Line, RiFlashlightLine } from 'react-icons/ri';
 
 const Header = ({ onStartChat }) => {
     const { currentUser, logout } = useAuth();
     const { isPremium } = usePremium();
+    const { openCoinStore } = useCoins();
     const [isScrolled, setIsScrolled] = useState(false);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isStoreOpen, setIsStoreOpen] = useState(false);
-    const [isPremiumModalOpen, setIsPremiumModalOpen] = useState(false);
 
     useEffect(() => {
         const handleScroll = () => {
@@ -61,15 +60,16 @@ const Header = ({ onStartChat }) => {
                         <>
                             {!isPremium && (
                                 <button
-                                    onClick={() => setIsPremiumModalOpen(true)}
+                                    onClick={openCoinStore}
                                     className="hidden md:flex items-center gap-2 bg-gradient-to-r from-yellow-400 to-orange-500 text-dark-900 px-4 py-1.5 rounded-full font-bold text-xs hover:shadow-lg hover:shadow-orange-500/20 transition-all hover:scale-105"
                                 >
-                                    <span>💎</span>
+                                    <RiVipCrown2Line size={14} />
                                     <span>GO PREMIUM</span>
                                 </button>
                             )}
 
-                            <CoinBalance onOpenStore={() => setIsStoreOpen(true)} />
+                            {/* Using the CoinBalance component but wiring it to open the unified Shop Modal (PremiumModal) */}
+                            <CoinBalance onOpenStore={openCoinStore} />
 
                             <div className="relative">
                                 <button
@@ -104,15 +104,15 @@ const Header = ({ onStartChat }) => {
 
                                         {!isPremium && (
                                             <button
-                                                onClick={() => { setIsPremiumModalOpen(true); setIsMenuOpen(false); }}
+                                                onClick={() => { openCoinStore(); setIsMenuOpen(false); }}
                                                 className="w-full text-left px-4 py-2 text-yellow-400 hover:bg-white/5 transition-colors font-bold flex items-center gap-2"
                                             >
-                                                <span>💎</span> Go Premium
+                                                <RiFlashlightLine size={14} /> Go Premium
                                             </button>
                                         )}
 
                                         <button
-                                            onClick={logout}
+                                            onClick={() => { setIsMenuOpen(false); logout(); }}
                                             className="w-full text-left px-4 py-2 text-red-400 hover:bg-white/5 transition-colors"
                                         >
                                             Logout
@@ -141,8 +141,8 @@ const Header = ({ onStartChat }) => {
                 </nav>
             </div>
 
-            <CoinStoreModal isOpen={isStoreOpen} onClose={() => setIsStoreOpen(false)} />
-            <PremiumModal isOpen={isPremiumModalOpen} onClose={() => setIsPremiumModalOpen(false)} />
+            {/* Modals */}
+            
         </header>
     );
 };

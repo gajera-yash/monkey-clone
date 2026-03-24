@@ -1,24 +1,28 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useCoins } from '../../context/CoinsContext';
 import { usePremium } from '../../context/PremiumContext';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../supabase';
 import toast from 'react-hot-toast';
+import { RiCoinsLine, RiGenderlessLine, RiCalendar2Line, RiFileCopyLine, RiGridLine, RiMapPinRangeLine, RiEdit2Line, RiCamera2Line, RiChat3Line, RiFlashlightLine } from 'react-icons/ri';
 
 const UserProfileMobile = ({ onClose }) => {
     const { currentUser, userLocation, logout, updateProfileInfo } = useAuth();
-    const { coins, stars } = useCoins();
+    const { coins } = useCoins();
     const { isPremium } = usePremium();
+    const navigate = useNavigate();
 
     const [isEditing, setIsEditing] = useState(false);
     const [uploadingImage, setUploadingImage] = useState(false);
+    const fileInputRef = useRef(null);
     const [editData, setEditData] = useState({
         displayName: currentUser?.displayName || '',
         bio: currentUser?.bio || ''
     });
 
     const userInitial = currentUser?.displayName?.charAt(0)?.toUpperCase() || 'U';
-    const displayId = currentUser?.uid?.slice(0, 8) || '00000000';
+    const displayId = currentUser?.id?.slice(0, 8) || '00000000';
 
     const handleSave = async () => {
         await updateProfileInfo(editData);
@@ -27,14 +31,21 @@ const UserProfileMobile = ({ onClose }) => {
 
     const handleImageUpload = async (e) => {
         const file = e.target.files[0];
-        if (!file) return;
+        if (!file || !currentUser?.id) return;
 
         try {
             setUploadingImage(true);
-            const fileName = `${currentUser.uid}_${Date.now()}`;
-            const { data, error } = await supabase.storage
+            const toastId = toast.loading("Uploading image...");
+            
+            const fileExt = file.name?.split('.').pop() || 'jpg';
+            const fileName = `${currentUser.id}/avatar_${Date.now()}.${fileExt}`;
+            
+            const { error } = await supabase.storage
                 .from('avatars')
-                .upload(fileName, file);
+                .upload(fileName, file, {
+                    contentType: file.type || 'image/jpeg',
+                    upsert: true
+                });
 
             if (error) throw error;
 
@@ -43,10 +54,10 @@ const UserProfileMobile = ({ onClose }) => {
                 .getPublicUrl(fileName);
 
             await updateProfileInfo({ photoURL: publicUrl });
-            toast.success("Profile photo updated!");
+            toast.success("Profile photo updated!", { id: toastId });
         } catch (error) {
             console.error("Error uploading image:", error);
-            toast.error("Failed to upload image.");
+            toast.error(error.message || "Failed to upload image.");
         } finally {
             setUploadingImage(false);
         }
@@ -85,7 +96,7 @@ const UserProfileMobile = ({ onClose }) => {
                     {/* Name Input */}
                     <div className="bg-white/5 rounded-2xl p-4 border border-white/10">
                         <div className="flex items-center gap-3">
-                            <span className="text-xl">😊</span>
+                            <RiEdit2Line size={20} className="text-gray-400" />
                             <input
                                 type="text"
                                 value={editData.displayName}
@@ -100,7 +111,7 @@ const UserProfileMobile = ({ onClose }) => {
                     {/* Bio Input */}
                     <div className="bg-white/5 rounded-2xl p-4 border border-white/10 flex flex-col gap-2">
                         <div className="flex items-center gap-3 border-b border-white/10 pb-2">
-                            <span className="text-xl">💬</span>
+                            <RiChat3Line size={20} className="text-gray-400" />
                             <span className="text-white font-bold">About</span>
                         </div>
                         <textarea
@@ -143,17 +154,37 @@ const UserProfileMobile = ({ onClose }) => {
                 <div className="bg-gradient-to-br from-dark-800 to-dark-900 border border-white/10 rounded-2xl p-5">
                     <div className="flex items-center gap-4">
                         {/* Avatar */}
-                        {currentUser?.photoURL ? (
-                            <img
-                                src={currentUser.photoURL}
-                                alt="avatar"
-                                className="w-16 h-16 rounded-full border-2 border-accent-pink object-cover"
-                            />
-                        ) : (
-                            <div className="w-16 h-16 rounded-full bg-accent-pink flex items-center justify-center text-2xl font-bold border-2 border-accent-pink">
-                                {userInitial}
+                        <div className="relative group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
+                            {currentUser?.photoURL ? (
+                                <img
+                                    src={currentUser.photoURL}
+                                    alt="avatar"
+                                    className={`w-16 h-16 rounded-full border-2 border-accent-pink object-cover ${uploadingImage ? 'opacity-50' : ''}`}
+                                />
+                            ) : (
+                                <div className={`w-16 h-16 rounded-full bg-accent-pink flex items-center justify-center text-2xl font-bold border-2 border-accent-pink text-white ${uploadingImage ? 'opacity-50' : ''}`}>
+                                    {userInitial}
+                                </div>
+                            )}
+                            {/* Edit Overlay */}
+                            <div className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                {uploadingImage ? (
+                                    <div className="w-6 h-6 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                                ) : (
+                                    <RiCamera2Line size={20} className="text-white drop-shadow-md" />
+                                )}
                             </div>
-                        )}
+                            <div className="absolute -bottom-1 -right-1 bg-dark-900 rounded-full p-1 border border-white/10 shadow-lg">
+                                <RiEdit2Line size={12} className="text-white" />
+                            </div>
+                        </div>
+                        <input
+                            type="file"
+                            ref={fileInputRef}
+                            onChange={handleImageUpload}
+                            accept="image/*"
+                            className="hidden"
+                        />
 
                         <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
@@ -162,7 +193,7 @@ const UserProfileMobile = ({ onClose }) => {
                                     onClick={() => setIsEditing(true)}
                                     className="text-xs bg-yellow-400/20 text-yellow-400 px-2.5 py-0.5 rounded-full flex items-center gap-1 hover:bg-yellow-400/30 transition-colors"
                                 >
-                                    <span>✏️</span> Edit
+                                    <RiEdit2Line size={12} /> Edit
                                 </button>
                             </div>
                             <div className="flex items-center gap-1.5 text-gray-400 text-sm mt-0.5">
@@ -186,36 +217,20 @@ const UserProfileMobile = ({ onClose }) => {
                                     className="text-gray-500 hover:text-white transition-colors p-1"
                                     title="Copy ID"
                                 >
-                                    📋
+                                    <RiFileCopyLine size={14} />
                                 </button>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                {/* Strangy Plus Banner */}
-                {!isPremium && (
-                    <div className="bg-gradient-to-r from-yellow-500/30 via-yellow-400/20 to-yellow-500/30 border border-yellow-400/30 rounded-2xl p-4 flex items-center gap-3">
-                        <span className="text-4xl">👑</span>
-                        <div className="flex-1">
-                            <h4 className="font-bold text-yellow-400">Strangy Plus</h4>
-                            <p className="text-xs text-gray-300">Get More Gender Filters</p>
-                        </div>
-                        <button className="bg-yellow-400 text-black font-bold px-5 py-2 rounded-full text-sm hover:bg-yellow-300 transition-colors">
-                            Join
-                        </button>
-                    </div>
-                )}
 
-                {/* Coins & Gems Row */}
-                <div className="grid grid-cols-2 gap-3">
-                    <div className="bg-dark-800 border border-white/10 rounded-xl p-4 flex items-center justify-center gap-2">
-                        <span className="text-2xl">🪙</span>
-                        <span className="text-lg font-bold">{coins}</span>
-                    </div>
-                    <div className="bg-dark-800 border border-white/10 rounded-xl p-4 flex items-center justify-center gap-2">
-                        <span className="text-2xl">💎</span>
-                        <span className="text-lg font-bold">0</span>
+                {/* Coins */}
+                <div className="bg-dark-800 border border-white/10 rounded-xl p-4 flex items-center gap-3">
+                    <RiCoinsLine size={28} className="text-yellow-400" />
+                    <div className="flex-1">
+                        <p className="text-xs text-gray-400 font-medium uppercase tracking-widest">Coins</p>
+                        <span className="text-2xl font-bold">{coins}</span>
                     </div>
                 </div>
 
@@ -223,21 +238,21 @@ const UserProfileMobile = ({ onClose }) => {
                 <div className="bg-dark-800 border border-white/10 rounded-2xl overflow-hidden divide-y divide-white/5">
                     <div className="flex items-center justify-between px-5 py-4">
                         <div className="flex items-center gap-3">
-                            <span className="text-xl">🎂</span>
+                            <RiCalendar2Line size={18} className="text-gray-400" />
                             <span className="text-gray-300">Birthday</span>
                         </div>
-                        <span className="text-gray-400 text-sm">2000-01-01</span>
+                        <span className="text-gray-400 text-sm">{currentUser?.birthdate || 'Not set'}</span>
                     </div>
                     <div className="flex items-center justify-between px-5 py-4">
                         <div className="flex items-center gap-3">
-                            <span className="text-xl">🧑</span>
+                            <RiGenderlessLine size={20} className="text-gray-400" />
                             <span className="text-gray-300">Gender</span>
                         </div>
-                        <span className="text-gray-400 text-sm">{localStorage.getItem('userGender') || 'male'}</span>
+                        <span className="text-gray-400 text-sm capitalize">{currentUser?.gender || 'Not set'}</span>
                     </div>
                     <div className="flex items-center justify-between px-5 py-4">
                         <div className="flex items-center gap-3">
-                            <span className="text-xl">🌍</span>
+                            <RiMapPinRangeLine size={20} className="text-gray-400" />
                             <span className="text-gray-300">Location</span>
                         </div>
                         <span className="text-gray-400 text-sm">{userLocation?.city || 'Unknown'}</span>
@@ -247,16 +262,33 @@ const UserProfileMobile = ({ onClose }) => {
                 {/* More */}
                 <button className="w-full bg-dark-800 border border-white/10 rounded-2xl px-5 py-4 flex items-center justify-between hover:bg-white/5 transition-colors">
                     <div className="flex items-center gap-3">
-                        <span className="text-xl">🔲</span>
+                        <RiGridLine size={18} className="text-gray-400" />
                         <span className="text-gray-300">More</span>
                     </div>
                     <span className="text-gray-500">›</span>
                 </button>
 
+                {/* Creator Dashboard (Only for verified creators) */}
+                {currentUser?.isCreator && (
+                    <button
+                        onClick={() => {
+                            navigate('/creator/dashboard');
+                            onClose();
+                        }}
+                        className="w-full bg-accent-purple/10 border border-accent-purple/30 rounded-2xl px-5 py-4 flex items-center justify-between hover:bg-accent-purple/20 transition-colors"
+                    >
+                        <div className="flex items-center gap-3 text-accent-purple">
+                            <RiGridLine size={18} />
+                            <span className="font-bold">Creator Dashboard</span>
+                        </div>
+                        <span className="text-accent-purple opacity-50">›</span>
+                    </button>
+                )}
+
                 {/* Sign Out */}
                 <button
-                    onClick={() => {
-                        logout();
+                    onClick={async () => {
+                        await logout();
                         onClose();
                     }}
                     className="w-full bg-dark-800 border border-red-500/20 rounded-2xl px-5 py-4 text-red-400 font-medium hover:bg-red-500/10 transition-colors text-left"

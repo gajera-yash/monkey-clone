@@ -2,10 +2,12 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '../../../supabase';
 import { FiDollarSign, FiStar, FiFilter, FiSearch } from 'react-icons/fi';
 import toast from 'react-hot-toast';
+import { useNavigate } from 'react-router-dom';
 
 const Creators = () => {
     const [creators, setCreators] = useState([]);
     const [loading, setLoading] = useState(true);
+    const navigate = useNavigate();
 
     useEffect(() => {
         fetchCreators();
@@ -16,7 +18,7 @@ const Creators = () => {
         const { data, error } = await supabase
             .from('profiles')
             .select('*')
-            .eq('role', 'creator')
+            .eq('is_creator', true)
             .order('coins', { ascending: false });
 
         if (error) {
@@ -35,7 +37,10 @@ const Creators = () => {
                     <h1 className="text-2xl font-black">Creator Management</h1>
                     <p className="text-gray-500">View earnings and stats for all creators</p>
                 </div>
-                <button className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold shadow-lg shadow-indigo-600/20 active:scale-95 transition-transform">
+                <button 
+                    onClick={() => navigate('/admin/settings')}
+                    className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold shadow-lg shadow-indigo-600/20 active:scale-95 transition-transform"
+                >
                     <FiDollarSign /> Manage Rates
                 </button>
             </div>
@@ -67,19 +72,29 @@ const Creators = () => {
                         <div className="grid grid-cols-2 gap-4 mb-6">
                             <div className="bg-gray-50 rounded-2xl p-4">
                                 <div className="text-xs text-gray-400 uppercase font-bold tracking-wider mb-1">Coins</div>
-                                <div className="text-xl font-black text-indigo-600">{creator.coins.toLocaleString()}</div>
+                                <div className="text-xl font-black text-indigo-600">{(creator.coins || 0).toLocaleString()}</div>
                             </div>
                             <div className="bg-gray-50 rounded-2xl p-4">
                                 <div className="text-xs text-gray-400 uppercase font-bold tracking-wider mb-1">Status</div>
                                 <div className={`text-sm font-bold ${creator.is_verified ? 'text-green-600' : 'text-orange-500'}`}>
-                                    {creator.is_verified ? 'Verified' : 'Pending'}
+                                    {creator.is_verified ? 'Verified' : (creator.account_status || 'Pending')}
                                 </div>
                             </div>
                         </div>
 
                         <div className="flex gap-2">
-                            <button className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 rounded-xl font-bold transition-colors">Details</button>
-                            <button className="flex-1 py-3 border border-indigo-600 text-indigo-600 hover:bg-indigo-50 rounded-xl font-bold transition-colors">Payouts</button>
+                            <button 
+                                onClick={() => navigate(`/admin/users?search=${encodeURIComponent(creator.username || creator.email || '')}`)}
+                                className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 rounded-xl font-bold transition-colors text-center"
+                            >
+                                Details
+                            </button>
+                            <button 
+                                onClick={() => toast.success("Payouts system coming soon")}
+                                className="flex-1 py-3 border border-indigo-600 text-indigo-600 hover:bg-indigo-50 rounded-xl font-bold transition-colors text-center"
+                            >
+                                Payouts
+                            </button>
                         </div>
                     </div>
                 ))}

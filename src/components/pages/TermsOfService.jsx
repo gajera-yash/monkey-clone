@@ -1,63 +1,85 @@
 import React from 'react';
+import { Shield, Scale, UserCheck, AlertTriangle, FileText, ChevronLeft } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 const TermsOfService = () => {
+    const navigate = useNavigate();
+
+    const sections = [
+        {
+            icon: <UserCheck className="text-[#6c3fcf]" />,
+            title: "1. Acceptance of Terms",
+            content: "By accessing and using Strangy, you agree to be bound by these Terms of Service. If you do not agree, please do not use the service. Use of the platform is restricted to individuals aged 18 or older."
+        },
+        {
+            icon: <Scale className="text-[#a855f7]" />,
+            title: "2. Community Guidelines",
+            content: "We maintain a high standard for our community. Prohibited behaviors include: nudity or sexually explicit content (monitored by AI), harassment, hate speech, bullying, and underage usage. Violations result in immediate strikes or permanent bans."
+        },
+        {
+            icon: <Shield className="text-[#ec4899]" />,
+            title: "3. User Responsibilities",
+            content: "Users are responsible for their interactions. While we use AI to detect NSFW content and offer reporting tools, you use the service at your own risk. Do not share personal information (address, phone numbers, financial data) during video calls."
+        },
+        {
+            icon: <FileText className="text-yellow-500" />,
+            title: "4. Monetization & Coins",
+            content: "Coins purchased on the platform are non-refundable. They have no cash value outside the platform. We reserve the right to change pricing or discontinue coin packages at any time. Subscriptions are billed periodically and can be cancelled in settings."
+        },
+        {
+            icon: <AlertTriangle className="text-red-500" />,
+            title: "5. Termination",
+            content: "We reserve the right to terminate or suspend your account at our sole discretion, without notice, for conduct that we believe violates these Terms or is harmful to other users of the service, us, or third parties."
+        }
+    ];
+
     return (
-        <div className="min-h-screen bg-dark-900 text-white pt-24 pb-12 px-4 md:px-8">
-            <div className="max-w-4xl mx-auto">
-                <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-indigo-600 mb-8">
-                    Terms of Service
-                </h1>
+        <div className="min-h-screen bg-[#0d0d0d] text-white font-sans selection:bg-purple-500/30 overflow-x-hidden">
+            {/* Background Decorations */}
+            <div className="fixed inset-0 overflow-hidden pointer-events-none">
+                <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-purple-600/10 rounded-full blur-[120px]" />
+                <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-600/10 rounded-full blur-[120px]" />
+            </div>
 
-                <div className="space-y-8 text-gray-300">
-                    <section className="bg-dark-800 p-8 rounded-2xl border border-white/10">
-                        <h2 className="text-2xl font-semibold mb-4 text-blue-400">1. Acceptance of Terms</h2>
-                        <p className="leading-relaxed">
-                            By accessing and using Strangy ("the Platform"), you agree to be bound by these Terms of Service. 
-                            If you do not agree to these terms, please do not use our services.
-                        </p>
-                    </section>
+            <div className="relative max-w-4xl mx-auto px-6 py-20">
+                {/* Header */}
+                <button 
+                    onClick={() => navigate('/')}
+                    className="group flex items-center gap-2 text-white/50 hover:text-white transition-colors mb-12"
+                >
+                    <ChevronLeft size={20} className="group-hover:-translate-x-1 transition-transform" />
+                    <span className="font-medium outline-none">Back to Home</span>
+                </button>
 
-                    <section className="bg-dark-800 p-8 rounded-2xl border border-white/10">
-                        <h2 className="text-2xl font-semibold mb-4 text-blue-400">2. Eligibility</h2>
-                        <p className="leading-relaxed">
-                            You must be at least 18 years of age to use the Platform. By using Strangy, you represent 
-                            and warrant that you have the right, authority, and capacity to enter into this agreement 
-                            and to abide by all of its terms and conditions.
-                        </p>
-                    </section>
+                <div className="mb-16">
+                    <h1 className="text-5xl md:text-7xl font-black mb-6 tracking-tighter">
+                        Terms of <span className="bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-pink-500">Service</span>
+                    </h1>
+                    <p className="text-xl text-white/40 font-medium">Last updated: March 22, 2026</p>
+                </div>
 
-                    <section className="bg-dark-800 p-8 rounded-2xl border border-white/10">
-                        <h2 className="text-2xl font-semibold mb-4 text-blue-400">3. Code of Conduct</h2>
-                        <p className="mb-4">Users must adhere to our Community Safety Guidelines. Prohibited activities include but are not limited to:</p>
-                        <ul className="list-disc list-inside space-y-2 ml-4">
-                            <li>Harassment or bullying of other users</li>
-                            <li>Sharing or broadcasting sexual or inappropriate content</li>
-                            <li>Fraudulent or illegal activities</li>
-                            <li>Impersionating others or misrepresenting your identity</li>
-                        </ul>
-                    </section>
+                {/* Content Sections */}
+                <div className="space-y-6">
+                    {sections.map((section, idx) => (
+                        <div key={idx} className="bg-white/5 backdrop-blur-xl border border-white/5 rounded-[32px] p-8 group hover:bg-white/[0.07] transition-all duration-500">
+                            <div className="flex flex-col md:flex-row items-start gap-6">
+                                <div className="w-14 h-14 rounded-2xl bg-white/5 flex items-center justify-center shrink-0 border border-white/10 group-hover:scale-110 group-hover:rotate-3 transition-all duration-500">
+                                    {section.icon}
+                                </div>
+                                <div className="flex-1">
+                                    <h3 className="text-2xl font-black mb-3 text-white/90">{section.title}</h3>
+                                    <p className="text-white/50 leading-relaxed text-lg font-medium">
+                                        {section.content}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
 
-                    <section className="bg-dark-800 p-8 rounded-2xl border border-white/10">
-                        <h2 className="text-2xl font-semibold mb-4 text-blue-400">4. Content Ownership</h2>
-                        <p className="leading-relaxed">
-                            You retain ownership of the content you share, but you grant Strangy a non-exclusive, 
-                            royalty-free license to use, host, and display that content for the purpose of 
-                            providing and improving our services.
-                        </p>
-                    </section>
-
-                    <section className="bg-dark-800 p-8 rounded-2xl border border-white/10">
-                        <h2 className="text-2xl font-semibold mb-4 text-blue-400">5. Termination</h2>
-                        <p className="leading-relaxed">
-                            We reserve the right to terminate or suspend your access to the Platform at any time, 
-                            without prior notice, for conduct that we believe violates these Terms or is harmful 
-                            to other users or the Platform itself.
-                        </p>
-                    </section>
-
-                    <div className="text-sm text-gray-500 mt-12 text-center">
-                        Last updated: March 2026
-                    </div>
+                {/* Footer Disclaimer */}
+                <div className="mt-20 text-center border-t border-white/5 pt-12 text-white/20 text-xs font-black uppercase tracking-widest">
+                    <p>© 2026 Strangy. All rights reserved.</p>
                 </div>
             </div>
         </div>

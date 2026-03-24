@@ -1,28 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '../../supabase';
+import socket from '../../utils/socket';
 import {
     LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
     PieChart, Pie, Cell, Legend
 } from 'recharts';
-
-// Mock Data for Phase 2 UI building (Will be replaced with real data in Phase 5)
-const mockDailyEarnings = [
-    { name: 'Mon', earnings: 1200 },
-    { name: 'Tue', earnings: 2100 },
-    { name: 'Wed', earnings: 800 },
-    { name: 'Thu', earnings: 1600 },
-    { name: 'Fri', earnings: 3400 },
-    { name: 'Sat', earnings: 4200 },
-    { name: 'Sun', earnings: 3800 },
-];
-
-const mockSourceData = [
-    { name: 'Video Chat', value: 6500 },
-    { name: 'Gifts', value: 2400 },
-    { name: 'Subscriptions', value: 1200 },
-    { name: 'Tips', value: 500 },
-];
 
 const COLORS = ['#8b5cf6', '#ec4899', '#f59e0b', '#3b82f6'];
 
@@ -30,6 +14,158 @@ const CreatorDashboard = () => {
     const { currentUser } = useAuth();
     const navigate = useNavigate();
     const [isOnline, setIsOnline] = useState(false);
+
+    // Earnings Data State
+    const [earningsData, setEarningsData] = useState({ today: 0, weekly: 0, monthly: 0, lifetime: 0 });
+    const [chartData, setChartData] = useState([]);
+    const [sourceData, setSourceData] = useState([]);
+    const [isLoadingStats, setIsLoadingStats] = useState(true);
+    const [incomingCallData, setIncomingCallData] = useState(null);
+
+    // Handle Direct Calls via Socket
+    useEffect(() => {
+        if (!socket.connected) socket.connect();
+
+        if (isOnline) {
+            socket.emit('creator-online', {
+                uid: currentUser?.uid,
+                name: currentUser?.displayName,
+                photoURL: currentUser?.photoURL,
+                gender: currentUser?.gender || 'Female'
+            });
+            console.log("Emitted creator-online");
+        } else {
+            socket.emit('creator-offline', currentUser?.uid);
+        }
+
+        const handleIncomingCall = (data) => {
+            console.log("Incoming direct call:", data);
+            setIncomingCallData(data);
+        };
+
+        socket.on('incoming-call', handleIncomingCall);
+
+        return () => {
+            socket.off('incoming-call', handleIncomingCall);
+            // Also turn them offline when unmounting the dashboard to prevent ghost calls
+            socket.emit('creator-offline', currentUser?.uid);
+        };
+    }, [isOnline, currentUser]);
+
+    const handleAcceptCall = () => {
+        if (incomingCallData) {
+            socket.emit('accept-direct-call', {
+                callerSocketId: incomingCallData.callerSocketId,
+                callerData: incomingCallData.callerData,
+                creatorData: {
+                    uid: currentUser?.uid,
+                    name: currentUser?.displayName,
+                    photoURL: currentUser?.photoURL,
+                    gender: currentUser?.gender || 'Female'
+                }
+            });
+            // The matches are emitted instantly by the server, 
+            // when we navigate to chat we should join the active matched session automatically!
+            setIncomingCallData(null);
+            navigate('/chat');
+        }
+    };
+
+    const handleDeclineCall = () => {
+        if (incomingCallData) {
+            socket.emit('decline-direct-call', { callerSocketId: incomingCallData.callerSocketId });
+            setIncomingCallData(null);
+        }
+    };
+
+    useEffect(() => {
+        if (!currentUser?.id) return;
+
+        const fetchEarnings = async () => {
+            setIsLoadingStats(true);
+            try {
+                // Fetch all earned transactions
+                const { data: txs, error } = await supabase
+                    .from('coin_transactions')
+                    .select('coins_amount, description, created_at')
+                    .eq('user_id', currentUser.id)
+                    .eq('transaction_type', 'earned');
+
+                if (error) throw error;
+
+                const now = new Date();
+                const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                const weekAgo = new Date(todayMidnight);
+                weekAgo.setDate(todayMidnight.getDate() - 7);
+                const monthAgo = new Date(todayMidnight);
+                monthAgo.setMonth(todayMidnight.getMonth() - 1);
+
+                let todayEarned = 0;
+                let weeklyEarned = 0;
+                let monthlyEarned = 0;
+                let lifetimeEarned = 0;
+
+                const dailyMap = {};
+                // Initialize last 7 days keys
+                for (let i = 6; i >= 0; i--) {
+                    const d = new Date(todayMidnight);
+                    d.setDate(d.getDate() - i);
+                    const dateStr = d.toLocaleDateString('en-US', { weekday: 'short' });
+                    dailyMap[dateStr] = 0;
+                }
+
+                const sources = {};
+
+                (txs || []).forEach(tx => {
+                    const txDate = new Date(tx.created_at);
+                    const amount = tx.coins_amount || 0;
+                    
+                    lifetimeEarned += amount;
+
+                    if (txDate >= todayMidnight) todayEarned += amount;
+                    if (txDate >= weekAgo) {
+                        weeklyEarned += amount;
+                        // For chart
+                        const dayStr = txDate.toLocaleDateString('en-US', { weekday: 'short' });
+                        if (dailyMap[dayStr] !== undefined) {
+                            dailyMap[dayStr] += amount;
+                        }
+                    }
+                    if (txDate >= monthAgo) monthlyEarned += amount;
+
+                    // Source pie chart
+                    let source = 'Other';
+                    const desc = tx.description?.toLowerCase() || '';
+                    if (desc.includes('video chat') || desc.includes('direct call')) source = 'Video Chat';
+                    else if (desc.includes('gift')) source = 'Gifts';
+                    else if (desc.includes('subscription')) source = 'Subscriptions';
+                    else if (desc.includes('tip')) source = 'Tips';
+
+                    sources[source] = (sources[source] || 0) + amount;
+                });
+
+                setEarningsData({
+                    today: todayEarned,
+                    weekly: weeklyEarned,
+                    monthly: monthlyEarned,
+                    lifetime: lifetimeEarned
+                });
+
+                setChartData(Object.keys(dailyMap).map(k => ({ name: k, earnings: dailyMap[k] })));
+                
+                const pieData = Object.keys(sources).map(k => ({ name: k, value: sources[k] }));
+                if (pieData.length === 0) pieData.push({ name: 'No Earnings Yet', value: 1 }); // fallback
+                setSourceData(pieData);
+
+            } catch (err) {
+                console.error("Failed to fetch earnings:", err);
+            } finally {
+                setIsLoadingStats(false);
+            }
+        };
+
+        fetchEarnings();
+    }, [currentUser]);
 
     // If still pending admin approval
     if (currentUser?.accountStatus === 'pending') {
@@ -53,7 +189,38 @@ const CreatorDashboard = () => {
     }
 
     return (
-        <div className="min-h-screen bg-dark-900 text-white p-4 md:p-8">
+        <div className="min-h-screen bg-dark-900 text-white p-4 md:p-8 relative">
+            
+            {/* INCOMING CALL MODAL */}
+            {incomingCallData && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md">
+                    <div className="bg-dark-800 border border-white/10 p-8 rounded-3xl max-w-sm w-full text-center shadow-2xl animate-pulse">
+                        <img 
+                            src={incomingCallData.callerData?.photoURL || `https://ui-avatars.com/api/?name=${incomingCallData.callerData?.name || 'User'}`} 
+                            alt="Caller" 
+                            className="w-24 h-24 rounded-full mx-auto mb-4 border-4 border-accent-pink shadow-[0_0_20px_#ec4899]"
+                        />
+                        <h2 className="text-2xl font-bold mb-1">{incomingCallData.callerData?.name || 'Stranger'}</h2>
+                        <p className="text-gray-400 mb-8 animate-pulse">is calling you for private chat...</p>
+                        
+                        <div className="flex justify-center gap-6">
+                            <button 
+                                onClick={handleDeclineCall}
+                                className="w-16 h-16 rounded-full bg-red-500 flex flex-col items-center justify-center hover:bg-red-600 transition-transform hover:scale-110 shadow-lg shadow-red-500/20"
+                            >
+                                <span className="text-2xl">❌</span>
+                            </button>
+                            <button 
+                                onClick={handleAcceptCall}
+                                className="w-16 h-16 rounded-full bg-green-500 flex flex-col items-center justify-center hover:bg-green-600 transition-transform hover:scale-110 shadow-lg shadow-green-500/20 animate-bounce"
+                            >
+                                <span className="text-2xl">📞</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <div className="max-w-7xl mx-auto space-y-6">
 
                 {/* 1. PROFILE HEADER CARD */}
@@ -115,27 +282,33 @@ const CreatorDashboard = () => {
                     <div className="bg-dark-800 p-6 rounded-3xl border border-white/5 relative overflow-hidden group">
                         <div className="absolute top-0 right-0 p-4 opacity-10 text-4xl group-hover:scale-110 transition-transform">💰</div>
                         <p className="text-gray-400 text-sm font-medium mb-1 relative z-10">Today's Earnings</p>
-                        <h2 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-emerald-500 relative z-10">
-                            ₹{currentUser?.totalEarnings?.toLocaleString() || 0}
+                        <h2 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-500 relative z-10">
+                            {isLoadingStats ? '...' : `🪙 ${earningsData.today.toLocaleString()}`}
                         </h2>
                     </div>
 
                     <div className="bg-dark-800 p-6 rounded-3xl border border-white/5 relative overflow-hidden group">
                         <div className="absolute top-0 right-0 p-4 opacity-10 text-4xl group-hover:scale-110 transition-transform">📅</div>
                         <p className="text-gray-400 text-sm font-medium mb-1 relative z-10">Weekly Earnings</p>
-                        <h2 className="text-3xl font-bold text-white relative z-10">₹0</h2>
+                        <h2 className="text-3xl font-bold text-white relative z-10">
+                            {isLoadingStats ? '...' : `🪙 ${earningsData.weekly.toLocaleString()}`}
+                        </h2>
                     </div>
 
                     <div className="bg-dark-800 p-6 rounded-3xl border border-white/5 relative overflow-hidden group">
                         <div className="absolute top-0 right-0 p-4 opacity-10 text-4xl group-hover:scale-110 transition-transform">📈</div>
                         <p className="text-gray-400 text-sm font-medium mb-1 relative z-10">Monthly Earnings</p>
-                        <h2 className="text-3xl font-bold text-white relative z-10">₹0</h2>
+                        <h2 className="text-3xl font-bold text-white relative z-10">
+                            {isLoadingStats ? '...' : `🪙 ${earningsData.monthly.toLocaleString()}`}
+                        </h2>
                     </div>
 
                     <div className="bg-dark-800 p-6 rounded-3xl border border-white/5 relative overflow-hidden group">
                         <div className="absolute top-0 right-0 p-4 opacity-10 text-4xl group-hover:scale-110 transition-transform">🏆</div>
                         <p className="text-gray-400 text-sm font-medium mb-1 relative z-10">Lifetime Earnings</p>
-                        <h2 className="text-3xl font-bold text-yellow-400 relative z-10">₹{currentUser?.totalEarnings?.toLocaleString() || 0}</h2>
+                        <h2 className="text-3xl font-bold text-yellow-400 relative z-10">
+                            {isLoadingStats ? '...' : `🪙 ${earningsData.lifetime.toLocaleString()}`}
+                        </h2>
                     </div>
                 </div>
 
@@ -144,38 +317,38 @@ const CreatorDashboard = () => {
                     <div className="lg:col-span-2 bg-dark-800 border border-white/5 rounded-3xl p-6">
                         <div className="flex items-center justify-between mb-8">
                             <h3 className="text-lg font-bold">Earnings Last 7 Days</h3>
-                            <select className="bg-dark-900 border border-white/10 rounded-lg px-3 py-1.5 text-sm outline-none text-gray-300">
-                                <option>This Week</option>
-                                <option>Last Week</option>
-                            </select>
                         </div>
                         <div className="h-72 w-full text-xs">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <LineChart data={mockDailyEarnings} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" vertical={false} />
-                                    <XAxis dataKey="name" stroke="#ffffff50" tick={{ fill: '#ffffff50' }} tickLine={false} axisLine={false} />
-                                    <YAxis
-                                        stroke="#ffffff50"
-                                        tick={{ fill: '#ffffff50' }}
-                                        tickLine={false}
-                                        axisLine={false}
-                                        tickFormatter={(value) => `₹${value}`}
-                                    />
-                                    <Tooltip
-                                        contentStyle={{ backgroundColor: '#1a1a1a', border: '1px solid #333', borderRadius: '12px' }}
-                                        itemStyle={{ color: '#fff' }}
-                                        formatter={(value) => [`₹${value}`, 'Earnings']}
-                                    />
-                                    <Line
-                                        type="monotone"
-                                        dataKey="earnings"
-                                        stroke="#8b5cf6"
-                                        strokeWidth={4}
-                                        dot={{ fill: '#8b5cf6', strokeWidth: 2, r: 4 }}
-                                        activeDot={{ r: 6, fill: '#ec4899' }}
-                                    />
-                                </LineChart>
-                            </ResponsiveContainer>
+                            {isLoadingStats ? (
+                                <div className="w-full h-full flex items-center justify-center text-gray-400">Loading chart data...</div>
+                            ) : (
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <LineChart data={chartData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+                                        <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" vertical={false} />
+                                        <XAxis dataKey="name" stroke="#ffffff50" tick={{ fill: '#ffffff50' }} tickLine={false} axisLine={false} />
+                                        <YAxis
+                                            stroke="#ffffff50"
+                                            tick={{ fill: '#ffffff50' }}
+                                            tickLine={false}
+                                            axisLine={false}
+                                            tickFormatter={(value) => `🪙${value}`}
+                                        />
+                                        <Tooltip
+                                            contentStyle={{ backgroundColor: '#1a1a1a', border: '1px solid #333', borderRadius: '12px' }}
+                                            itemStyle={{ color: '#fff' }}
+                                            formatter={(value) => [`🪙${value}`, 'Earnings']}
+                                        />
+                                        <Line
+                                            type="monotone"
+                                            dataKey="earnings"
+                                            stroke="#8b5cf6"
+                                            strokeWidth={4}
+                                            dot={{ fill: '#8b5cf6', strokeWidth: 2, r: 4 }}
+                                            activeDot={{ r: 6, fill: '#ec4899' }}
+                                        />
+                                    </LineChart>
+                                </ResponsiveContainer>
+                            )}
                         </div>
                     </div>
 
@@ -183,34 +356,38 @@ const CreatorDashboard = () => {
                     <div className="bg-dark-800 border border-white/5 rounded-3xl p-6 flex flex-col">
                         <h3 className="text-lg font-bold mb-6">Earnings by Source</h3>
                         <div className="h-56 w-full flex-grow">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <PieChart>
-                                    <Pie
-                                        data={mockSourceData}
-                                        cx="50%"
-                                        cy="50%"
-                                        innerRadius={60}
-                                        outerRadius={80}
-                                        paddingAngle={5}
-                                        dataKey="value"
-                                        stroke="none"
-                                    >
-                                        {mockSourceData.map((entry, index) => (
-                                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                                        ))}
-                                    </Pie>
-                                    <Tooltip
-                                        contentStyle={{ backgroundColor: '#1a1a1a', border: 'none', borderRadius: '12px', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.5)' }}
-                                        formatter={(value) => `₹${value}`}
-                                    />
-                                    <Legend
-                                        verticalAlign="bottom"
-                                        height={36}
-                                        iconType="circle"
-                                        formatter={(value, entry, index) => <span className="text-gray-400 text-xs ml-1">{value}</span>}
-                                    />
-                                </PieChart>
-                            </ResponsiveContainer>
+                            {isLoadingStats ? (
+                                <div className="w-full h-full flex items-center justify-center text-gray-400">Loading sources...</div>
+                            ) : (
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <PieChart>
+                                        <Pie
+                                            data={sourceData}
+                                            cx="50%"
+                                            cy="50%"
+                                            innerRadius={60}
+                                            outerRadius={80}
+                                            paddingAngle={5}
+                                            dataKey="value"
+                                            stroke="none"
+                                        >
+                                            {sourceData.map((entry, index) => (
+                                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                            ))}
+                                        </Pie>
+                                        <Tooltip
+                                            contentStyle={{ backgroundColor: '#1a1a1a', border: 'none', borderRadius: '12px', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.5)' }}
+                                            formatter={(value) => `🪙${value}`}
+                                        />
+                                        <Legend
+                                            verticalAlign="bottom"
+                                            height={36}
+                                            iconType="circle"
+                                            formatter={(value, entry, index) => <span className="text-gray-400 text-xs ml-1">{value}</span>}
+                                        />
+                                    </PieChart>
+                                </ResponsiveContainer>
+                            )}
                         </div>
                     </div>
                 </div>

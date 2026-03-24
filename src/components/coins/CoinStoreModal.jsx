@@ -3,96 +3,311 @@ import { useCoins } from '../../context/CoinsContext';
 import { useAuth } from '../../context/AuthContext';
 import toast from 'react-hot-toast';
 
+const PACKAGES = [
+    { id: 'pkg_100', coins: 100, price: 99, label: 'Starter', discount: null, icon: '🪙' },
+    { id: 'pkg_500', coins: 500, price: 449, label: 'Popular', discount: '10% OFF', icon: '💰', popular: true },
+    { id: 'pkg_1000', coins: 1000, price: 799, label: 'Best Value', discount: '20% OFF', icon: '💎' },
+    { id: 'pkg_5000', coins: 5000, price: 3499, label: 'Pro', discount: '30% OFF', icon: '👑' },
+];
+
+const formatCard = (val) => {
+    const digits = val.replace(/\D/g, '').slice(0, 16);
+    return digits.replace(/(.{4})/g, '$1 ').trim();
+};
+
+const formatExpiry = (val) => {
+    const digits = val.replace(/\D/g, '').slice(0, 4);
+    if (digits.length >= 3) return digits.slice(0, 2) + '/' + digits.slice(2);
+    return digits;
+};
+
 const CoinStoreModal = ({ isOpen, onClose }) => {
-    const { purchaseCoins } = useCoins();
+    const { addCoins } = useCoins();
     const { currentUser } = useAuth();
-    const [loading, setLoading] = useState(false);
+    const [step, setStep] = useState('packages'); // 'packages' | 'payment' | 'success'
+    const [selectedPkg, setSelectedPkg] = useState(null);
+    const [processing, setProcessing] = useState(false);
+
+    // Payment form state
+    const [cardName, setCardName] = useState('');
+    const [cardNumber, setCardNumber] = useState('');
+    const [expiry, setExpiry] = useState('');
+    const [cvv, setCvv] = useState('');
+    const [formError, setFormError] = useState('');
 
     if (!isOpen) return null;
 
-    const packages = [
-        { id: 'pkg_100', coins: 100, price: 99, discount: '0%' },
-        { id: 'pkg_500', coins: 500, price: 449, discount: '10%' },
-        { id: 'pkg_1000', coins: 1000, price: 799, discount: '20%', popular: true },
-        { id: 'pkg_5000', coins: 5000, price: 3499, discount: '30%' },
-    ];
+    const handleSelectPackage = (pkg) => {
+        setSelectedPkg(pkg);
+        setStep('payment');
+        setFormError('');
+    };
 
-    const handlePurchase = async (pkg) => {
-        setLoading(true);
-        const success = await purchaseCoins(pkg.id);
-        setLoading(false);
+    const validateForm = () => {
+        if (!cardName.trim()) return 'Please enter your name on card.';
+        if (cardNumber.replace(/\s/g, '').length < 16) return 'Please enter a valid 16-digit card number.';
+        const [mm, yy] = expiry.split('/');
+        if (!mm || !yy || parseInt(mm) < 1 || parseInt(mm) > 12) return 'Please enter a valid expiry (MM/YY).';
+        if (cvv.length < 3) return 'Please enter a valid CVV.';
+        return null;
+    };
+
+    const handlePay = async () => {
+        const err = validateForm();
+        if (err) { setFormError(err); return; }
+
+        setFormError('');
+        setProcessing(true);
+
+        // Simulate payment gateway delay
+        await new Promise(r => setTimeout(r, 2200));
+
+        const success = await addCoins(selectedPkg.coins, `Purchased ${selectedPkg.coins} Coins`);
+        setProcessing(false);
 
         if (success) {
-            toast.success(`Purchased ${pkg.coins} Coins!`);
-            onClose();
+            setStep('success');
         } else {
-            toast.error('Purchase failed. Please try again.');
+            toast.error('Payment failed. Please try again.');
         }
+    };
+
+    const handleClose = () => {
+        setStep('packages');
+        setSelectedPkg(null);
+        setCardName('');
+        setCardNumber('');
+        setExpiry('');
+        setCvv('');
+        setFormError('');
+        setProcessing(false);
+        onClose();
     };
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-            <div className="bg-dark-900 border border-white/10 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl animate-fade-in-up relative">
+            <div className="relative w-full max-w-md animate-fade-in-up" style={{ filter: 'drop-shadow(0 25px 60px rgba(0,0,0,0.5))' }}>
 
                 {/* Close Button */}
                 <button
-                    onClick={onClose}
-                    className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors"
+                    onClick={handleClose}
+                    className="absolute -top-3 -right-3 z-20 w-9 h-9 bg-red-500 hover:bg-red-600 text-white rounded-xl flex items-center justify-center font-black text-base transition-colors shadow-lg"
                 >
                     ✕
                 </button>
 
-                <div className="p-6 text-center">
-                    <div className="w-16 h-16 bg-yellow-500/20 rounded-full flex items-center justify-center mx-auto mb-4 animate-bounce-slow">
-                        <span className="text-4xl filter drop-shadow-lg">💰</span>
+                {/* ===== STEP 1: PACKAGE SELECT ===== */}
+                {step === 'packages' && (
+                    <div className="rounded-3xl overflow-hidden" style={{ background: 'linear-gradient(160deg, #1a1830 0%, #0f0d1e 100%)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                        {/* Header */}
+                        <div className="px-6 pt-8 pb-5 text-center"
+                            style={{ background: 'linear-gradient(160deg, rgba(139,92,246,0.3) 0%, transparent 100%)' }}>
+                            <div className="w-16 h-16 rounded-2xl mx-auto mb-4 flex items-center justify-center text-4xl"
+                                style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)', boxShadow: '0 8px 24px rgba(245,158,11,0.35)' }}>
+                                💰
+                            </div>
+                            <h2 className="text-2xl font-black text-white">Get Coins</h2>
+                            <p className="text-white/50 text-sm mt-1">Use coins for filters, gifts & more!</p>
+                        </div>
+
+                        {/* Packages */}
+                        <div className="px-5 pb-6 space-y-3">
+                            {PACKAGES.map(pkg => (
+                                <button
+                                    key={pkg.id}
+                                    onClick={() => handleSelectPackage(pkg)}
+                                    className="w-full group relative flex items-center justify-between p-4 rounded-2xl border transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
+                                    style={{
+                                        background: pkg.popular
+                                            ? 'linear-gradient(135deg, rgba(139,92,246,0.25), rgba(109,40,217,0.15))'
+                                            : 'rgba(255,255,255,0.04)',
+                                        borderColor: pkg.popular ? 'rgba(139,92,246,0.6)' : 'rgba(255,255,255,0.08)'
+                                    }}
+                                >
+                                    {pkg.popular && (
+                                        <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 text-[10px] font-black px-3 py-0.5 rounded-full"
+                                            style={{ background: 'linear-gradient(90deg, #7c3aed, #a855f7)', color: '#fff' }}>
+                                            ⭐ MOST POPULAR
+                                        </span>
+                                    )}
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl flex-shrink-0"
+                                            style={{ background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.2)' }}>
+                                            {pkg.icon}
+                                        </div>
+                                        <div className="text-left">
+                                            <div className="text-white font-black text-lg leading-none">{pkg.coins.toLocaleString()} Coins</div>
+                                            <div className="text-xs mt-1 font-semibold">
+                                                {pkg.discount
+                                                    ? <span className="text-green-400">{pkg.discount}</span>
+                                                    : <span className="text-white/40">{pkg.label}</span>
+                                                }
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="text-right">
+                                        <div className="bg-white text-gray-900 font-black px-4 py-2 rounded-xl text-sm group-hover:bg-yellow-400 transition-colors">
+                                            ₹{pkg.price}
+                                        </div>
+                                    </div>
+                                </button>
+                            ))}
+                        </div>
+
+                        <div className="px-5 pb-5 text-center">
+                            <p className="text-white/25 text-xs">🔒 Secure • Instant Delivery • No Real Payment</p>
+                        </div>
                     </div>
+                )}
 
-                    <h2 className="text-2xl font-bold text-white mb-2">Get More Coins</h2>
-                    <p className="text-gray-400 text-sm mb-6">Use coins for gifts, skips, and premium filters!</p>
-
-                    <div className="space-y-3">
-                        {packages.map((pkg) => (
+                {/* ===== STEP 2: PAYMENT FORM ===== */}
+                {step === 'payment' && (
+                    <div className="rounded-3xl overflow-hidden" style={{ background: 'linear-gradient(160deg, #1a1830 0%, #0f0d1e 100%)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                        {/* Header */}
+                        <div className="px-6 pt-7 pb-5" style={{ background: 'linear-gradient(160deg, rgba(139,92,246,0.2) 0%, transparent 100%)' }}>
                             <button
-                                key={pkg.id}
-                                onClick={() => handlePurchase(pkg)}
-                                disabled={loading}
-                                className={`w-full group relative flex items-center justify-between p-4 rounded-xl border transition-all duration-200
-                  ${pkg.popular
-                                        ? 'bg-accent-purple/10 border-accent-purple hover:bg-accent-purple/20'
-                                        : 'bg-white/5 border-white/10 hover:bg-white/10'
-                                    } ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                onClick={() => setStep('packages')}
+                                className="flex items-center gap-2 text-white/50 hover:text-white text-sm font-semibold mb-4 transition-colors"
                             >
-                                {pkg.popular && (
-                                    <span className="absolute -top-2 left-1/2 -translate-x-1/2 bg-accent-purple text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-lg">
-                                        MOST POPULAR
-                                    </span>
-                                )}
-
-                                <div className="flex items-center gap-3">
-                                    <div className="bg-yellow-500/10 p-2 rounded-full">
-                                        <span className="text-xl">🪙</span>
-                                    </div>
-                                    <div className="text-left">
-                                        <div className="font-bold text-white text-lg">{pkg.coins.toLocaleString()}</div>
-                                        <div className="text-xs text-green-400 font-medium">{pkg.discount !== '0%' ? `Save ${pkg.discount}` : 'Starter Pack'}</div>
-                                    </div>
-                                </div>
-
-                                <div className="bg-white text-dark-900 font-bold px-4 py-1.5 rounded-full text-sm group-hover:scale-105 transition-transform">
-                                    ₹{pkg.price}
-                                </div>
+                                ← Back
                             </button>
-                        ))}
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <h2 className="text-xl font-black text-white">Payment</h2>
+                                    <p className="text-white/40 text-sm">Secure checkout</p>
+                                </div>
+                                <div className="text-right">
+                                    <div className="text-yellow-400 font-black text-lg">{selectedPkg?.coins.toLocaleString()} 🪙</div>
+                                    <div className="text-white/60 text-sm">₹{selectedPkg?.price}</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Card Visual */}
+                        <div className="mx-5 mb-5 rounded-2xl p-5 relative overflow-hidden"
+                            style={{ background: 'linear-gradient(135deg, #6d28d9 0%, #4c1d95 50%, #1e40af 100%)', boxShadow: '0 12px 32px rgba(109,40,217,0.4)' }}>
+                            <div className="absolute top-0 right-0 w-32 h-32 rounded-full opacity-20"
+                                style={{ background: 'radial-gradient(circle, white, transparent)', transform: 'translate(30%, -30%)' }} />
+                            <div className="text-white/60 text-xs font-bold uppercase tracking-widest mb-6">Credit / Debit Card</div>
+                            <div className="text-white font-mono text-lg font-bold tracking-widest mb-4">
+                                {cardNumber || '•••• •••• •••• ••••'}
+                            </div>
+                            <div className="flex items-end justify-between">
+                                <div>
+                                    <div className="text-white/50 text-[10px] uppercase tracking-widest">Card Holder</div>
+                                    <div className="text-white font-semibold text-sm">{cardName || 'YOUR NAME'}</div>
+                                </div>
+                                <div>
+                                    <div className="text-white/50 text-[10px] uppercase tracking-widest">Expires</div>
+                                    <div className="text-white font-semibold text-sm">{expiry || 'MM/YY'}</div>
+                                </div>
+                                <div className="text-2xl">💳</div>
+                            </div>
+                        </div>
+
+                        {/* Form */}
+                        <div className="px-5 pb-5 space-y-3">
+                            <div>
+                                <label className="text-white/50 text-xs font-bold uppercase tracking-widest block mb-1.5">Name on Card</label>
+                                <input
+                                    type="text"
+                                    value={cardName}
+                                    onChange={e => setCardName(e.target.value)}
+                                    placeholder="John Doe"
+                                    className="w-full rounded-xl px-4 py-3 text-sm font-semibold text-white outline-none transition-all"
+                                    style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)' }}
+                                />
+                            </div>
+                            <div>
+                                <label className="text-white/50 text-xs font-bold uppercase tracking-widest block mb-1.5">Card Number</label>
+                                <input
+                                    type="text"
+                                    value={cardNumber}
+                                    onChange={e => setCardNumber(formatCard(e.target.value))}
+                                    placeholder="1234 5678 9012 3456"
+                                    className="w-full rounded-xl px-4 py-3 text-sm font-mono font-semibold text-white outline-none transition-all"
+                                    style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)' }}
+                                />
+                            </div>
+                            <div className="flex gap-3">
+                                <div className="flex-1">
+                                    <label className="text-white/50 text-xs font-bold uppercase tracking-widest block mb-1.5">Expiry</label>
+                                    <input
+                                        type="text"
+                                        value={expiry}
+                                        onChange={e => setExpiry(formatExpiry(e.target.value))}
+                                        placeholder="MM/YY"
+                                        className="w-full rounded-xl px-4 py-3 text-sm font-mono font-semibold text-white outline-none"
+                                        style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)' }}
+                                    />
+                                </div>
+                                <div className="flex-1">
+                                    <label className="text-white/50 text-xs font-bold uppercase tracking-widest block mb-1.5">CVV</label>
+                                    <input
+                                        type="password"
+                                        value={cvv}
+                                        onChange={e => setCvv(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                                        placeholder="•••"
+                                        className="w-full rounded-xl px-4 py-3 text-sm font-mono font-semibold text-white outline-none"
+                                        style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)' }}
+                                    />
+                                </div>
+                            </div>
+
+                            {formError && (
+                                <div className="text-red-400 text-xs font-semibold bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-2.5">
+                                    ⚠️ {formError}
+                                </div>
+                            )}
+
+                            <button
+                                onClick={handlePay}
+                                disabled={processing}
+                                className="w-full py-4 rounded-2xl font-black text-base tracking-wide transition-all active:scale-95 disabled:opacity-80 flex items-center justify-center gap-3"
+                                style={{
+                                    background: processing ? 'rgba(139,92,246,0.5)' : 'linear-gradient(135deg, #7c3aed, #a855f7)',
+                                    boxShadow: processing ? 'none' : '0 8px 24px rgba(139,92,246,0.4)',
+                                    color: 'white'
+                                }}
+                            >
+                                {processing ? (
+                                    <>
+                                        <svg className="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                                        </svg>
+                                        Processing Payment...
+                                    </>
+                                ) : (
+                                    <>🔒 Pay ₹{selectedPkg?.price}</>
+                                )}
+                            </button>
+
+                            <p className="text-center text-white/25 text-xs">🛡️ Demo mode — no real charges</p>
+                        </div>
                     </div>
-                </div>
+                )}
 
-                <div className="bg-white/5 p-4 text-center border-t border-white/5">
-                    <p className="text-xs text-gray-500">
-                        Secure processing by Stripe/Razorpay. <br />
-                        By purchasing, you agree to our Terms & Conditions.
-                    </p>
-                </div>
-
+                {/* ===== STEP 3: SUCCESS ===== */}
+                {step === 'success' && (
+                    <div className="rounded-3xl overflow-hidden text-center py-12 px-8"
+                        style={{ background: 'linear-gradient(160deg, #064e3b 0%, #0f0d1e 100%)', border: '1px solid rgba(52,211,153,0.25)' }}>
+                        <div className="w-20 h-20 rounded-full mx-auto mb-5 flex items-center justify-center text-5xl animate-bounce"
+                            style={{ background: 'rgba(52,211,153,0.15)', border: '2px solid rgba(52,211,153,0.4)' }}>
+                            🎉
+                        </div>
+                        <h2 className="text-2xl font-black text-white mb-2">Payment Successful!</h2>
+                        <p className="text-green-300 font-semibold text-lg mb-1">+{selectedPkg?.coins.toLocaleString()} Coins Added!</p>
+                        <p className="text-white/40 text-sm mb-8">Your wallet has been updated</p>
+                        <button
+                            onClick={handleClose}
+                            className="px-10 py-3.5 rounded-2xl font-black text-sm tracking-widest transition-all hover:scale-105 active:scale-95"
+                            style={{ background: 'linear-gradient(135deg, #10b981, #059669)', boxShadow: '0 8px 24px rgba(16,185,129,0.35)', color: 'white' }}
+                        >
+                            AWESOME! ✨
+                        </button>
+                    </div>
+                )}
             </div>
         </div>
     );

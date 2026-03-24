@@ -6,7 +6,8 @@ import { supabase } from '../../supabase';
 import {
     LayoutDashboard, Users as UsersIcon, MessageSquare, ShieldAlert,
     CreditCard, BarChart3, Palette, Settings,
-    Lock, Bell, LifeBuoy, Menu, X, ChevronRight, LogOut, Coins
+    Lock, Bell, LifeBuoy, Menu, X, ChevronRight, LogOut, Coins, ShieldCheck,
+    FileText, Zap, Globe, ClipboardList, Receipt
 } from 'lucide-react';
 
 // Real Section Imports
@@ -14,6 +15,7 @@ import Dashboard from './sections/Dashboard';
 import Reports from './sections/Reports';
 import Users from './sections/Users';
 import Verifications from './sections/Verifications';
+import FemaleVerifications from './sections/FemaleVerifications';
 import Creators from './sections/Creators';
 import Chats from './sections/Chats';
 import Revenue from './sections/Revenue';
@@ -21,6 +23,11 @@ import Content from './sections/Content';
 import SystemSettings from './sections/Settings';
 import SubscriptionPlansAdmin from './sections/SubscriptionPlansAdmin';
 import CoinRewards from './sections/CoinRewards';
+import SessionLogs from './sections/SessionLogs';
+import StrikeSystem from './sections/StrikeSystem';
+import GeoBlocking from './sections/GeoBlocking';
+import AdminActionLog from './sections/AdminActionLog';
+import Transactions from './sections/Transactions';
 
 import Analytics from './sections/Analytics';
 import AdminUsers from './sections/AdminUsers';
@@ -42,41 +49,117 @@ const AdminLayout = () => {
     }, []);
 
     const fetchNotifications = async () => {
-        const { data } = await supabase
-            .from('notifications')
-            .select('*')
-            .order('created_at', { ascending: false })
-            .limit(5);
-        if (data) {
-            setNotifications(data);
-            setUnreadCount(data.filter(n => !n.is_read).length);
+        try {
+            const lastSeen = localStorage.getItem('admin_notif_last_seen');
+            const lastSeenDate = lastSeen ? new Date(lastSeen) : new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+            const [usersRes, txsRes, reportsRes, verRes] = await Promise.all([
+                supabase.from('profiles').select('id, username, email, gender, created_at').order('created_at', { ascending: false }).limit(5),
+                supabase.from('transactions').select('id, amount, type, created_at, user:profiles(username)').eq('status', 'success').order('created_at', { ascending: false }).limit(5),
+                supabase.from('reports').select('id, reason, created_at, reporter:profiles!reports_reporter_id_fkey(username), reported:profiles!reports_reported_user_id_fkey(username)').order('created_at', { ascending: false }).limit(5),
+                supabase.from('verifications').select('id, status, created_at, user_id, profiles!verifications_user_id_fkey(username, email, gender)').order('created_at', { ascending: false }).limit(5),
+            ]);
+
+            let merged = [];
+
+            if (usersRes.data) merged = [...merged, ...usersRes.data.map(u => ({
+                id: `usr-${u.id}`, type: 'user',
+                message: `New user: ${u.username || u.email || 'Unknown'}${u.gender === 'Female' ? ' 👩 (Female)' : ''}`,
+                created_at: u.created_at, is_read: new Date(u.created_at) <= lastSeenDate
+            }))];
+
+            if (txsRes.data) merged = [...merged, ...txsRes.data.map(t => ({
+                id: `tx-${t.id}`, type: 'revenue',
+                message: `${t.user?.username || 'Guest'} — ₹${t.amount} ${t.type}`,
+                created_at: t.created_at, is_read: new Date(t.created_at) <= lastSeenDate
+            }))];
+
+            if (reportsRes.data) merged = [...merged, ...reportsRes.data.map(r => ({
+                id: `rpt-${r.id}`, type: 'report',
+                message: `Report: ${r.reporter?.username || 'Someone'} reported a user — ${r.reason}`,
+                created_at: r.created_at, is_read: new Date(r.created_at) <= lastSeenDate
+            }))];
+
+            if (verRes.data) merged = [...merged, ...verRes.data
+                .filter(v => v.profiles?.gender === 'Female' || v.profiles?.gender === 'female')
+                .map(v => ({
+                    id: `ver-${v.id}`, type: 'verification',
+                    message: `Female verification ${v.status}: ${v.profiles?.username || v.profiles?.email || 'Unknown'}`,
+                    created_at: v.created_at, is_read: new Date(v.created_at) <= lastSeenDate
+                }))];
+
+            merged.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+            const top5 = merged.slice(0, 5);
+            setNotifications(top5);
+            setUnreadCount(top5.filter(n => !n.is_read).length);
+        } catch (e) {
+            console.error('Failed to fetch header notifications:', e);
         }
     };
 
-
-    const allMenuItems = [
-        { name: 'Dashboard', path: '/admin', id: 'dashboard', icon: <LayoutDashboard size={18} /> },
-        { name: 'Users', path: '/admin/users', id: 'users', icon: <UsersIcon size={18} /> },
-        { name: 'Chat Monitoring', path: '/admin/chats', id: 'chats', icon: <MessageSquare size={18} /> },
-        { name: 'Reports', path: '/admin/reports', id: 'reports', icon: <ShieldAlert size={18} /> },
-        { name: 'Revenue', path: '/admin/revenue', id: 'revenue', icon: <CreditCard size={18} /> },
-        { name: 'Analytics', path: '/admin/analytics', id: 'revenue', icon: <BarChart3 size={18} /> },
-        { name: 'Content', path: '/admin/content', id: 'content', icon: <Palette size={18} /> },
-        { name: 'Plans', path: '/admin/plans', id: 'revenue', icon: <CreditCard size={18} /> },
-        { name: 'Coin Rewards', path: '/admin/coin-rewards', id: 'revenue', icon: <Coins size={18} /> },
-        { name: 'Settings', path: '/admin/settings', id: 'settings', icon: <Settings size={18} /> },
-        { name: 'Admins', path: '/admin/roles', id: 'settings', icon: <Lock size={18} /> },
-        { name: 'Notifications', path: '/admin/alerts', id: 'reports', icon: <Bell size={18} /> },
-        { name: 'Support', path: '/admin/support', id: 'reports', icon: <LifeBuoy size={18} /> },
+    const menuSections = [
+        {
+            title: 'Overview',
+            items: [
+                { name: 'Dashboard', path: '/admin', id: 'dashboard', icon: <LayoutDashboard size={18} /> },
+                { name: 'Analytics', path: '/admin/analytics', id: 'revenue', icon: <BarChart3 size={18} /> },
+            ]
+        },
+        {
+            title: 'User Management',
+            items: [
+                { name: 'Users', path: '/admin/users', id: 'users', icon: <UsersIcon size={18} /> },
+                { name: 'Female Verifications', path: '/admin/female-verifications', id: 'users', icon: <ShieldCheck size={18} /> },
+                { name: 'Creators', path: '/admin/creators', id: 'users', icon: <ShieldCheck size={18} /> },
+            ]
+        },
+        {
+            title: 'Moderation & Safety',
+            items: [
+                { name: 'Chat Monitoring', path: '/admin/chats', id: 'chats', icon: <MessageSquare size={18} /> },
+                { name: 'Reports', path: '/admin/reports', id: 'reports', icon: <ShieldAlert size={18} /> },
+                { name: 'Session Logs', path: '/admin/session-logs', id: 'reports', icon: <FileText size={18} /> },
+                { name: 'Strike System', path: '/admin/strikes', id: 'reports', icon: <Zap size={18} /> },
+            ]
+        },
+        {
+            title: 'Economy & Billing',
+            items: [
+                { name: 'Revenue', path: '/admin/revenue', id: 'revenue', icon: <CreditCard size={18} /> },
+                { name: 'Plans', path: '/admin/plans', id: 'revenue', icon: <CreditCard size={18} /> },
+                { name: 'Coin Rewards', path: '/admin/coin-rewards', id: 'revenue', icon: <Coins size={18} /> },
+                { name: 'Coin Transactions', path: '/admin/transactions', id: 'revenue', icon: <Receipt size={18} /> },
+            ]
+        },
+        {
+            title: 'Platform System',
+            items: [
+                { name: 'Content', path: '/admin/content', id: 'content', icon: <Palette size={18} /> },
+                { name: 'Settings', path: '/admin/settings', id: 'settings', icon: <Settings size={18} /> },
+                { name: 'Admins', path: '/admin/roles', id: 'settings', icon: <Lock size={18} /> },
+                { name: 'Geo Blocking', path: '/admin/geo-blocking', id: 'settings', icon: <Globe size={18} /> },
+                { name: 'Action Log', path: '/admin/action-log', id: 'settings', icon: <ClipboardList size={18} /> },
+            ]
+        },
+        {
+            title: 'Support & Alerts',
+            items: [
+                { name: 'Notifications', path: '/admin/alerts', id: 'reports', icon: <Bell size={18} /> },
+                { name: 'Support', path: '/admin/support', id: 'reports', icon: <LifeBuoy size={18} /> },
+            ]
+        }
     ];
 
-    const menuItems = adminRole === 'admin' 
-        ? allMenuItems 
-        : allMenuItems.filter(item => {
-            if (item.id === 'dashboard') return true; // Always show dashboard
-            if (adminPermissions) return adminPermissions[item.id];
-            return false;
-        });
+    const filteredSections = menuSections.map(section => ({
+        ...section,
+        items: adminRole === 'admin' 
+            ? section.items 
+            : section.items.filter(item => {
+                if (item.id === 'dashboard') return true;
+                if (adminPermissions) return adminPermissions[item.id];
+                return false;
+            })
+    })).filter(section => section.items.length > 0);
 
     return (
         <div className="flex h-screen bg-[#F1F5F9] text-[#1E293B] font-sans overflow-hidden">
@@ -94,26 +177,37 @@ const AdminLayout = () => {
                     )}
                 </div>
 
-                <nav className="flex-1 px-3 py-6 space-y-1 overflow-y-auto custom-scrollbar uppercase italic-none">
-                    {menuItems.map((item) => {
-                        const isActive = location.pathname === item.path || (item.path === '/admin' && (location.pathname === '/admin/' || location.pathname === '/admin'));
-                        return (
-                            <Link
-                                key={item.path}
-                                to={item.path}
-                                className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all group ${isActive
-                                    ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20'
-                                    : 'text-slate-400 hover:text-white hover:bg-slate-800'
-                                    }`}
-                            >
-                                <span className={`${isActive ? 'text-white' : 'text-slate-500 group-hover:text-indigo-400'}`}>
-                                    {item.icon}
-                                </span>
-                                {isSidebarOpen && <span className="text-[11px] tracking-widest">{item.name}</span>}
-                                {isSidebarOpen && isActive && <ChevronRight size={14} className="ml-auto opacity-50" />}
-                            </Link>
-                        );
-                    })}
+                <nav className="flex-1 px-3 py-6 space-y-8 overflow-y-auto custom-scrollbar uppercase italic-none">
+                    {filteredSections.map((section) => (
+                        <div key={section.title}>
+                            {isSidebarOpen && (
+                                <div className="px-4 mb-3 text-[10px] font-black text-indigo-400 uppercase tracking-[2px] opacity-70">
+                                    {section.title}
+                                </div>
+                            )}
+                            <div className="space-y-1">
+                                {section.items.map((item) => {
+                                    const isActive = location.pathname === item.path || (item.path === '/admin' && (location.pathname === '/admin/' || location.pathname === '/admin'));
+                                    return (
+                                        <Link
+                                            key={item.path}
+                                            to={item.path}
+                                            className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all group ${isActive
+                                                ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20'
+                                                : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                                                }`}
+                                        >
+                                            <span className={`${isActive ? 'text-white' : 'text-slate-500 group-hover:text-indigo-400'}`}>
+                                                {item.icon}
+                                            </span>
+                                            {isSidebarOpen && <span className="text-[11px] tracking-widest">{item.name}</span>}
+                                            {isSidebarOpen && isActive && <ChevronRight size={14} className="ml-auto opacity-50" />}
+                                        </Link>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    ))}
                 </nav>
 
                 <div className="p-4 mt-auto border-t border-white/5 bg-slate-900/50">
@@ -156,7 +250,8 @@ const AdminLayout = () => {
                         <div className="h-6 w-[1px] bg-slate-200"></div>
                         <div>
                             <h2 className="font-black text-slate-800 text-lg tracking-tight uppercase">
-                                {menuItems.find(m => m.path === location.pathname)?.name || 'Dashboard'}
+                                {filteredSections.flatMap(s => s.items).find(m => m.path === location.pathname)?.name || 
+                                 (location.pathname === '/admin' ? 'Dashboard' : '')}
                             </h2>
                         </div>
                     </div>
@@ -164,7 +259,14 @@ const AdminLayout = () => {
                     <div className="flex items-center gap-4">
                         <div className="relative mr-4">
                             <button
-                                onClick={() => setShowNotifications(!showNotifications)}
+                                onClick={() => {
+                                    setShowNotifications(!showNotifications);
+                                    if (!showNotifications) {
+                                        // Mark as seen when opening
+                                        localStorage.setItem('admin_notif_last_seen', new Date().toISOString());
+                                        setUnreadCount(0);
+                                    }
+                                }}
                                 className="relative p-2 hover:bg-slate-100 rounded-xl transition-colors"
                             >
                                 <Bell size={20} className="text-slate-400 hover:text-indigo-600 transition-colors" />
@@ -209,7 +311,7 @@ const AdminLayout = () => {
                     </div>
                 </header>
 
-                <div className="flex-1 overflow-y-auto bg-[#F8FAFC]">
+                <div className="flex-1 overflow-y-auto bg-[#F8FAFC] custom-scrollbar">
                     <Routes>
                         <Route index element={<Dashboard />} />
                         <Route path="users" element={<Users />} />
@@ -220,6 +322,7 @@ const AdminLayout = () => {
                         <Route path="content" element={<Content />} />
                         <Route path="plans" element={<SubscriptionPlansAdmin />} />
                         <Route path="coin-rewards" element={<CoinRewards />} />
+                        <Route path="transactions" element={<Transactions />} />
                         <Route path="settings" element={<SystemSettings />} />
                         <Route path="roles" element={<AdminUsers />} />
                         <Route path="alerts" element={<Notifications />} />
@@ -227,7 +330,14 @@ const AdminLayout = () => {
 
                         {/* Verifications & Creators */}
                         <Route path="verifications" element={<Verifications />} />
+                        <Route path="female-verifications" element={<FemaleVerifications />} />
                         <Route path="creators" element={<Creators />} />
+
+                        {/* Security Features */}
+                        <Route path="session-logs" element={<SessionLogs />} />
+                        <Route path="strikes" element={<StrikeSystem />} />
+                        <Route path="geo-blocking" element={<GeoBlocking />} />
+                        <Route path="action-log" element={<AdminActionLog />} />
                     </Routes>
                 </div>
             </main>

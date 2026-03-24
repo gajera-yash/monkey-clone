@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import socket from '../utils/socket';
 import PermissionModal from './PermissionModal';
 import ReportModal from './safety/ReportModal';
@@ -17,6 +18,10 @@ import DesktopSubscriptionModal from './desktop/modals/DesktopSubscriptionModal'
 import DesktopSearchModal from './desktop/modals/DesktopSearchModal';
 import DesktopSafetyModal from './desktop/modals/DesktopSafetyModal';
 import DesktopMatchPreferenceModal from './desktop/modals/DesktopMatchPreferenceModal';
+import { RiMagicLine, RiChat3Line, RiFlagLine, RiHeartLine, RiEmotionHappyLine, RiGiftLine, RiArrowRightDoubleLine, RiMicFill, RiMicOffLine, RiVidiconFill, RiVideoOffLine, RiCloseLine, RiMenuLine, RiUserLine, RiSendPlaneLine } from 'react-icons/ri';
+import CoinStoreModal from './coins/CoinStoreModal';
+import SafetyInfoModal from './safety/SafetyInfoModal';
+import { loadNsfwModel, checkVideoForNsfw } from '../utils/nsfwDetector';
 
 const RTC_CONFIG = {
   iceServers: [
@@ -26,8 +31,16 @@ const RTC_CONFIG = {
 };
 
 const VideoChat = ({ onEndChat }) => {
-  const { currentUser, blockedUsers, reportUser, userLocation, saveMatchToHistory, logCreatorEarnings } = useAuth();
-  const { spendCoins } = useCoins();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const searchParams = new URLSearchParams(location.search);
+  const directCallTarget = searchParams.get('directCall');
+  const directCallName = searchParams.get('name');
+  
+  const incomingDirectCall = location.state?.incomingDirectCall;
+
+  const { currentUser, blockedUsers, reportUser, userLocation, saveMatchToHistory, startChatLog, updateChatLog } = useAuth();
+  const { spendCoins, addCoins, coins, filterCosts, openCoinStore, openDailyBonus, creatorMonetizationSettings } = useCoins();
   const { isPremium } = usePremium();
 
   const localVideoRef = useRef(null);
@@ -42,6 +55,11 @@ const VideoChat = ({ onEndChat }) => {
   const scrollRef = useRef(null);
   const typingTimeoutRef = useRef(null);
   const notificationSound = useRef(new Audio('https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3'));
+  const pendingFilterCharge = useRef(null);
+  const activeLogId = useRef(null);
+  const randomRewardAdded = useRef(false);
+  const lastMinuteHandled = useRef(-1); // To handle per-minute billing once per minute
+  const streamRef = useRef(null);
 
   const [stream, setStream] = useState(null);
   const [remoteStream, setRemoteStream] = useState(null);
@@ -71,14 +89,73 @@ const VideoChat = ({ onEndChat }) => {
   const [showPreferencesModal, setShowPreferencesModal] = useState(false);
   const [showConnectedUsers, setShowConnectedUsers] = useState(false);
   const [showStickerPicker, setShowStickerPicker] = useState(false);
+  const [showCoinStore, setShowCoinStore] = useState(false);
+  const [showSafetyInfo, setShowSafetyInfo] = useState(false);
+  const [waitingCount, setWaitingCount] = useState(0);
 
   // Location States
   const [partnerLocation, setPartnerLocation] = useState(null);
+  const [partnerGender, setPartnerGender] = useState(null);
+  const [partnerAge, setPartnerAge] = useState(null);
   const [showCityName, setShowCityName] = useState(true);
   const [partnerIsPremium, setPartnerIsPremium] = useState(false);
 
   // Filter state (set from IdleDesktop)
   const [chatFilters, setChatFilters] = useState({ gender: 'Both', location: 'Global', ageRange: 'Any' });
+  const [isLocalNsfw, setIsLocalNsfw] = useState(false);
+  const nsfwViolations = useRef(0);
+
+  // Refs to avoid stale closures in interval
+  const coinsRef = useRef(coins);
+  const filterCostsRef = useRef(filterCosts);
+  const chatFiltersRef = useRef(chatFilters);
+  useEffect(() => { coinsRef.current = coins; }, [coins]);
+  useEffect(() => { filterCostsRef.current = filterCosts; }, [filterCosts]);
+  useEffect(() => { chatFiltersRef.current = chatFilters; }, [chatFilters]);
+
+  // Load NSFW model on mount
+  useEffect(() => {
+    loadNsfwModel().catch(err => console.error("NSFW Model load error", err));
+  }, []);
+
+  // NSFW Detection Logic
+  useEffect(() => {
+    let nsfwInterval;
+    if (status === 'Connected') {
+      nsfwInterval = setInterval(async () => {
+        const video = localVideoRef.current || localVideoMobileRef.current;
+        if (video && video.readyState === 4) {
+          const result = await checkVideoForNsfw(video);
+          if (result && result.isNsfw) {
+            setIsLocalNsfw(true);
+            nsfwViolations.current += 1;
+            
+            if (nsfwViolations.current === 1) {
+              toast.error("⚠️ Inappropriate content detected! Your camera is blurred. Please adjust your camera to avoid being banned.", { duration: 5000 });
+            }
+
+            if (nsfwViolations.current >= 3) {
+              toast.error("🚨 Call disconnected due to multiple safety violations.", { duration: 6000 });
+              // Emit violation to server for strike
+              socket.emit('system-violation', { reason: 'NSFW content detected', uid: currentUser.uid });
+              handleNext();
+            }
+          } else if (result) {
+            setIsLocalNsfw(false);
+            // Slowly decay violations if user behaves? Or just keep it.
+            // Let's reset if they are clean for a bit
+            if (nsfwViolations.current > 0) nsfwViolations.current = 0;
+          }
+        }
+      }, 2000); // Check every 2 seconds
+    } else {
+      setIsLocalNsfw(false);
+      nsfwViolations.current = 0;
+    }
+    return () => clearInterval(nsfwInterval);
+  }, [status, currentUser.uid]);
+
+
 
   // Timer & Earnings logic
   useEffect(() => {
@@ -87,20 +164,110 @@ const VideoChat = ({ onEndChat }) => {
       interval = setInterval(() => {
         setChatTimer(prev => {
           const newTime = prev + 1;
-          // Calculate Earnings for Creators (e.g. 10 coins per minute roughly 0.16 coins per second for Tier 1)
-          if (currentUser?.isCreator) {
-            const ratePerSecond = (currentUser.currentTier || 1) * 10 / 60;
-            setSessionEarnings(prevEarnings => prevEarnings + ratePerSecond);
+          const isPrivate = roomIdRef.current?.startsWith('private_');
+          
+          // --- CASE 1: RANDOM CHAT (NOT PRIVATE) ---
+          if (!isPrivate && currentUser?.isCreator && !randomRewardAdded.current) {
+            // Reward after 15 seconds
+            if (newTime >= 15) {
+              const reward = creatorMonetizationSettings?.randomChatCoins || 10;
+              setSessionEarnings(prevEarnings => prevEarnings + reward);
+              randomRewardAdded.current = true;
+              toast.success(`+${reward} Coins (Chat Reward)`);
+            }
           }
+
+          // --- CASE 2: PRIVATE 1-ON-1 CHAT ---
+          if (isPrivate) {
+            const currentMinute = Math.floor(newTime / 60);
+            
+            // Per-minute billing logic (every 60 seconds)
+            if (currentMinute > lastMinuteHandled.current) {
+              lastMinuteHandled.current = currentMinute;
+              
+              const isCaller = roomIdRef.current.includes(`private_${currentUser.uid}_`) || roomIdRef.current.startsWith(`private_${currentUser.uid}`);
+              const perMinuteCost = creatorMonetizationSettings?.privateCallCost || 60;
+              const creatorPercentage = (creatorMonetizationSettings?.privateCallPercentage || 50) / 100;
+
+              if (isCaller) {
+                // MALE USER / CALLER: Spend Coins
+                if (coinsRef.current < perMinuteCost) {
+                  toast.error("Insufficient coins for private call!");
+                  handleNext(); // Disconnect
+                } else {
+                  spendCoins(perMinuteCost, `Private Call (Min ${currentMinute + 1})`);
+                }
+              } else if (currentUser?.isCreator) {
+                // FEMALE CREATOR / RECEIVER: Earn Coins (50% or dynamic cut)
+                const creatorEarned = perMinuteCost * creatorPercentage;
+                setSessionEarnings(prev => prev + creatorEarned);
+                toast.success(`+${creatorEarned.toFixed(0)} Coins (Private Call Min ${currentMinute + 1})`);
+              }
+            }
+          }
+
           return newTime;
         });
       }, 1000);
     } else {
       setChatTimer(0);
       setSessionEarnings(0);
+      randomRewardAdded.current = false;
+      lastMinuteHandled.current = -1;
     }
     return () => clearInterval(interval);
-  }, [status, currentUser]);
+  }, [status, currentUser, creatorMonetizationSettings]);
+
+  // Auto-disconnect when coins run out during active filter session
+  useEffect(() => {
+    if (status !== 'Connected') return;
+
+    const checkInterval = setInterval(() => {
+      const filters = chatFiltersRef.current;
+      const fCosts = filterCostsRef.current;
+      const userCoins = coinsRef.current;
+
+      let filterCost = 0;
+      if (filters.gender !== 'Both') filterCost += fCosts.gender;
+      if (filters.location !== 'Global') filterCost += fCosts.location;
+      if (filters.ageRange !== 'Any') filterCost += fCosts.age;
+
+      if (filterCost > 0 && userCoins < filterCost) {
+        clearInterval(checkInterval);
+        toast.error('💸 Out of coins! Switching to free video chat...', { duration: 4000 });
+        // Reset to free filters
+        setChatFilters({ gender: 'Both', location: 'Global', ageRange: 'Any' });
+        // Disconnect current session
+        setTimeout(() => {
+          if (peerConnection.current) { peerConnection.current.close(); peerConnection.current = null; }
+          if (roomIdRef.current) { socket.emit('leave-room', { roomId: roomIdRef.current }); roomIdRef.current = null; }
+          setRemoteStream(null);
+          setPartnerName(null);
+          setPartnerLocation(null);
+          setPartnerIsPremium(false);
+          setMessages([]);
+          setChatTimer(0);
+          setIsPartnerTyping(false);
+          partnerIdRef.current = null;
+          pendingFilterCharge.current = null;
+          hasEmittedJoin.current = false;
+          setStatus('Idle');
+        }, 1000);
+      }
+    }, 10000); // Check every 10 seconds
+
+    return () => clearInterval(checkInterval);
+  }, [status]);
+
+  const calculateAge = (birthdate) => {
+    if (!birthdate) return null;
+    const birth = new Date(birthdate);
+    const today = new Date();
+    let age = today.getFullYear() - birth.getFullYear();
+    const m = today.getMonth() - birth.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+    return age;
+  };
 
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);
@@ -111,22 +278,59 @@ const VideoChat = ({ onEndChat }) => {
   const performJoin = useCallback(() => {
     if (hasEmittedJoin.current) return;
     if (!userInitiatedJoin.current) return; // Only join if user clicked Start
+    
     if (socket.connected && stream && currentUser) {
       hasEmittedJoin.current = true;
-      setStatus('Searching for partner...');
-      socket.emit('join-waiting', {
-        name: currentUser?.safetySettings?.invisibleMode ? 'Ghost User' : (currentUser.displayName || 'Stranger'),
-        uid: currentUser.uid,
-        blockedUsers: blockedUsers || [],
-        location: userLocation,
-        isPremium,
-        filters: chatFilters
-      });
+      
+      if (incomingDirectCall) {
+        setStatus(`Connecting to ${incomingDirectCall.callerData?.name || 'User'}...`);
+        socket.emit('accept-direct-call', {
+            callerSocketId: incomingDirectCall.callerSocketId,
+            callerData: incomingDirectCall.callerData,
+            creatorData: {
+                uid: currentUser?.uid,
+                name: currentUser?.displayName,
+                photoURL: currentUser?.photoURL,
+                gender: currentUser?.gender || 'Female'
+            }
+        });
+        
+        // Remove state so it doesn't auto-call again
+        navigate(location.pathname, { replace: true });
+        
+      } else if (directCallTarget) {
+        setStatus(`Calling ${directCallName || 'Creator'}...`);
+        socket.emit('request-direct-call', {
+            targetUid: directCallTarget,
+            callerData: {
+                uid: currentUser.id || currentUser.uid,
+                name: currentUser.displayName || 'Stranger',
+                photoURL: currentUser.photoURL || currentUser.avatar_url,
+                gender: currentUser.gender
+            }
+        });
+        
+        // Remove param so it doesn't auto-call again
+        navigate(location.pathname, { replace: true });
+        
+      } else {
+        setStatus('Searching for partner...');
+        socket.emit('join-waiting', {
+          name: currentUser?.safetySettings?.invisibleMode ? 'Ghost User' : (currentUser.displayName || 'Stranger'),
+          uid: currentUser.uid,
+          blockedUsers: blockedUsers || [],
+          location: userLocation,
+          isPremium,
+          filters: chatFilters,
+          ownGender: currentUser?.gender || localStorage.getItem('userGender'),
+          ownBirthdate: currentUser?.birthdate || null
+        });
+      }
     } else {
       if (!stream) setStatus('Waiting for camera...');
       else if (!socket.connected) setStatus('Connecting to server...');
     }
-  }, [stream, currentUser, blockedUsers, userLocation, chatFilters]);
+  }, [stream, currentUser, blockedUsers, userLocation, chatFilters, directCallTarget, incomingDirectCall, directCallName, navigate, location.pathname, isPremium]);
 
 
   const handleStartChat = useCallback(() => {
@@ -134,11 +338,31 @@ const VideoChat = ({ onEndChat }) => {
     performJoin();
   }, [performJoin]);
 
+  // Auto-Start Stream for Direct Calls
+  useEffect(() => {
+    if (directCallTarget || incomingDirectCall) {
+       userInitiatedJoin.current = true;
+       performJoin();
+    }
+  }, [directCallTarget, incomingDirectCall, performJoin]);
+
   const requestMedia = useCallback(async () => {
     setError(null);
     try {
-      const mediaStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      const mediaStream = await navigator.mediaDevices.getUserMedia({ 
+        video: {
+          facingMode: 'user',
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        }, 
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        } 
+      });
       setStream(mediaStream);
+      streamRef.current = mediaStream;
       if (localVideoRef.current) localVideoRef.current.srcObject = mediaStream;
       setShowPermissionModal(false);
     } catch (err) {
@@ -147,11 +371,24 @@ const VideoChat = ({ onEndChat }) => {
     }
   }, []);
 
+  const payoutSessionEarnings = useCallback(async () => {
+    if (currentUser?.isCreator && sessionEarnings > 0) {
+      const amount = Math.floor(sessionEarnings);
+      console.log(`[Payout] Payout for creator: ${amount} coins`);
+      await addCoins(amount, "Video Chat Earning", 'earned');
+      setSessionEarnings(0);
+      randomRewardAdded.current = false;
+      lastMinuteHandled.current = -1;
+    }
+  }, [currentUser, sessionEarnings, addCoins]);
+
   const handleNext = () => {
     if (peerConnection.current) {
       peerConnection.current.close();
       peerConnection.current = null;
     }
+    payoutSessionEarnings();
+    
     setRemoteStream(null);
     setPartnerName(null);
     setPartnerLocation(null);
@@ -160,6 +397,7 @@ const VideoChat = ({ onEndChat }) => {
     setChatTimer(0);
     setIsPartnerTyping(false);
     partnerIdRef.current = null;
+    pendingFilterCharge.current = null;
     if (roomIdRef.current) {
       socket.emit('leave-room', { roomId: roomIdRef.current });
       roomIdRef.current = null;
@@ -226,9 +464,21 @@ const VideoChat = ({ onEndChat }) => {
     setNewMessage(prev => prev + emojiData.emoji);
   };
 
-  const handleReportSubmit = async ({ reason, description }) => {
+  const handleReportSubmit = async ({ reason, description, screenshotBlob }) => {
     if (partnerIdRef.current) {
-      await reportUser(partnerIdRef.current, reason, description);
+      const targetId = partnerIdRef.current;
+      await reportUser(targetId, reason, description, activeLogId.current, screenshotBlob);
+      
+      // Notify server to check auto-disconnect on the reported user
+      try {
+        const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+        fetch(`${apiUrl}/api/flag-report`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reportedUid: targetId })
+        }).catch(e => console.error(e));
+      } catch (err) {}
+
       handleNext(); // Skip after reporting
     }
   };
@@ -262,13 +512,17 @@ const VideoChat = ({ onEndChat }) => {
         socket.emit('leave-room', { roomId: roomIdRef.current });
         roomIdRef.current = null;
       }
-      if (stream) {
-        stream.getTracks().forEach(t => t.stop());
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(t => t.stop());
       }
+      // CRITICAL: Force disconnect to reset session state on server
+      socket.disconnect();
+      
+      pendingFilterCharge.current = null;
       hasEmittedJoin.current = false;
       userInitiatedJoin.current = false;
     };
-  }, [stream]);
+  }, []); // Empty array ensures this only runs on actual component unmount!
 
   // Toggle Microphone
   useEffect(() => {
@@ -288,12 +542,7 @@ const VideoChat = ({ onEndChat }) => {
     }
   }, [isCamOn, stream]);
 
-  // REMOVED: Auto-join on mount
-  // useEffect(() => {
-  //   performJoin();
-  // }, [performJoin]);
-
-  // Fix: Listen for socket connection to retry join if it wasn't ready initially
+  // Re-join the waiting queue automatically if socket reconnects
   useEffect(() => {
     const handleConnect = () => {
       console.log("Socket connected, retrying join...");
@@ -320,32 +569,91 @@ const VideoChat = ({ onEndChat }) => {
     }
   }, [messages, isPartnerTyping]);
 
-    useEffect(() => {
-    const handleMatched = async ({ roomId, initiator, partnerId, partnerName, partnerLocation, partnerIsPremium }) => {
+  // --- Stable Socket Listeners (Run once on mount) ---
+  useEffect(() => {
+    const handleMatched = async ({ roomId, initiator, partnerId, partnerName, partnerLocation, partnerIsPremium, partnerGender, partnerBirthdate, isDirectCall }) => {
       roomIdRef.current = roomId;
       partnerIdRef.current = partnerId;
       setPartnerName(partnerName || 'Stranger');
       setPartnerLocation(partnerLocation || null);
       setPartnerIsPremium(partnerIsPremium || false);
+      setPartnerGender(partnerGender || null);
+      setPartnerAge(calculateAge(partnerBirthdate));
       setStatus('Connected');
       setStartTime(Date.now());
       setMessages([]);
       setChatTimer(0);
 
+      // --- Deduct filter coins on each match (Unless Direct Call) ---
+      const filters = chatFiltersRef.current;
+      const fCosts = filterCostsRef.current;
+      let filterCost = fCosts.standard || 0;
+      const filterDesc = [];
+      
+      if (fCosts.standard > 0) filterDesc.push('Match Fee');
+      if (filters.gender !== 'Both') { filterCost += fCosts.gender; filterDesc.push(`Gender(${filters.gender})`); }
+      if (filters.location !== 'Global') { filterCost += fCosts.location; filterDesc.push(`Location(${filters.location})`); }
+      if (filters.ageRange !== 'Any') { filterCost += fCosts.age; filterDesc.push(`Age(${filters.ageRange})`); }
+
+      if (isDirectCall) {
+          filterCost = 0; // Direct calls are billed per minute via timer
+      }
+
+      if (filterCost > 0) {
+        const userCoins = coinsRef.current;
+        if (userCoins < filterCost) {
+          toast.error('⚠️ Not enough coins for filter! Switching to free chat...');
+          setChatFilters({ gender: 'Both', location: 'Global', ageRange: 'Any' });
+          setTimeout(() => {
+            if (peerConnection.current) { peerConnection.current.close(); peerConnection.current = null; }
+            if (roomIdRef.current) { socket.emit('leave-room', { roomId: roomIdRef.current }); roomIdRef.current = null; }
+            pendingFilterCharge.current = null;
+            hasEmittedJoin.current = false;
+            performJoin();
+          }, 500);
+          return;
+        }
+        pendingFilterCharge.current = { cost: filterCost, desc: filterDesc.join(', ') };
+      }
+
+      if (peerConnection.current) {
+        peerConnection.current.close();
+      }
       const pc = new RTCPeerConnection(RTC_CONFIG);
       peerConnection.current = pc;
 
-      if (stream) {
-        stream.getTracks().forEach(track => pc.addTrack(track, stream));
+      // Use stable streamRef instead of stream state
+      const currentStream = streamRef.current;
+      if (currentStream) {
+        currentStream.getTracks().forEach(track => pc.addTrack(track, currentStream));
       }
 
-      pc.ontrack = (e) => setRemoteStream(e.streams[0]);
+      pc.ontrack = (e) => {
+        setRemoteStream(e.streams[0]);
+        if (pendingFilterCharge.current) {
+          const { cost, desc } = pendingFilterCharge.current;
+          pendingFilterCharge.current = null;
+          spendCoins(cost, `Filter: ${desc}`);
+        }
+      };
+      
       pc.onicecandidate = (e) => {
         if (e.candidate) socket.emit('ice-candidate', { candidate: e.candidate, roomId });
       };
 
       if (initiator) {
+        const logId = await startChatLog(partnerId, roomId);
+        if (logId) {
+          activeLogId.current = logId;
+          socket.emit('share-log-id', { logId, roomId });
+        }
+        
+        // Safety check after async call
+        if (pc.signalingState === 'closed') return;
+
         const offer = await pc.createOffer();
+        if (pc.signalingState === 'closed') return;
+        
         await pc.setLocalDescription(offer);
         socket.emit('offer', { offer, roomId });
       }
@@ -353,9 +661,13 @@ const VideoChat = ({ onEndChat }) => {
 
     const handleOffer = async (offer) => {
       const pc = peerConnection.current;
-      if (pc) {
+      if (pc && pc.signalingState !== 'closed') {
         await pc.setRemoteDescription(new RTCSessionDescription(offer));
+        if (pc.signalingState === 'closed') return;
+        
         const answer = await pc.createAnswer();
+        if (pc.signalingState === 'closed') return;
+        
         await pc.setLocalDescription(answer);
         socket.emit('answer', { answer, roomId: roomIdRef.current });
       }
@@ -363,7 +675,9 @@ const VideoChat = ({ onEndChat }) => {
 
     const handleAnswer = async (answer) => {
       const pc = peerConnection.current;
-      if (pc) await pc.setRemoteDescription(new RTCSessionDescription(answer));
+      if (pc && pc.signalingState !== 'closed') {
+          await pc.setRemoteDescription(new RTCSessionDescription(answer));
+      }
     };
 
     const handleIce = (candidate) => {
@@ -376,7 +690,6 @@ const VideoChat = ({ onEndChat }) => {
         peerConnection.current.close();
         peerConnection.current = null;
       }
-      // Leave the old room cleanly
       if (roomIdRef.current) {
         socket.emit('leave-room', { roomId: roomIdRef.current });
         roomIdRef.current = null;
@@ -388,29 +701,37 @@ const VideoChat = ({ onEndChat }) => {
       setMessages([]);
       setChatTimer(0);
       setIsPartnerTyping(false);
+      
+      if (activeLogId.current) {
+        const durationSec = startTime ? Math.floor((Date.now() - startTime) / 1000) : 0;
+        updateChatLog(activeLogId.current, durationSec, messages.length);
+        activeLogId.current = null;
+      }
+      payoutSessionEarnings();
       partnerIdRef.current = null;
+      pendingFilterCharge.current = null;
       hasEmittedJoin.current = false;
       setStatus('Searching for partner...');
-      // Re-join the waiting queue automatically
       performJoin();
     };
 
     const handleReceiveMessage = (message) => {
       setMessages(prev => [...prev, message]);
-      // Increment unread count if chat is hidden
       setUnreadCount(prevCount => showChat ? 0 : prevCount + 1);
       notificationSound.current.play().catch(e => console.log("Sound play failed", e));
-
-      // Process Gift Commission for Creators
       if (message.type === 'gift' && currentUser?.isCreator && message.giftValue) {
-        const commission = message.giftValue * 0.70; // 70% cut
+        const commission = message.giftValue * 0.70;
         setSessionEarnings(prev => prev + commission);
         toast.success(`Received ${commission.toFixed(0)} coins from gift!`);
       }
     };
 
-    const handlePartnerTyping = (typing) => {
-      setIsPartnerTyping(typing);
+    const handleDirectCallDeclined = ({ reason }) => {
+      let msg = "Call declined.";
+      if (reason === 'offline') msg = "User is currently offline or busy.";
+      toast.error(msg, { icon: '🚫', duration: 4000 });
+      handleDisconnect();
+      setStatus('Idle');
     };
 
     socket.on('matched', handleMatched);
@@ -418,8 +739,20 @@ const VideoChat = ({ onEndChat }) => {
     socket.on('answer', handleAnswer);
     socket.on('ice-candidate', handleIce);
     socket.on('partner-disconnected', handleDisconnect);
+    socket.on('system-disconnect', ({ reason }) => {
+      toast.error(reason || 'Session closed by safety system', { icon: '🚨' });
+      handleDisconnect();
+      setStatus('Idle');
+    });
+    socket.on('geo-blocked', ({ reason }) => {
+      toast.error(reason || 'Your region is blocked', { icon: '🌍' });
+      setStatus('Idle');
+    });
+    socket.on('direct-call-declined', handleDirectCallDeclined);
     socket.on('receive-message', handleReceiveMessage);
-    socket.on('partner-typing', handlePartnerTyping);
+    socket.on('partner-typing', (typing) => setIsPartnerTyping(typing));
+    socket.on('waiting-count', (count) => setWaitingCount(count));
+    socket.on('share-log-id', ({ logId }) => { activeLogId.current = logId; });
 
     return () => {
       socket.off('matched');
@@ -427,10 +760,15 @@ const VideoChat = ({ onEndChat }) => {
       socket.off('answer');
       socket.off('ice-candidate');
       socket.off('partner-disconnected');
+      socket.off('system-disconnect');
+      socket.off('geo-blocked');
+      socket.off('direct-call-declined');
       socket.off('receive-message');
       socket.off('partner-typing');
+      socket.off('waiting-count');
+      socket.off('share-log-id');
     };
-  }, [stream, performJoin]);
+  }, []); // Re-join still relies on performJoin, but listeners remain stable.
 
   const endCall = () => {
     if (status === 'Connected' && partnerName) {
@@ -439,19 +777,13 @@ const VideoChat = ({ onEndChat }) => {
       const seconds = durationSec % 60;
       const durationStr = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
 
-      saveMatchToHistory({
-        uid: partnerIdRef.current,
-        name: partnerName,
-        location: partnerLocation ? getLocationDisplay(partnerLocation, true) : 'Unknown',
-        durationSec: durationSec,
-        startTimeIso: startTime ? new Date(startTime).toISOString() : new Date().toISOString(),
-        avatar: partnerName.charAt(0).toUpperCase(),
-        hasRecording: false
-      });
-
-      if (currentUser?.isCreator && sessionEarnings > 0) {
-        logCreatorEarnings(durationSec, sessionEarnings);
+      // Update Unified Chat Monitoring Log
+      if (activeLogId.current) {
+        updateChatLog(activeLogId.current, durationSec, messages.length);
+        activeLogId.current = null;
       }
+
+      payoutSessionEarnings();
     }
 
     if (peerConnection.current) {
@@ -463,6 +795,7 @@ const VideoChat = ({ onEndChat }) => {
 
     setStartTime(null);
     setSessionEarnings(0);
+    pendingFilterCharge.current = null;
     onEndChat();
   };
 
@@ -497,6 +830,7 @@ const VideoChat = ({ onEndChat }) => {
         onClose={() => setShowReportModal(false)}
         onSubmit={handleReportSubmit}
         reportedUserName={partnerName}
+        remoteVideoRef={remoteVideoRef}
       />
 
       {/* Center Panel - Main Video Area */}
@@ -514,7 +848,7 @@ const VideoChat = ({ onEndChat }) => {
                   autoPlay
                   playsInline
                   muted
-                  className={`w-full h-full object-cover ${!isCamOn ? 'hidden' : ''}`}
+                  className={`w-full h-full object-cover -scale-x-100 ${!isCamOn ? 'hidden' : ''} ${isLocalNsfw ? 'nsfw-blur' : ''}`}
                 />
                 {!isCamOn && (
                   <div className="absolute inset-0 bg-dark-900 flex items-center justify-center">
@@ -528,9 +862,12 @@ const VideoChat = ({ onEndChat }) => {
               {/* Top Bar */}
               <div className="relative z-10 flex items-center justify-between px-4 pt-4 pb-2">
                 {/* Verified badge */}
-                <div className="w-9 h-9 rounded-full bg-green-500/20 border border-green-500/40 flex items-center justify-center">
+                <button 
+                  onClick={() => setShowSafetyInfo(true)}
+                  className="w-9 h-9 rounded-full bg-green-500/20 border border-green-500/40 flex items-center justify-center hover:bg-green-500/30 transition-colors"
+                >
                   <span className="text-green-400 text-sm">✅</span>
-                </div>
+                </button>
 
                 {/* Free space where tabs used to be */}
                 <div className="flex-1"></div>
@@ -576,13 +913,22 @@ const VideoChat = ({ onEndChat }) => {
                   <span className="text-lg">🛡️</span>
                 </button>
 
-                {/* Coin Store */}
+                {/* Free Coins (Trigger Bonus) */}
                 <button
-                  onClick={() => setShowSubscriptionModal(true)}
-                  className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-md border border-yellow-400/30 flex items-center justify-center hover:bg-yellow-400/10 transition-colors relative"
+                  onClick={() => openDailyBonus()}
+                  className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-md border border-yellow-400/30 flex items-center justify-center hover:bg-yellow-400/10 transition-colors relative shadow-[0_0_15px_rgba(250,204,21,0.2)]"
                 >
-                  <span className="text-lg">🪙</span>
-                  <span className="absolute -bottom-1 text-[8px] bg-green-500 text-white px-1 rounded-full font-bold">FREE</span>
+                  <span className="text-lg">💰</span>
+                  <span className="absolute -bottom-1 text-[8px] bg-green-500 text-white px-1.5 py-0.5 rounded-full font-black uppercase tracking-wider shadow-sm border border-green-400">FREE</span>
+                </button>
+
+                {/* Coin Store (Purchase Coins) */}
+                <button
+                  onClick={() => setShowCoinStore(true)}
+                  className="w-10 h-10 rounded-full bg-gradient-to-br from-yellow-300 to-yellow-500 backdrop-blur-md border px-0 border-yellow-200 flex flex-col items-center justify-center hover:scale-105 transition-transform relative shadow-[0_0_20px_rgba(250,204,21,0.4)] mt-2"
+                >
+                  <span className="text-base font-black text-yellow-900 leading-none">C</span>
+                  <span className="text-[7px] font-black uppercase tracking-widest text-yellow-900 leading-none mt-0.5">Topup</span>
                 </button>
               </div>
 
@@ -599,12 +945,22 @@ const VideoChat = ({ onEndChat }) => {
                       <button
                         key={opt}
                         onClick={() => {
-                          if (opt !== 'Both' && !isPremium) { setShowSubscriptionModal(true); return; }
+                          if (opt !== 'Both') {
+                            const cost = filterCosts.gender;
+                            if (cost > 0 && coins < cost) {
+                              toast.error(`Need ${cost} coins for this filter!`);
+                              if (openCoinStore) openCoinStore();
+                              return;
+                            }
+                          }
                           setChatFilters(p => ({ ...p, gender: opt }));
                         }}
-                        className={`flex-1 py-2 rounded-xl text-xs font-bold transition-colors shadow-sm ${chatFilters.gender === opt ? 'bg-green-500 text-white shadow-green-500/30' : 'bg-white/10 text-white/70'}`}
+                        className={`flex-1 py-2 rounded-xl text-xs font-bold transition-colors shadow-sm flex items-center justify-center gap-1 ${chatFilters.gender === opt ? 'bg-green-500 text-white shadow-green-500/30' : 'bg-white/10 text-white/70'}`}
                       >
                         {opt}
+                        {opt !== 'Both' && filterCosts.gender > 0 && (
+                          <span className="text-[8px] bg-yellow-400 text-black px-1 rounded-full font-bold">🪙{filterCosts.gender}</span>
+                        )}
                       </button>
                     ))}
                   </div>
@@ -615,12 +971,22 @@ const VideoChat = ({ onEndChat }) => {
                       <button
                         key={opt}
                         onClick={() => {
-                          if (opt !== 'Any' && !isPremium) { setShowSubscriptionModal(true); return; }
+                          if (opt !== 'Any') {
+                            const cost = filterCosts.age;
+                            if (cost > 0 && coins < cost) {
+                              toast.error(`Need ${cost} coins for this filter!`);
+                              if (openCoinStore) openCoinStore();
+                              return;
+                            }
+                          }
                           setChatFilters(p => ({ ...p, ageRange: opt }));
                         }}
-                        className={`flex-1 py-2 rounded-xl text-xs font-bold transition-colors shadow-sm ${chatFilters.ageRange === opt ? 'bg-blue-500 text-white shadow-blue-500/30' : 'bg-white/10 text-white/70'}`}
+                        className={`flex-1 py-2 rounded-xl text-xs font-bold transition-colors shadow-sm flex items-center justify-center gap-1 ${chatFilters.ageRange === opt ? 'bg-blue-500 text-white shadow-blue-500/30' : 'bg-white/10 text-white/70'}`}
                       >
                         {opt}
+                        {opt !== 'Any' && filterCosts.age > 0 && (
+                          <span className="text-[8px] bg-yellow-400 text-black px-1 rounded-full font-bold">🪙{filterCosts.age}</span>
+                        )}
                       </button>
                     ))}
                   </div>
@@ -630,19 +996,27 @@ const VideoChat = ({ onEndChat }) => {
                     <select
                       value={chatFilters.location}
                       onChange={(e) => {
-                        if (e.target.value !== 'Global' && !isPremium) { setShowSubscriptionModal(true); return; }
-                        setChatFilters(p => ({ ...p, location: e.target.value }));
+                        const val = e.target.value;
+                        if (val !== 'Global') {
+                          const cost = filterCosts.location;
+                          if (cost > 0 && coins < cost) {
+                            toast.error(`Need ${cost} coins for this filter!`);
+                            if (openCoinStore) openCoinStore();
+                            return;
+                          }
+                        }
+                        setChatFilters(p => ({ ...p, location: val }));
                       }}
                       className="w-full bg-white/10 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white outline-none appearance-none font-bold"
                     >
                       <option value="Global" className="bg-dark-800">🌍 Global (All Regions)</option>
-                      <option value="North America" className="bg-dark-800">🇺🇸 North America</option>
-                      <option value="Latin America" className="bg-dark-800">🇧🇷 Latin America</option>
-                      <option value="Europe" className="bg-dark-800">🇪🇺 Europe</option>
-                      <option value="Middle East" className="bg-dark-800">🇸🇦 Middle East</option>
-                      <option value="South Asia" className="bg-dark-800">🇮🇳 South Asia</option>
-                      <option value="East Asia" className="bg-dark-800">🇯🇵 East Asia</option>
-                      <option value="Africa" className="bg-dark-800">🌍 Africa</option>
+                      <option value="North America" className="bg-dark-800">🇺🇸 North America {filterCosts.location > 0 ? `(🪙${filterCosts.location}/match)` : ''}</option>
+                      <option value="Latin America" className="bg-dark-800">🇧🇷 Latin America {filterCosts.location > 0 ? `(🪙${filterCosts.location}/match)` : ''}</option>
+                      <option value="Europe" className="bg-dark-800">🇪🇺 Europe {filterCosts.location > 0 ? `(🪙${filterCosts.location}/match)` : ''}</option>
+                      <option value="Middle East" className="bg-dark-800">🇸🇦 Middle East {filterCosts.location > 0 ? `(🪙${filterCosts.location}/match)` : ''}</option>
+                      <option value="South Asia" className="bg-dark-800">🇮🇳 South Asia {filterCosts.location > 0 ? `(🪙${filterCosts.location}/match)` : ''}</option>
+                      <option value="East Asia" className="bg-dark-800">🇯🇵 East Asia {filterCosts.location > 0 ? `(🪙${filterCosts.location}/match)` : ''}</option>
+                      <option value="Africa" className="bg-dark-800">🌍 Africa {filterCosts.location > 0 ? `(🪙${filterCosts.location}/match)` : ''}</option>
                     </select>
                     <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-white/50">
                       ▼
@@ -659,15 +1033,6 @@ const VideoChat = ({ onEndChat }) => {
                 </button>
               </div>
 
-              {/* Bottom Promo Banner */}
-              <div className="relative z-10 bg-gradient-to-r from-yellow-400/10 via-yellow-400/20 to-yellow-400/10 border-t border-yellow-400/20 px-4 py-3 flex items-center justify-center gap-2">
-                <span className="text-xl">🐵</span>
-                <div className="text-center">
-                  <span className="text-yellow-400 font-bold text-sm">Enjoy with Strangy Plus</span>
-                  <p className="text-[10px] text-gray-400">Select your preference to meet people you like</p>
-                </div>
-                <span className="text-xl">🐵</span>
-              </div>
 
               {/* Profile Overlay */}
               {showProfile && <UserProfileMobile onClose={() => setShowProfile(false)} />}
@@ -687,6 +1052,7 @@ const VideoChat = ({ onEndChat }) => {
                 onToggleMic={() => setIsMicOn(!isMicOn)}
                 onFiltersChange={setChatFilters}
                 onSubscriptionRequired={() => setShowSubscriptionModal(true)}
+                isLocalNsfw={isLocalNsfw}
               />
             </div>
 
@@ -758,11 +1124,11 @@ const VideoChat = ({ onEndChat }) => {
                     autoPlay
                     playsInline
                     muted
-                    className={`w-full h-full object-cover ${!isCamOn ? 'hidden' : ''}`}
+                    className={`w-full h-full object-cover -scale-x-100 ${!isCamOn ? 'hidden' : ''} ${isLocalNsfw ? 'nsfw-blur' : ''}`}
                   />
                   {!isCamOn && (
                     <div className="absolute inset-0 flex items-center justify-center bg-gray-900">
-                      <span className="text-4xl">📷</span>
+                      <RiVideoOffLine className="text-white/40" size={40} />
                     </div>
                   )}
                   {/* Chat & Gift buttons bottom bar */}
@@ -790,7 +1156,7 @@ const VideoChat = ({ onEndChat }) => {
                       onClick={() => setShowStickerPicker(!showStickerPicker)}
                       className="w-12 h-12 rounded-full bg-yellow-400 flex items-center justify-center shadow-lg active:scale-95 transition-transform"
                     >
-                      <span className="text-2xl">✨</span>
+                      <RiMagicLine className="text-black" size={22} />
                     </button>
 
                     {/* End Call Button (Call Cut) */}
@@ -826,10 +1192,18 @@ const VideoChat = ({ onEndChat }) => {
                     <div className="absolute inset-3 rounded-full border-4 border-t-accent-purple border-r-transparent border-b-transparent border-l-transparent animate-spin" style={{ animationDirection: 'reverse', animationDuration: '1.5s' }}></div>
                   </div>
                   <p className="text-white font-bold text-lg mb-1">Finding a partner...</p>
-                  <p className="text-gray-500 text-sm mb-6">Please wait while we connect you</p>
+                  <p className="text-gray-500 text-sm mb-2">Please wait while we connect you</p>
+                  <div className="flex items-center justify-center gap-2 mb-6">
+                    <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                    <p className="text-accent-purple font-bold text-xs uppercase tracking-widest">{waitingCount} users online</p>
+                  </div>
                   <button
                     onClick={() => {
                       setStatus('Idle');
+                      setPartnerName(null);
+                      setPartnerLocation(null);
+                      setPartnerIsPremium(false);
+                      pendingFilterCharge.current = null;
                       userInitiatedJoin.current = false;
                       hasEmittedJoin.current = false;
                     }}
@@ -881,18 +1255,22 @@ const VideoChat = ({ onEndChat }) => {
         )}
 
         {/* Top-Right: Partner location */}
-        {partnerName && partnerLocation && (
+        {remoteStream && partnerName && partnerLocation && (
           <div className="absolute top-6 right-6 z-50 hidden md:flex items-center">
             <div className="flex items-center gap-4 bg-[#4a4049]/60 backdrop-blur-xl rounded-full pl-5 pr-1.5 py-1.5 shadow-2xl">
               <div className="flex flex-col py-1">
                 <div className="flex items-center gap-1.5">
-                  <svg className="w-4 h-4 text-white/80" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
-                  <span className="text-white font-bold text-[15px]">{getLocationDisplay(partnerLocation, showCityName)}</span>
+                  <RiUserLine className="w-4 h-4 text-white/80" />
+                  <span className="text-white font-bold text-[15px]">
+                    {partnerName} {partnerAge ? `(${partnerAge})` : ''} {partnerGender ? (partnerGender === 'Male' ? '♂' : '♀') : ''}
+                    <span className="mx-1.5 text-white/40">|</span>
+                    {getLocationDisplay(partnerLocation, showCityName)}
+                  </span>
                   {partnerIsPremium && <PremiumBadge size="sm" />}
                 </div>
                 {userLocation && getDistanceBetween(userLocation, partnerLocation) && (
                   <p className="text-white/70 text-xs mt-0.5 flex items-center gap-1">
-                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" /></svg>
+                    <RiHeartLine className="w-3 h-3" />
                     {getDistanceBetween(userLocation, partnerLocation)} away
                   </p>
                 )}
@@ -914,11 +1292,11 @@ const VideoChat = ({ onEndChat }) => {
                 autoPlay
                 playsInline
                 muted
-                className={`w-full h-full object-cover ${!isCamOn ? 'hidden' : ''}`}
+                className={`w-full h-full object-cover -scale-x-100 ${!isCamOn ? 'hidden' : ''} ${isLocalNsfw ? 'nsfw-blur' : ''}`}
               />
               {!isCamOn && (
                 <div className="absolute inset-0 flex items-center justify-center bg-[#1a1c1e]">
-                  <span className="text-4xl">📷</span>
+                  <RiVideoOffLine className="text-white/40" size={40} />
                 </div>
               )}
               {/* YOU (Live) label */}
@@ -935,7 +1313,7 @@ const VideoChat = ({ onEndChat }) => {
         )}
 
         {/* ===== MOBILE CONNECTED TOP BAR ===== */}
-        {partnerName && (
+        {status === 'Connected' && remoteStream && partnerName && (
           <div className="absolute top-0 left-0 right-0 z-50 md:hidden">
             <div className="flex items-center justify-between px-4 py-3 bg-black/40 backdrop-blur-sm">
               <div className="flex items-center gap-3 min-w-0">
@@ -945,15 +1323,19 @@ const VideoChat = ({ onEndChat }) => {
                 </div>
                 <div className="min-w-0 flex flex-col">
                   <span className="text-white font-bold text-[15px] truncate leading-tight">{partnerName}</span>
-                  <div className="flex items-center gap-1.5 overflow-hidden">
+                   <div className="flex items-center gap-1.5 overflow-hidden">
                     <p className="text-[12px] text-white/70 truncate flex-shrink">
+                      {partnerGender && (
+                        <span className="mr-1 opacity-80">{partnerGender === 'Male' ? '♂' : '♀'}</span>
+                      )}
+                      {partnerAge && `${partnerAge} • `}
                       {getLocationDisplay(partnerLocation, showCityName) || 'Somewhere'}
                     </p>
-                    <span className="text-[14px] flex-shrink-0">💜</span>
+                    <RiHeartLine className="text-purple-400 flex-shrink-0" size={14} />
                     <button
                       onClick={() => setShowReportModal(true)}
-                      className="text-[14px] flex-shrink-0 hover:scale-110 active:scale-90 transition-transform"
-                    >👮</button>
+                      className="flex-shrink-0 hover:scale-110 active:scale-90 transition-transform text-white/50 hover:text-red-400"
+                    ><RiFlagLine size={16} /></button>
                   </div>
                 </div>
               </div>
@@ -964,9 +1346,7 @@ const VideoChat = ({ onEndChat }) => {
                   onClick={() => setShowConnectedUsers(true)}
                   className="w-10 h-10 bg-[#3a4959]/90 backdrop-blur-md rounded-lg flex items-center justify-center text-white shadow-lg active:scale-95 transition-all"
                 >
-                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor font-bold">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 6h16M4 12h16M4 18h16" />
-                  </svg>
+                  <RiMenuLine size={24} />
                 </button>
 
                 {/* Next Button */}
@@ -974,10 +1354,7 @@ const VideoChat = ({ onEndChat }) => {
                   onClick={handleNext}
                   className="w-10 h-10 bg-[#3a4959]/90 backdrop-blur-md rounded-lg flex items-center justify-center text-white shadow-lg active:scale-95 transition-all"
                 >
-                  <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M4.555 13.904l1.39-1.39a1 1 0 011.414 0l.293.293V10a1 1 0 112 0v2.807l.293-.293a1 1 0 011.414 0l1.39 1.39a1 1 0 01-1.414 1.414l-1.39-1.39L8 15.414l-1.39 1.39-1.39-1.39z" />
-                    <path fillRule="evenodd" d="M12.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-2.293-2.293a1 1 0 010-1.414z" clipRule="evenodd" />
-                  </svg>
+                  <RiArrowRightDoubleLine size={28} />
                 </button>
               </div>
             </div>
@@ -992,31 +1369,21 @@ const VideoChat = ({ onEndChat }) => {
               onClick={() => setIsMicOn(!isMicOn)}
               className={`w-[52px] h-[52px] rounded-full flex items-center justify-center transition-all ${isMicOn ? 'bg-white/10 hover:bg-white/20 text-white' : 'bg-red-500 text-white'}`}
             >
-              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                {isMicOn
-                  ? <path strokeLinecap="round" strokeLinejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-                  : <path strokeLinecap="round" strokeLinejoin="round" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
-                }
-              </svg>
+              {isMicOn ? <RiMicFill size={24} /> : <RiMicOffLine size={24} />}
             </button>
             {/* Cam */}
             <button
               onClick={() => setIsCamOn(!isCamOn)}
               className={`w-[52px] h-[52px] rounded-full flex items-center justify-center transition-all ${isCamOn ? 'bg-white/10 hover:bg-white/20 text-white' : 'bg-red-500 text-white'}`}
             >
-              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-              </svg>
+              {isCamOn ? <RiVidiconFill size={24} /> : <RiVideoOffLine size={24} />}
             </button>
             {/* End Call */}
             <button
               onClick={endCall}
               className="w-[60px] h-[60px] bg-[#ff4b4b] hover:bg-red-500 rounded-full flex items-center justify-center transition-all shadow-[0_0_20px_rgba(255,75,75,0.4)] mx-2 transform hover:scale-105"
             >
-              <svg className="w-8 h-8 text-white transform rotate-[135deg]" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M20 18.35V19c0 .55-.45 1-1 1h-1c-5.52 0-10.48-2.24-14.14-5.86S0 5.52 0 0V0C0-1 .45-1 1-1h.65C2.11-1 2.5-1.5 2.5-2v-3.5c0-.5-.5-1-1-1c-.5 0-1 .5-1 1v3.5c0 1.05-.85 1.9-1.9 1.9H-1c-1.66 0-3 1.34-3 3v0c0 4.97 2.01 9.47 5.27 12.73S9.03 20 14 20h0c1.66 0 3-1.34 3-3V19h-.65c-.55 0-1-.45-1-1v-4c0-.55.45-1 1-1H19c.55 0 1 .45 1 1v.65z" transform="translate(2 2)" />
-                <path d="M12.26 9l4.59-4.59c.39-.39.39-1.02 0-1.41s-1.02-.39-1.41 0L10.84 7.59l-4.59-4.59c-.39-.39-1.02-.39-1.41 0s-.39 1.02 0 1.41L9.43 9l-4.59 4.59c-.39.39-.39 1.02 0 1.41.19.19.45.29.71.29s.51-.1.71-.29l4.59-4.59 4.59 4.59c.19.19.45.29.71.29s.51-.1.71-.29c.39-.39.39-1.02 0-1.41L12.26 9z" />
-              </svg>
+              <RiCloseLine size={32} className="text-white" />
             </button>
             {/* Effects */}
             <button className="w-[52px] h-[52px] rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-all text-white">
@@ -1029,9 +1396,7 @@ const VideoChat = ({ onEndChat }) => {
               onClick={handleNext}
               className="w-[52px] h-[52px] rounded-full bg-[#8234f9] hover:bg-[#7220e9] flex items-center justify-center transition-all shadow-[0_0_15px_rgba(130,52,249,0.5)] transform hover:scale-105"
             >
-              <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
-              </svg>
+              <RiArrowRightDoubleLine size={28} className="text-white" />
             </button>
           </div>
         )}
@@ -1061,7 +1426,7 @@ const VideoChat = ({ onEndChat }) => {
           >
             {messages.length === 0 && !isPartnerTyping && (
               <div className="h-full flex flex-col items-center justify-center text-gray-500 text-center px-8">
-                <div className="text-4xl mb-4">💬</div>
+                <RiChat3Line className="mb-4 text-white/20" size={48} />
                 <p>Say hi! Start the conversation with emojis or text.</p>
               </div>
             )}
@@ -1136,7 +1501,7 @@ const VideoChat = ({ onEndChat }) => {
                 onClick={() => setShowEmojiPicker(!showEmojiPicker)}
                 className={`p-2 rounded-full transition-colors ${showEmojiPicker ? 'bg-accent-purple text-white' : 'hover:bg-white/5 text-gray-400'}`}
               >
-                😊
+                <RiEmotionHappyLine size={22} />
               </button>
 
               {/* Gift Button */}
@@ -1145,7 +1510,7 @@ const VideoChat = ({ onEndChat }) => {
                   type="button"
                   className="p-2 rounded-full hover:bg-white/5 text-pink-500 transition-colors"
                 >
-                  🎁
+                  <RiGiftLine size={20} />
                 </button>
 
                 {/* Gift Popover */}
@@ -1188,9 +1553,7 @@ const VideoChat = ({ onEndChat }) => {
                 disabled={!newMessage.trim() || status !== 'Connected'}
                 className="flex items-center justify-center w-11 h-11 bg-[#8234f9] text-white rounded-full hover:bg-[#7220e9] transition-all disabled:opacity-50 disabled:grayscale flex-shrink-0"
               >
-                <svg className="w-5 h-5 ml-1" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
-                </svg>
+                <RiSendPlaneLine size={20} className="ml-1" />
               </button>
             </form>
           </div>
@@ -1208,7 +1571,9 @@ const VideoChat = ({ onEndChat }) => {
             <button
               onClick={() => setShowConnectedUsers(false)}
               className="w-10 h-10 bg-white/10 flex items-center justify-center rounded-full hover:bg-white/20 transition-colors"
-            >✕</button>
+            >
+              <RiCloseLine size={24} />
+            </button>
           </div>
           <div className="flex-1 overflow-y-auto px-4 py-2">
             <MatchHistoryMobile onClose={() => setShowConnectedUsers(false)} />
@@ -1248,6 +1613,18 @@ const VideoChat = ({ onEndChat }) => {
         <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/60 backdrop-blur-sm pointer-events-auto">
           <DesktopSubscriptionModal onClose={() => setShowSubscriptionModal(false)} />
         </div>
+      )}
+
+      {/* Coin Store Modal Overlay */}
+      {showCoinStore && (
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/60 backdrop-blur-sm pointer-events-auto">
+          <CoinStoreModal isOpen={showCoinStore} onClose={() => setShowCoinStore(false)} />
+        </div>
+      )}
+
+      {/* Safety Info Modal Overlay (Stay safe and have fun design) */}
+      {showSafetyInfo && (
+        <SafetyInfoModal onClose={() => setShowSafetyInfo(false)} />
       )}
     </div >
   );

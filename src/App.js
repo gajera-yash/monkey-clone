@@ -7,6 +7,8 @@ import { CoinsProvider, useCoins } from './context/CoinsContext';
 import { PremiumProvider } from './context/PremiumContext';
 import { supabase } from './supabase';
 import Header from './components/Header';
+import socket from './utils/socket';
+import toast from 'react-hot-toast';
 import Hero from './components/Hero';
 import Features from './components/Features';
 import FAQ from './components/FAQ';
@@ -21,9 +23,10 @@ import AgeGate from './components/safety/AgeGate';
 import SafetyGuidelines from './components/safety/SafetyGuidelines';
 import GenderModal from './components/auth/GenderModal';
 import DailyBonusModal from './components/coins/DailyBonusModal';
-import CoinStore from './components/monetization/CoinStore';
+import CoinStoreModal from './components/coins/CoinStoreModal';
 import SubscriptionPlans from './components/monetization/SubscriptionPlans';
 import MaintenancePage from './components/MaintenancePage';
+import ProfileCompletionModal from './components/auth/ProfileCompletionModal';
 
 // Creator Components
 import CreatorRoute from './components/creator/CreatorRoute';
@@ -33,6 +36,7 @@ import VoiceVerification from './components/creator/VoiceVerification';
 import CreatorDashboard from './components/creator/CreatorDashboard';
 import CreatorWithdraw from './components/creator/CreatorWithdraw';
 import CreatorSettings from './components/creator/CreatorSettings';
+import { loadFaceModels } from './utils/faceApiModelLoader';
 
 // Static Pages
 import About from './components/pages/About';
@@ -52,6 +56,11 @@ const AppContent = () => {
   const [isSubscriptionOpen, setIsSubscriptionOpen] = useState(false);
   const [maintenanceMode, setMaintenanceMode] = useState(false);
   const { currentUser, loading, logout } = useAuth();
+  const ringtone = useRef(new Audio('https://assets.mixkit.co/active_storage/sfx/1350/1350-preview.mp3'));
+  
+  useEffect(() => {
+    if (ringtone.current) ringtone.current.loop = true;
+  }, []);
   const { checkDailyBonus, registerModalCallbacks } = useCoins();
   const navigate = useNavigate();
   const location = useLocation();
@@ -104,6 +113,13 @@ const AppContent = () => {
       bonusCheckedForUser.current = null;
       return;
     }
+
+    // Delay bonus for creators until they are active/verified
+    if (currentUser.isCreator && currentUser.accountStatus !== 'active') return;
+    
+    // Delay bonus until profile is completed (to avoid overlapping modals)
+    if (!currentUser.is_profile_completed) return;
+
     if (bonusCheckedForUser.current === currentUser.id) return;
     bonusCheckedForUser.current = currentUser.id;
 
@@ -112,7 +128,124 @@ const AppContent = () => {
       if (hasBonus) setIsBonusOpen(true);
     };
     checkBonus();
-  }, [currentUser?.id, checkDailyBonus]);
+  }, [currentUser?.id, currentUser?.isCreator, currentUser?.accountStatus, currentUser?.is_profile_completed, checkDailyBonus]);
+
+  // Global Call Listener and UID Registration
+  useEffect(() => {
+    if (!currentUser?.id) return;
+
+
+
+    const handleConnect = () => {
+      console.log("[Global] Socket connected, registering UID:", currentUser.id);
+      socket.emit('register-uid', currentUser.id);
+    };
+
+    const handleIncomingCall = (payload) => {
+      // Support both legacy `send-private-invite` payload and new `request-direct-call` payload
+      const senderUid = payload.senderUid || payload.callerData?.uid;
+      const senderName = payload.senderName || payload.callerData?.name || 'User';
+      const senderPhoto = payload.senderPhoto || payload.callerData?.photoURL;
+      const isNewDirectCall = payload.isNewDirectCall || !!payload.callerSocketId;
+
+      console.log("[Global] Incoming call from:", senderName);
+      ringtone.current.play().catch(e => console.log("Ringtone blocked", e));
+      
+      // If we are on the CreatorDashboard we already show a big modal, skip the toast
+      if (window.location.pathname.includes('/creator') && isNewDirectCall) {
+          return;
+      }
+
+      toast((t) => (
+        <div className="flex flex-col gap-3 min-w-[250px]">
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <div className="w-12 h-12 rounded-full bg-indigo-600 flex items-center justify-center text-white font-bold text-xl overflow-hidden border-2 border-indigo-400">
+                {senderPhoto ? <img src={senderPhoto} className="w-full h-full object-cover" alt="" /> : (senderName ? senderName.charAt(0) : 'U')}
+              </div>
+              <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-[#333] animate-pulse" />
+            </div>
+            <div>
+              <p className="text-white text-sm font-bold">{senderName}</p>
+              <p className="text-white/40 text-[10px]">is calling you now...</p>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-2 mt-2">
+            <button 
+              onClick={() => {
+                if (isNewDirectCall) {
+                    navigate('/chat', { state: { incomingDirectCall: payload } });
+                } else {
+                    socket.emit('accept-private-invite', { targetUid: currentUser.id, senderUid });
+                    if (window.location.pathname !== '/chat') navigate('/chat');
+                }
+                
+                toast.dismiss(t.id);
+                ringtone.current.pause();
+                ringtone.current.currentTime = 0;
+              }}
+              className="flex-1 bg-green-500 hover:bg-green-400 text-white text-xs font-black py-2.5 rounded-xl transition-colors shadow-lg shadow-green-500/20"
+            >
+              ACCEPT
+            </button>
+            <button 
+              onClick={() => {
+                if (isNewDirectCall) {
+                    socket.emit('decline-direct-call', { callerSocketId: payload.callerSocketId });
+                } else {
+                    socket.emit('decline-private-invite', { targetUid: currentUser.id, senderUid });
+                }
+                toast.dismiss(t.id);
+                ringtone.current.pause();
+                ringtone.current.currentTime = 0;
+              }}
+              className="flex-1 bg-white/5 hover:bg-white/10 text-white/60 text-xs font-bold py-2.5 rounded-xl transition-colors"
+            >
+              DECLINE
+            </button>
+          </div>
+        </div>
+      ), { 
+        duration: 15000, 
+        id: `call-${payload.callerSocketId || senderUid}`,
+        position: 'top-right',
+        style: {
+          background: '#1a172e',
+          border: '1px solid rgba(255,255,255,0.1)',
+          padding: '16px',
+          borderRadius: '20px'
+        }
+      });
+    };
+
+    const handleCallCancelled = (payload) => {
+        toast.dismiss(`call-${payload.callerSocketId}`);
+        ringtone.current.pause();
+        ringtone.current.currentTime = 0;
+    };
+
+    socket.on('connect', handleConnect);
+    socket.on('incoming-call', handleIncomingCall);
+    socket.on('call-cancelled', handleCallCancelled);
+
+    if (socket.connected) {
+      handleConnect();
+    }
+
+    return () => {
+      socket.off('connect', handleConnect);
+      socket.off('incoming-call', handleIncomingCall);
+      socket.off('call-cancelled', handleCallCancelled);
+    };
+  }, [currentUser?.id, navigate]);
+
+  // Pre-load AI models for creators or potential creators
+  useEffect(() => {
+    if (currentUser?.isCreator || location.pathname.includes('/creator') || localStorage.getItem('userGender') === 'Female') {
+      loadFaceModels().catch(err => console.error("Initial model load failed", err));
+    }
+  }, [currentUser?.isCreator, location.pathname]);
 
   // Force navigate to home on back button
   useEffect(() => {
@@ -156,13 +289,8 @@ const AppContent = () => {
         navigate('/chat');
       }
     } else {
-      // Not logged in - show gender selection first
-      const savedGender = localStorage.getItem('userGender');
-      if (!savedGender) {
-        setIsGenderModalOpen(true);
-      } else {
-        setIsLoginOpen(true);
-      }
+      // Not logged in - show login modal directly
+      setIsLoginOpen(true);
     }
   };
 
@@ -192,10 +320,15 @@ const AppContent = () => {
         <DailyBonusModal isOpen={isBonusOpen} onClose={() => setIsBonusOpen(false)} />
       )}
       {isCoinStoreOpen && currentUser && (
-        <CoinStore userId={currentUser.id} onClose={() => setIsCoinStoreOpen(false)} />
+        <CoinStoreModal isOpen={isCoinStoreOpen} onClose={() => setIsCoinStoreOpen(false)} />
       )}
       {isSubscriptionOpen && currentUser && (
         <SubscriptionPlans userId={currentUser.id} onClose={() => setIsSubscriptionOpen(false)} />
+      )}
+
+      {/* Mandatory Profile Completion Modal */}
+      {currentUser && !currentUser.is_profile_completed && !isAdminRoute && (
+        <ProfileCompletionModal isOpen={true} user={currentUser} />
       )}
 
       <Routes>
@@ -355,16 +488,15 @@ const ChatLayout = () => {
   useEffect(() => {
     if (loading) return; // wait for Supabase data
     if (currentUser?.isCreator) {
-      if (currentUser.accountStatus === 'active') {
-        navigate('/creator/dashboard', { replace: true });
-      } else {
+      if (currentUser.accountStatus !== 'active') {
         navigate('/creator/onboarding', { replace: true });
       }
+      // If active, they are allowed to stay here (Go Live mode)
     }
   }, [currentUser, navigate, loading]);
 
-  // Show nothing while redirecting a creator
-  if (loading || currentUser?.isCreator) {
+  // Show loader only while loading OR while a non-active creator is being redirected to onboarding
+  if (loading || (currentUser?.isCreator && currentUser?.accountStatus !== 'active')) {
     return (
       <div className="min-h-screen bg-dark-900 flex items-center justify-center">
         <div className="w-12 h-12 rounded-full border-4 border-t-accent-purple border-white/10 animate-spin"></div>

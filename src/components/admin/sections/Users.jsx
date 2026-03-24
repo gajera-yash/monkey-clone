@@ -1,25 +1,80 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { supabase } from '../../../supabase';
-import {
-    Search, Filter, UserMinus,
-    ShieldCheck, Eye, Mail, Trash2, Calendar,
-    Clock, Crown, X
-} from 'lucide-react';
+import { Search, Filter, UserMinus, ShieldCheck, Eye, Mail, Trash2, Calendar, Clock, Crown, X, ChevronLeft, ChevronRight, Users as UsersIcon, User, CreditCard } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { useLocation } from 'react-router-dom';
+
+const StatCard = ({ icon: Icon, label, value, colorClass, iconColorClass }) => (
+    <div className="bg-white border border-slate-200 rounded-[32px] p-8 shadow-sm hover:shadow-md transition-all group flex-1 min-w-[200px]">
+        <div className="flex justify-between items-start mb-6">
+            <div className={`p-4 rounded-3xl ${colorClass} transition-colors group-hover:scale-110 duration-300`}>
+                <Icon size={24} className={iconColorClass} />
+            </div>
+            <div className="flex items-center gap-1.5 px-3 py-1 bg-slate-50 border border-slate-100 rounded-full">
+                <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></div>
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Live</span>
+            </div>
+        </div>
+        <div>
+            <p className="text-[11px] font-black text-slate-400 uppercase tracking-[2px] mb-2">{label}</p>
+            <h3 className="text-4xl font-black text-slate-800 tracking-tighter tabular-nums">{value}</h3>
+        </div>
+    </div>
+);
 
 const Users = () => {
+    const location = useLocation();
     const [users, setUsers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
+
+    useEffect(() => {
+        const params = new URLSearchParams(location.search);
+        const search = params.get('search');
+        if (search) {
+            setSearchTerm(search);
+        }
+    }, [location.search]);
+
     const [filterStatus, setFilterStatus] = useState('all'); // all, active, banned, premium
+    const [filterGender, setFilterGender] = useState('all'); // all, Male, Female, Other
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage] = useState(10);
     const [selectedUser, setSelectedUser] = useState(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [banReason, setBanReason] = useState('');
     const [banDuration, setBanDuration] = useState('5');
+    const [modalTab, setModalTab] = useState('overview'); // overview, transactions
+    const [userTransactions, setUserTransactions] = useState([]);
+    const [txLoading, setTxLoading] = useState(false);
 
     useEffect(() => {
         fetchUsers();
     }, []);
+
+    useEffect(() => {
+        if (isModalOpen && selectedUser && modalTab === 'transactions') {
+            fetchUserTransactions(selectedUser.id);
+        }
+    }, [isModalOpen, selectedUser, modalTab]);
+
+    const fetchUserTransactions = async (userId) => {
+        setTxLoading(true);
+        try {
+            const { data, error } = await supabase
+                .from('coin_transactions')
+                .select('*')
+                .eq('user_id', userId)
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+            setUserTransactions(data || []);
+        } catch (error) {
+            console.error("Failed to load user transactions:", error);
+            toast.error("Failed to load user transactions.");
+        }
+        setTxLoading(false);
+    };
 
     const fetchUsers = async () => {
         setLoading(true);
@@ -128,9 +183,42 @@ const Users = () => {
                 (filterStatus === 'banned' && user.is_blocked) ||
                 (filterStatus === 'premium' && user.is_premium);
 
-            return matchesSearch && matchesFilter;
+            const matchesGender = 
+                filterGender === 'all' || 
+                user.gender === filterGender;
+
+            return matchesSearch && matchesFilter && matchesGender;
         });
-    }, [users, searchTerm, filterStatus]);
+    }, [users, searchTerm, filterStatus, filterGender]);
+    
+    const stats = useMemo(() => {
+        return {
+            total: users.length,
+            male: users.filter(u => u.gender === 'Male').length,
+            female: users.filter(u => u.gender === 'Female').length,
+            purchasers: users.filter(u => (u.total_coins_purchased || 0) > 0).length
+        };
+    }, [users]);
+
+    // Pagination Logic
+    const { paginatedUsers, totalPages } = useMemo(() => {
+        const total = filteredUsers.length;
+        const pages = Math.ceil(total / itemsPerPage);
+        const start = (currentPage - 1) * itemsPerPage;
+        const sliced = filteredUsers.slice(start, start + itemsPerPage);
+        return { paginatedUsers: sliced, totalPages: pages };
+    }, [filteredUsers, currentPage, itemsPerPage]);
+
+    const totalEarned = useMemo(() => {
+        return userTransactions
+            .filter(tx => tx.transaction_type === 'earned' || tx.transaction_type === 'gift')
+            .reduce((sum, tx) => sum + (tx.coins_amount || 0), 0);
+    }, [userTransactions]);
+
+    // Reset to page 1 when filters change
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm, filterStatus, filterGender]);
 
     return (
         <div className="p-10 max-w-[1600px] mx-auto">
@@ -158,17 +246,60 @@ const Users = () => {
                         onChange={(e) => setFilterStatus(e.target.value)}
                         className="bg-white border border-slate-200 px-4 py-3 rounded-2xl outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all shadow-sm font-bold text-slate-600 appearance-none pr-10 cursor-pointer"
                     >
-                        <option value="all">All Users</option>
+                        <option value="all">All Status</option>
                         <option value="active">Active Only</option>
                         <option value="banned">Banned Only</option>
                         <option value="premium">Premium Only</option>
                     </select>
+
+                    <select
+                        value={filterGender}
+                        onChange={(e) => setFilterGender(e.target.value)}
+                        className="bg-white border border-slate-200 px-4 py-3 rounded-2xl outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all shadow-sm font-bold text-slate-600 appearance-none pr-10 cursor-pointer"
+                    >
+                        <option value="all">All Genders</option>
+                        <option value="Male">Male Only</option>
+                        <option value="Female">Female Only</option>
+                        <option value="Other">Other Only</option>
+                    </select>
                 </div>
+            </div>
+            
+            {/* Statistics Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+                <StatCard 
+                    icon={UsersIcon}
+                    label="All Users"
+                    value={stats.total}
+                    colorClass="bg-indigo-50"
+                    iconColorClass="text-indigo-500"
+                />
+                <StatCard 
+                    icon={User}
+                    label="Male Users"
+                    value={stats.male}
+                    colorClass="bg-blue-50"
+                    iconColorClass="text-blue-500"
+                />
+                <StatCard 
+                    icon={User}
+                    label="Female Users"
+                    value={stats.female}
+                    colorClass="bg-pink-50"
+                    iconColorClass="text-pink-500"
+                />
+                <StatCard 
+                    icon={CreditCard}
+                    label="Paying Users"
+                    value={stats.purchasers}
+                    colorClass="bg-emerald-50"
+                    iconColorClass="text-emerald-500"
+                />
             </div>
 
             {/* Table Area */}
             <div className="bg-white border border-slate-200 rounded-[32px] overflow-hidden shadow-xl shadow-slate-200/50">
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto custom-scrollbar">
                     <table className="w-full text-left border-collapse">
                         <thead>
                             <tr className="bg-slate-50/50 border-b border-slate-100 italic-none">
@@ -182,9 +313,9 @@ const Users = () => {
                         <tbody className="divide-y divide-slate-50">
                             {loading ? (
                                 <tr><td colSpan="5" className="p-20 text-center"><div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div><p className="text-slate-400 font-bold uppercase tracking-widest text-xs">Fetching Records...</p></td></tr>
-                            ) : filteredUsers.length === 0 ? (
+                            ) : paginatedUsers.length === 0 ? (
                                 <tr><td colSpan="5" className="p-20 text-center font-bold text-slate-400 uppercase tracking-widest text-xs">No records matching criteria</td></tr>
-                            ) : filteredUsers.map((user) => (
+                            ) : paginatedUsers.map((user) => (
                                 <tr key={user.id} className="hover:bg-indigo-50/30 transition-colors group">
                                     <td className="px-8 py-5">
                                         <div className="flex items-center gap-4">
@@ -194,10 +325,16 @@ const Users = () => {
                                                 </div>
                                                 {user.is_premium && <div className="absolute -top-1 -right-1 w-5 h-5 bg-yellow-400 rounded-lg flex items-center justify-center text-[10px] shadow-sm border-2 border-white"><Crown size={10} className="text-white fill-white" /></div>}
                                             </div>
-                                            <div>
-                                                <div className="font-black text-slate-800 tracking-tight">{user.username || 'Hidden User'}</div>
-                                                <div className="text-xs text-slate-500 font-medium">{user.email}</div>
-                                            </div>
+                                    <div>
+                                        <div className="font-black text-slate-800 tracking-tight">{user.username || 'Hidden User'}
+                                            {user.gender && (
+                                                <span className={`ml-2 text-[9px] px-1.5 py-0.5 rounded font-black uppercase ${user.gender === 'Female' ? 'bg-pink-100 text-pink-600' : 'bg-blue-100 text-blue-600'}`}>
+                                                    {user.gender}
+                                                </span>
+                                            )}
+                                        </div>
+                                        <div className="text-xs text-slate-500 font-medium">{user.email || user.auth_email || '—'}</div>
+                                    </div>
                                         </div>
                                     </td>
                                     <td className="px-8 py-5">
@@ -225,7 +362,7 @@ const Users = () => {
                                         )}
                                     </td>
                                     <td className="px-8 py-5 text-right">
-                                        <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <div className="flex justify-end gap-2">
                                             <button
                                                 onClick={() => { setSelectedUser(user); setIsModalOpen(true); }}
                                                 className="p-2 hover:bg-white hover:shadow-md rounded-xl text-slate-500 hover:text-indigo-600 transition-all border border-transparent hover:border-slate-100"
@@ -248,6 +385,49 @@ const Users = () => {
                         </tbody>
                     </table>
                 </div>
+
+                {/* Pagination Controls */}
+                {!loading && filteredUsers.length > 0 && (
+                    <div className="px-8 py-5 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
+                        <div className="text-xs font-black text-slate-400 uppercase tracking-widest">
+                            Showing {Math.min(filteredUsers.length, (currentPage - 1) * itemsPerPage + 1)}-{Math.min(filteredUsers.length, currentPage * itemsPerPage)} of {filteredUsers.length} records
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                disabled={currentPage === 1}
+                                className="p-2 bg-white border border-slate-200 rounded-xl text-slate-400 hover:text-indigo-600 disabled:opacity-50 transition-all shadow-sm"
+                            >
+                                <ChevronLeft size={18} />
+                            </button>
+                            <div className="flex items-center gap-1">
+                                {[...Array(totalPages)].map((_, i) => {
+                                    const page = i + 1;
+                                    if (totalPages > 7 && Math.abs(page - currentPage) > 2 && page !== 1 && page !== totalPages) {
+                                        if (Math.abs(page - currentPage) === 3) return <span key={page} className="px-2 text-slate-300">...</span>;
+                                        return null;
+                                    }
+                                    return (
+                                        <button
+                                            key={page}
+                                            onClick={() => setCurrentPage(page)}
+                                            className={`w-9 h-9 rounded-xl text-xs font-black transition-all ${currentPage === page ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' : 'bg-white border border-slate-200 text-slate-500 hover:border-indigo-300'}`}
+                                        >
+                                            {page}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                            <button
+                                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                                disabled={currentPage === totalPages}
+                                className="p-2 bg-white border border-slate-200 rounded-xl text-slate-400 hover:text-indigo-600 disabled:opacity-50 transition-all shadow-sm"
+                            >
+                                <ChevronRight size={18} />
+                            </button>
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* Details Modal */}
@@ -261,7 +441,8 @@ const Users = () => {
                                     {selectedUser.avatar_url ? <img src={selectedUser.avatar_url} alt="" className="w-full h-full object-cover" /> : selectedUser.username?.charAt(0)}
                                 </div>
                                 <h3 className="text-xl font-black text-slate-800 text-center">{selectedUser.username}</h3>
-                                <p className="text-slate-500 text-sm font-medium mb-8">{selectedUser.email}</p>
+                                <p className="text-slate-500 text-sm font-medium mb-1">{selectedUser.email || '—'}</p>
+                                <p className="text-[10px] font-mono text-slate-400 mb-8 truncate max-w-full px-2">{selectedUser.id?.slice(0, 16)}...</p>
 
                                 <div className="w-full space-y-3">
                                     <div className="bg-white p-4 rounded-3xl border border-slate-100 shadow-sm">
@@ -300,26 +481,67 @@ const Users = () => {
                             </div>
 
                             {/* Modal Content */}
-                            <div className="flex-1 p-10 overflow-y-auto">
-                                <div className="flex items-center justify-between mb-8">
-                                    <h4 className="text-xl font-black text-slate-800 uppercase tracking-tight">System Data</h4>
-                                    <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-slate-100 rounded-xl transition-colors"><X size={20} /></button>
+                            <div className="flex-1 overflow-y-auto bg-white flex flex-col custom-scrollbar">
+                                {/* Tabs */}
+                                <div className="flex items-center border-b border-slate-100 sticky top-0 bg-white/80 backdrop-blur-md z-10 px-4">
+                                    <div className="flex flex-1">
+                                        <button 
+                                            onClick={() => setModalTab('overview')}
+                                            className={`flex-1 py-5 text-sm font-black uppercase tracking-widest transition-colors ${modalTab === 'overview' ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}
+                                        >
+                                            System Data
+                                        </button>
+                                        <button 
+                                            onClick={() => setModalTab('transactions')}
+                                            className={`flex-1 py-5 text-sm font-black uppercase tracking-widest transition-colors ${modalTab === 'transactions' ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}
+                                        >
+                                            Coin History
+                                        </button>
+                                    </div>
+                                    <button 
+                                        onClick={() => setIsModalOpen(false)}
+                                        className="p-2 ml-4 hover:bg-slate-100 rounded-xl transition-colors text-slate-400 hover:text-slate-600"
+                                    >
+                                        <X size={20} />
+                                    </button>
                                 </div>
 
-                                <div className="grid grid-cols-2 md:grid-cols-3 gap-6 mb-8">
+                                <div className="p-10">
+                                {modalTab === 'overview' ? (
+                                    <>
+                                        <div className="grid grid-cols-2 md:grid-cols-3 gap-6 mb-8">
                                     <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
                                         <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Gender</div>
-                                        <div className="font-bold text-slate-700">{selectedUser.gender || 'Not Specified'}</div>
+                                        <div className="font-bold text-slate-700">
+                                            {selectedUser.gender
+                                                ? <span className={`px-2 py-0.5 rounded-lg text-sm font-black ${selectedUser.gender === 'Female' ? 'bg-pink-50 text-pink-600' : 'bg-blue-50 text-blue-600'}`}>{selectedUser.gender}</span>
+                                                : <span className="text-slate-400">Not Specified</span>}
+                                        </div>
                                     </div>
                                     <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
                                         <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Birth Date</div>
-                                        <div className="font-bold text-slate-700">{selectedUser.dob ? new Date(selectedUser.dob).toLocaleDateString() : 'Unknown'}</div>
+                                        <div className="font-bold text-slate-700">
+                                            {selectedUser.birthdate
+                                                ? new Date(selectedUser.birthdate).toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: 'numeric' })
+                                                : <span className="text-slate-400">Not Provided</span>}
+                                        </div>
                                     </div>
                                     <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
                                         <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Location</div>
-                                        <div className="font-bold text-slate-700">{selectedUser.location || 'Unknown Location'}</div>
+                                        <div className="font-bold text-slate-700">
+                                            {(selectedUser.location_city || selectedUser.location_country)
+                                                ? [selectedUser.location_city, selectedUser.location_country].filter(Boolean).join(', ')
+                                                : <span className="text-slate-400">Not Available</span>}
+                                        </div>
+                                    </div>
+                                    <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 col-span-2 md:col-span-3">
+                                        <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Email Address</div>
+                                        <div className="font-bold text-slate-700 break-all">
+                                            {selectedUser.email || <span className="text-slate-400">Not Available</span>}
+                                        </div>
                                     </div>
                                 </div>
+
 
                                 <div className="grid grid-cols-2 gap-6 mb-10">
                                     <div className="p-5 bg-indigo-50/50 rounded-3xl border border-indigo-100/50">
@@ -404,11 +626,67 @@ const Users = () => {
                                         ERASE PLAYER DATA PERMANENTLY
                                     </button>
                                 </div>
+                                </>
+                            ) : (
+                                <>
+                                    {/* Coin History Tab */}
+                                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10 text-center">
+                                            <div className="bg-amber-50 p-6 rounded-3xl border border-amber-100">
+                                                <div className="text-[10px] font-black uppercase text-amber-500 tracking-widest mb-1">Current Balance</div>
+                                                <div className="text-2xl font-black text-amber-600">{selectedUser.coins || 0}</div>
+                                            </div>
+                                            <div className="bg-emerald-50 p-6 rounded-3xl border border-emerald-100">
+                                                <div className="text-[10px] font-black uppercase text-emerald-500 tracking-widest mb-1">Total Purchased</div>
+                                                <div className="text-2xl font-black text-emerald-600">{selectedUser.total_coins_purchased || 0}</div>
+                                            </div>
+                                            <div className="bg-indigo-50 p-6 rounded-3xl border border-indigo-100">
+                                                <div className="text-[10px] font-black uppercase text-indigo-500 tracking-widest mb-1">Total Claimed</div>
+                                                <div className="text-2xl font-black text-indigo-600">{totalEarned.toLocaleString()}</div>
+                                            </div>
+                                            <div className="bg-rose-50 p-6 rounded-3xl border border-rose-100">
+                                                <div className="text-[10px] font-black uppercase text-rose-500 tracking-widest mb-1">Total Spent</div>
+                                                <div className="text-2xl font-black text-rose-600">{selectedUser.total_coins_spent || 0}</div>
+                                            </div>
+                                        </div>
+
+                                        <h5 className="text-[11px] font-black text-slate-400 uppercase tracking-[3px] mb-6 border-b border-slate-100 pb-2">Transaction Log</h5>
+                                        
+                                        {txLoading ? (
+                                            <div className="p-10 text-center text-slate-400 text-sm font-bold animate-pulse">Loading Ledger...</div>
+                                        ) : userTransactions.length === 0 ? (
+                                            <div className="p-16 border-2 border-dashed border-slate-200 rounded-[32px] text-center text-slate-400 italic-none">
+                                                <span className="text-[10px] font-black uppercase tracking-widest">No coin transactions found</span>
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-4">
+                                                {userTransactions.map(tx => (
+                                                    <div key={tx.id} className="flex items-center justify-between p-5 bg-slate-50 border border-slate-100 rounded-3xl">
+                                                        <div>
+                                                            <div className="font-bold text-slate-700">{tx.description}</div>
+                                                            <div className="flex items-center gap-3 mt-1">
+                                                                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{new Date(tx.created_at).toLocaleString()}</span>
+                                                                <span className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md bg-white border border-slate-200 text-slate-500">{tx.transaction_type}</span>
+                                                            </div>
+                                                        </div>
+                                                        <div className="text-right">
+                                                            <div className={`text-xl font-black ${tx.coins_amount > 0 ? 'text-green-500' : 'text-rose-500'}`}>
+                                                                {tx.coins_amount > 0 ? '+' : ''}{tx.coins_amount}
+                                                            </div>
+                                                            <div className="text-[10px] font-bold text-slate-400">Bal: {tx.coins_balance_after}</div>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </>
+                                )}
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
             )}
+
         </div>
     );
 };

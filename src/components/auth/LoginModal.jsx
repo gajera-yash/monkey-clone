@@ -3,9 +3,10 @@ import { useAuth } from '../../context/AuthContext';
 import { toast } from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 import GenderModal from './GenderModal';
+import { RiFacebookFill, RiMailFill } from "react-icons/ri";
 
 const LoginModal = ({ isOpen, onClose }) => {
-    const { loginWithGoogle, continueAsGuest } = useAuth();
+    const { loginWithGoogle, continueAsGuest, loginWithUserEmail, signUpWithEmail } = useAuth();
     const navigate = useNavigate();
 
     const [loading, setLoading] = useState(false);
@@ -13,16 +14,64 @@ const LoginModal = ({ isOpen, onClose }) => {
     const [ageChecked, setAgeChecked] = useState(false);
     const [termsChecked, setTermsChecked] = useState(false);
     const [isGenderModalOpen, setIsGenderModalOpen] = useState(false);
+    
+    // New state for Email Auth
+    const [view, setView] = useState('social'); // 'social', 'email-login', 'email-signup'
+    const [authMethod, setAuthMethod] = useState('google'); // 'google' or 'email-signup'
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [name, setName] = useState('');
 
     // Get last logged user
     const lastUser = JSON.parse(localStorage.getItem('lastLoggedUser') || 'null');
+
+    // Reset forms when switching views
+    const switchView = (newView) => {
+        setView(newView);
+        setEmail('');
+        setPassword('');
+        setName('');
+    };
 
     const handleGoogleLogin = async () => {
         if (!ageChecked || !termsChecked) {
             toast.error("Please agree to the Terms and Age verification");
             return;
         }
+        setAuthMethod('google');
         setIsGenderModalOpen(true);
+    };
+
+    const handleEmailSignup = async (e) => {
+        e.preventDefault();
+        if (!name || !email || !password) {
+            toast.error("Please fill in all fields");
+            return;
+        }
+        if (!ageChecked || !termsChecked) {
+            toast.error("Please agree to the Terms and Age verification");
+            return;
+        }
+        setAuthMethod('email-signup');
+        setIsGenderModalOpen(true);
+    };
+
+    const handleEmailLogin = async (e) => {
+        e.preventDefault();
+        if (!email || !password) {
+            toast.error("Please enter email and password");
+            return;
+        }
+        setLoading(true);
+        try {
+            await loginWithUserEmail(email, password);
+            toast.success('Logged in successfully!');
+            onClose();
+        } catch (error) {
+            console.error(error);
+        } finally {
+            setLoading(false);
+        }
     };
 
     const onGenderSelect = async (gender) => {
@@ -30,7 +79,18 @@ const LoginModal = ({ isOpen, onClose }) => {
         localStorage.setItem('userGender', gender);
         setLoading(true);
         try {
-            await loginWithGoogle();
+            if (authMethod === 'google') {
+                await loginWithGoogle();
+            } else if (authMethod === 'email-signup') {
+                const res = await signUpWithEmail(email, password, name);
+                if (res?.needsVerification) {
+                    toast.success('Verification email sent! Please check your inbox before logging in.', { duration: 6000 });
+                    setView('email-login'); // switch to login view for when they come back
+                } else {
+                    toast.success('Account created successfully!');
+                }
+                onClose();
+            }
         } catch (error) {
             console.error(error);
         } finally {
@@ -76,7 +136,7 @@ const LoginModal = ({ isOpen, onClose }) => {
                         <h1 className="text-4xl font-extrabold text-white tracking-tight">Strangy</h1>
                     </div>
 
-                    {!showOptions && lastUser ? (
+                    {!showOptions && lastUser && view === 'social' ? (
                         <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                             {/* Last User Card */}
                             <button
@@ -114,7 +174,7 @@ const LoginModal = ({ isOpen, onClose }) => {
                                 More sign-in options
                             </button>
                         </div>
-                    ) : (
+                    ) : view === 'social' ? (
                         <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                             {/* Connect with Google Main Button */}
                             <button
@@ -134,23 +194,31 @@ const LoginModal = ({ isOpen, onClose }) => {
                             </div>
 
                             {/* Social Grid */}
-                            <div className="grid grid-cols-4 gap-4 mb-10">
+                            <div className="flex justify-center gap-8 mb-10">
                                 {[
-                                    { icon: 'https://www.svgrepo.com/show/475647/facebook-color.svg', label: 'FB' },
-                                    { icon: 'https://www.svgrepo.com/show/442911/apple-logo.svg', label: 'Apple', filter: 'brightness(0) invert(1)' },
-                                    { icon: 'https://www.svgrepo.com/show/475647/facebook-color.svg', label: 'FB' },
-                                    { icon: 'https://www.svgrepo.com/show/442911/apple-logo.svg', label: 'Apple', filter: 'brightness(0) invert(1)' },
-                                    { icon: 'https://www.svgrepo.com/show/349340/email-fill.svg', label: 'Email', filter: 'brightness(0) invert(1)' }
-                                ].map((item, idx) => (
+                                    { 
+                                        id: 'facebook', 
+                                        Icon: RiFacebookFill,
+                                        colorClass: 'text-white',
+                                        label: 'Facebook',
+                                        onClick: () => toast.success('Facebook login coming soon!')
+                                    },
+                                    { 
+                                        id: 'email', 
+                                        Icon: RiMailFill,
+                                        colorClass: 'text-white',
+                                        label: 'Email', 
+                                        onClick: () => switchView('email-login') 
+                                    }
+                                ].map((item) => (
                                     <button
-                                        key={idx}
-                                        className="aspect-square rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-all border border-white/10 group"
+                                        key={item.id}
+                                        onClick={item.onClick}
+                                        className="w-16 h-16 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-all border border-white/10 group shadow-xl"
+                                        title={item.label}
                                     >
-                                        <img
-                                            src={item.icon}
-                                            alt={item.label}
-                                            className="w-6 h-6 transition-transform group-hover:scale-110"
-                                            style={{ filter: item.filter }}
+                                        <item.Icon 
+                                            className={`w-8 h-8 transition-transform group-hover:scale-110 ${item.colorClass}`}
                                         />
                                     </button>
                                 ))}
@@ -183,7 +251,137 @@ const LoginModal = ({ isOpen, onClose }) => {
                                 </label>
                             </div>
                         </div>
-                    )}
+                    ) : view === 'email-login' ? (
+                        <div className="animate-in fade-in slide-in-from-right-4 duration-300">
+                            <h2 className="text-2xl font-bold text-white mb-6">Welcome Back</h2>
+                            <form onSubmit={handleEmailLogin} className="space-y-4">
+                                <input
+                                    type="email"
+                                    placeholder="Email address"
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                    className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-white/40 focus:outline-none focus:border-white/30 transition-colors"
+                                    required
+                                />
+                                <input
+                                    type="password"
+                                    placeholder="Password"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-white/40 focus:outline-none focus:border-white/30 transition-colors"
+                                    required
+                                />
+                                <button
+                                    type="submit"
+                                    disabled={loading}
+                                    className="w-full bg-white text-gray-900 font-bold py-3.5 rounded-xl hover:bg-gray-100 transition-colors disabled:opacity-70 mt-4"
+                                >
+                                    {loading ? 'Logging in...' : 'Log In'}
+                                </button>
+                            </form>
+                            
+                            <div className="mt-6 space-y-3">
+                                <p className="text-white/60 text-sm">
+                                    Don't have an account?{' '}
+                                    <button onClick={() => switchView('email-signup')} className="text-white font-bold hover:underline">
+                                        Sign up
+                                    </button>
+                                </p>
+                                <button
+                                    onClick={() => switchView('social')}
+                                    className="text-white/40 hover:text-white text-sm transition-colors flex items-center justify-center gap-2 mx-auto"
+                                >
+                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                                    </svg>
+                                    Back to options
+                                </button>
+                            </div>
+                        </div>
+                    ) : view === 'email-signup' ? (
+                        <div className="animate-in fade-in slide-in-from-right-4 duration-300">
+                            <h2 className="text-2xl font-bold text-white mb-6">Create Account</h2>
+                            <form onSubmit={handleEmailSignup} className="space-y-4">
+                                <input
+                                    type="text"
+                                    placeholder="Full Name"
+                                    value={name}
+                                    onChange={(e) => setName(e.target.value)}
+                                    className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-white/40 focus:outline-none focus:border-white/30 transition-colors"
+                                    required
+                                />
+                                <input
+                                    type="email"
+                                    placeholder="Email address"
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                    className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-white/40 focus:outline-none focus:border-white/30 transition-colors"
+                                    required
+                                />
+                                <input
+                                    type="password"
+                                    placeholder="Password"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-white/40 focus:outline-none focus:border-white/30 transition-colors"
+                                    required
+                                />
+
+                                {/* Checkboxes for Signup */}
+                                <div className="space-y-3 text-left pt-2 pb-2">
+                                    <label className="flex items-start gap-3 cursor-pointer group text-white/70 hover:text-white transition-colors">
+                                        <input
+                                            type="checkbox"
+                                            checked={ageChecked}
+                                            onChange={(e) => setAgeChecked(e.target.checked)}
+                                            className="mt-1 w-5 h-5 rounded border-white/20 bg-white/10 checked:bg-white checked:border-white transition-all cursor-pointer"
+                                        />
+                                        <span className="text-xs font-medium pt-1">
+                                            I am at least 18 years old.
+                                        </span>
+                                    </label>
+
+                                    <label className="flex items-start gap-3 cursor-pointer group text-white/70 hover:text-white transition-colors">
+                                        <input
+                                            type="checkbox"
+                                            checked={termsChecked}
+                                            onChange={(e) => setTermsChecked(e.target.checked)}
+                                            className="mt-1 w-5 h-5 rounded border-white/20 bg-white/10 checked:bg-white checked:border-white transition-all cursor-pointer"
+                                        />
+                                        <span className="text-xs font-medium pt-1">
+                                            I agree to the Terms of Service & Privacy Policy.
+                                        </span>
+                                    </label>
+                                </div>
+
+                                <button
+                                    type="submit"
+                                    disabled={loading}
+                                    className="w-full bg-white text-gray-900 font-bold py-3.5 rounded-xl hover:bg-gray-100 transition-colors disabled:opacity-70 mt-2"
+                                >
+                                    {loading ? 'Creating...' : 'Sign Up'}
+                                </button>
+                            </form>
+                            
+                            <div className="mt-6 space-y-3">
+                                <p className="text-white/60 text-sm">
+                                    Already have an account?{' '}
+                                    <button onClick={() => switchView('email-login')} className="text-white font-bold hover:underline">
+                                        Log in
+                                    </button>
+                                </p>
+                                <button
+                                    onClick={() => switchView('social')}
+                                    className="text-white/40 hover:text-white text-sm transition-colors flex items-center justify-center gap-2 mx-auto"
+                                >
+                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                                    </svg>
+                                    Back to options
+                                </button>
+                            </div>
+                        </div>
+                    ) : null}
 
                     {/* Footer Spacer */}
                     <div className="mt-12"></div>

@@ -17,6 +17,12 @@ export const CoinsProvider = ({ children }) => {
     const [onOpenDailyBonus, setOnOpenDailyBonus] = useState(null);
     const [streakRewards, setStreakRewards] = useState([100, 500, 1000, 5000, 10000, 50000, 100000]); // default fallback
     const [dailyCoinsBase, setDailyCoinsBase] = useState(10);
+    const [filterCosts, setFilterCosts] = useState({ gender: 5, location: 5, age: 5, standard: 0 }); // default fallback
+    const [creatorMonetizationSettings, setCreatorMonetizationSettings] = useState({ 
+        randomChatCoins: 15, 
+        privateCallCost: 60, 
+        privateCallPercentage: 50 
+    });
 
     // Sync coins with currentUser from AuthContext
     useEffect(() => {
@@ -47,13 +53,24 @@ export const CoinsProvider = ({ children }) => {
                 setTransactions(txData);
             }
 
-            // 2. Fetch System Settings (Streak Rewards)
+            // 2. Fetch System Settings (Streak Rewards + Filter Costs)
             const { data: settingsData, error: settingsError } = await supabase
                 .from('system_settings')
                 .select('*')
-                .in('key', ['daily_coins', 'streak_rewards']);
+                .in('key', [
+                    'daily_coins', 
+                    'streak_rewards', 
+                    'filter_cost_gender', 
+                    'filter_cost_location', 
+                    'filter_cost_age', 
+                    'filter_cost_standard',
+                    'creator_random_chat_coins',
+                    'private_call_cost_per_minute',
+                    'creator_private_call_percentage'
+                ]);
             
             if (!settingsError && settingsData) {
+                const newFilterCosts = { gender: 5, location: 5, age: 5, standard: 0 };
                 settingsData.forEach(row => {
                     if (row.key === 'daily_coins') {
                         setDailyCoinsBase(parseInt(row.value) || 10);
@@ -64,7 +81,22 @@ export const CoinsProvider = ({ children }) => {
                             if (Array.isArray(parsed)) setStreakRewards(parsed);
                         } catch (_) {}
                     }
+                    if (row.key === 'filter_cost_gender') newFilterCosts.gender = parseInt(row.value) || 5;
+                    if (row.key === 'filter_cost_location') newFilterCosts.location = parseInt(row.value) || 5;
+                    if (row.key === 'filter_cost_age') newFilterCosts.age = parseInt(row.value) || 5;
+                    if (row.key === 'filter_cost_standard') newFilterCosts.standard = parseInt(row.value) || 0;
+                    
+                    if (row.key === 'creator_random_chat_coins') {
+                        setCreatorMonetizationSettings(prev => ({ ...prev, randomChatCoins: parseInt(row.value) || 15 }));
+                    }
+                    if (row.key === 'private_call_cost_per_minute') {
+                        setCreatorMonetizationSettings(prev => ({ ...prev, privateCallCost: parseInt(row.value) || 60 }));
+                    }
+                    if (row.key === 'creator_private_call_percentage') {
+                        setCreatorMonetizationSettings(prev => ({ ...prev, privateCallPercentage: parseInt(row.value) || 50 }));
+                    }
                 });
+                setFilterCosts(newFilterCosts);
             }
 
         } catch (error) {
@@ -102,7 +134,7 @@ export const CoinsProvider = ({ children }) => {
                         id: currentUser.id,
                         username: currentUser.displayName || 'User',
                         avatar_url: currentUser.photoURL,
-                        coins: newBalance
+                        coins: 50 + amount
                     });
                 if (insertError) throw insertError;
             }
@@ -229,22 +261,50 @@ export const CoinsProvider = ({ children }) => {
         await refreshProfile();
     };
 
-    // Get streak info from localStorage
-    const getDailyStreakInfo = (userId) => {
-        const now = Date.now();
-        const lastClaimTime = parseInt(localStorage.getItem(`dailyBonus_lastTime_${userId}`) || '0', 10);
-        const lastClaimDay = parseInt(localStorage.getItem(`dailyBonus_lastDay_${userId}`) || '0', 10);
+    // Get streak info from profile (Supabase)
+    const getDailyStreakInfo = (userProfile) => {
+        if (!userProfile || !userProfile.id) {
+            return { currentDay: 1, claimedDays: [], canClaim: false, nextClaimTime: null };
+        }
 
-        // Check if 24 hours have passed since last claim
-        const MS_IN_DAY = 24 * 60 * 60 * 1000;
-        const timeSinceLastClaim = now - lastClaimTime;
-        const canClaim = timeSinceLastClaim >= MS_IN_DAY || lastClaimTime === 0;
+        const now = new Date();
+        const lastClaimTimestamp = userProfile.last_reward_claim ? new Date(userProfile.last_reward_claim).getTime() : 0;
+        const lastClaimDay = userProfile.reward_streak || 0;
 
-        // Reset streak if more than 48 hours have passed
-        const isMissed = timeSinceLastClaim > (MS_IN_DAY * 2) && lastClaimTime !== 0;
+        let canClaim = false;
+        let isMissed = false;
+        
+        // Calculate start of today (midnight local time)
+        const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+        
+        let nextClaimTime = todayMidnight + 24 * 60 * 60 * 1000; // Midnight tomorrow
+
+        if (lastClaimTimestamp === 0) {
+            canClaim = true;
+        } else {
+            const lastDate = new Date(lastClaimTimestamp);
+            const lastClaimMidnight = new Date(lastDate.getFullYear(), lastDate.getMonth(), lastDate.getDate()).getTime();
+            
+            // Days difference based on midnight-to-midnight (whole numbers only)
+            const msDiff = todayMidnight - lastClaimMidnight;
+            const daysDiff = Math.floor(msDiff / (24 * 60 * 60 * 1000));
+            
+            if (daysDiff === 0) {
+                // Same day
+                canClaim = false;
+                nextClaimTime = lastClaimMidnight + 24 * 60 * 60 * 1000;
+            } else if (daysDiff === 1) {
+                // Next day!
+                canClaim = true;
+            } else {
+                // Missed more than 1 day
+                canClaim = true;
+                isMissed = true;
+            }
+        }
 
         let currentDay = 1;
-        if (lastClaimTime === 0 || isMissed) {
+        if (lastClaimTimestamp === 0 || isMissed) {
             currentDay = 1;
         } else if (canClaim) {
             currentDay = Math.min(lastClaimDay + 1, 7);
@@ -254,28 +314,28 @@ export const CoinsProvider = ({ children }) => {
 
         // Build list of claimed days
         const claimedDays = [];
-        if (!canClaim && lastClaimTime !== 0) {
-            // If already claimed in last 24h, mark days up to lastClaimDay as claimed
+        if (!canClaim && lastClaimTimestamp !== 0) {
+            // If already claimed today, mark days up to lastClaimDay as claimed
             for (let d = 1; d <= lastClaimDay; d++) claimedDays.push(d);
         } else {
             // Otherwise mark days before currentDay as claimed
             for (let d = 1; d < currentDay; d++) claimedDays.push(d);
         }
 
-        return { currentDay, claimedDays, canClaim, nextClaimTime: lastClaimTime + MS_IN_DAY };
+        return { currentDay, claimedDays, canClaim, nextClaimTime };
     };
 
     // Check if bonus is available today
     const checkDailyBonus = async () => {
         if (!currentUser?.id) return false;
-        const { canClaim } = getDailyStreakInfo(currentUser.id);
+        const { canClaim } = getDailyStreakInfo(currentUser);
         return canClaim;
     };
 
     const claimDailyBonus = async () => {
         if (!currentUser?.id) return false;
 
-        const { currentDay, canClaim } = getDailyStreakInfo(currentUser.id);
+        const { currentDay, canClaim } = getDailyStreakInfo(currentUser);
 
         if (!canClaim) {
             toast.error("Reward already claimed. Come back later!");
@@ -286,8 +346,26 @@ export const CoinsProvider = ({ children }) => {
 
         const success = await addCoins(reward, `Day ${currentDay} Daily Bonus`);
         if (success) {
-            localStorage.setItem(`dailyBonus_lastTime_${currentUser.id}`, Date.now().toString());
-            localStorage.setItem(`dailyBonus_lastDay_${currentUser.id}`, currentDay.toString());
+            try {
+                // Update profile in Supabase
+                const { error } = await supabase
+                    .from('profiles')
+                    .update({
+                        last_reward_claim: new Date().toISOString(),
+                        reward_streak: currentDay
+                    })
+                    .eq('id', currentUser.id);
+
+                if (error) throw error;
+
+                // Cleanup old localStorage items (migration)
+                localStorage.removeItem(`dailyBonus_lastTime_${currentUser.id}`);
+                localStorage.removeItem(`dailyBonus_lastDay_${currentUser.id}`);
+
+                await refreshProfile();
+            } catch (error) {
+                console.error("Error updating streak in DB:", error);
+            }
         }
         return success;
     };
@@ -307,7 +385,9 @@ export const CoinsProvider = ({ children }) => {
         checkDailyBonus,
         claimDailyBonus,
         getDailyStreakInfo,
-        streakRewards // Export this so the modal can use it
+        streakRewards, // Export this so the modal can use it
+        filterCosts, // Admin-configurable per-match filter costs
+        creatorMonetizationSettings, // Admin-configurable creator earnings
     };
 
     return (

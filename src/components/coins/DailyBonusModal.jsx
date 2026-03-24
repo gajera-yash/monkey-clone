@@ -11,7 +11,7 @@ const DailyBonusModal = ({ isOpen, onClose }) => {
 
     useEffect(() => {
         if (isOpen && currentUser?.id && currentUser?.role !== 'admin') {
-            const info = getDailyStreakInfo(currentUser.id);
+            const info = getDailyStreakInfo(currentUser);
             setStreakInfo(info);
         }
     }, [isOpen, currentUser, getDailyStreakInfo]);
@@ -34,7 +34,7 @@ const DailyBonusModal = ({ isOpen, onClose }) => {
             if (success) {
                 toast.success('Daily Bonus Claimed! 🎉');
                 // Refresh local streak info
-                const info = getDailyStreakInfo(currentUser.id);
+                const info = getDailyStreakInfo(currentUser);
                 setStreakInfo(info);
             }
         } catch (error) {

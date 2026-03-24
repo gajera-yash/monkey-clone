@@ -5,7 +5,7 @@ import { supabase } from '../../supabase';
 import toast from 'react-hot-toast';
 
 const VoiceVerification = () => {
-    const { currentUser, updateProfileInfo } = useAuth();
+    const { currentUser, updateProfileInfo, refreshProfile } = useAuth();
     const navigate = useNavigate();
 
     const [isRecording, setIsRecording] = useState(false);
@@ -46,7 +46,7 @@ const VoiceVerification = () => {
 
             timerIntervalRef.current = setInterval(() => {
                 setRecordingTime(prev => {
-                    if (prev >= 15) { // Max 15 seconds
+                    if (prev >= 8) { // Max 8 seconds is enough
                         stopRecording();
                         return prev;
                     }
@@ -78,47 +78,74 @@ const VoiceVerification = () => {
         if (!audioBlob || !currentUser?.uid) return;
 
         setIsUploading(true);
-        const toastId = toast.loading("Uploading voice verification...");
+        const toastId = toast.loading("Completing verification...");
 
         try {
+            // Check AI confidence from face verification to decide on auto-approval
+            const { data: vData } = await supabase
+                .from('verifications')
+                .select('ai_confidence')
+                .eq('user_id', currentUser.uid)
+                .maybeSingle();
+
+            const isHighlyConfident = vData?.ai_confidence > 0.85;
+
+            // FAST PATH: Update DB immediately
+            const [approveResult, profileResult] = await Promise.all([
+                supabase
+                    .from('verifications')
+                    .update({
+                        status: isHighlyConfident ? 'approved' : 'pending',
+                        ai_notes: isHighlyConfident 
+                            ? `Auto-approved via AI (${Math.round(vData.ai_confidence * 100)}% confidence)` 
+                            : `Pending audit (AI confidence: ${Math.round((vData?.ai_confidence || 0) * 100)}%)`
+                    })
+                    .eq('user_id', currentUser.uid),
+
+                supabase
+                    .from('profiles')
+                    .update({ 
+                        is_verified: isHighlyConfident, 
+                        account_status: isHighlyConfident ? 'active' : 'pending', 
+                        is_creator: true 
+                    })
+                    .eq('id', currentUser.uid)
+            ]);
+
+            if (approveResult.error) throw approveResult.error;
+            if (profileResult.error) throw profileResult.error;
+
+            // Trigger navigation as soon as DB is updated — don't await refreshProfile
+            refreshProfile(); 
+            
+            if (isHighlyConfident) {
+                toast.success("Identity Verified! Welcome! 🎉", { id: toastId });
+                navigate('/creator/dashboard');
+            } else {
+                toast.success("Verification submitted! Awaiting admin review.", { id: toastId });
+                navigate('/'); // Send to home or a "thank you" page
+            }
+
+            // BACKGROUND UPLOAD: Upload audio file AFTER user is already on dashboard
+            // This keeps the voice recording in storage for admin review
             const fileName = `${currentUser.uid}/voice_${Date.now()}.webm`;
-
-            // 1. Upload to Supabase Storage
-            const { data: uploadData, error: uploadError } = await supabase.storage
+            supabase.storage
                 .from('verifications')
-                .upload(fileName, audioBlob, { contentType: 'audio/webm' });
-
-            if (uploadError) throw uploadError;
-
-            // 2. Get Public URL
-            const { data: { publicUrl } } = supabase.storage
-                .from('verifications')
-                .getPublicUrl(fileName);
-
-            // 3. Update Verifications Table
-            const { error: dbError } = await supabase
-                .from('verifications')
-                .update({
-                    voice_url: publicUrl,
-                    status: 'pending'
-                })
-                .eq('user_id', currentUser.uid);
-
-            if (dbError) throw dbError;
-
-            // 4. Finalize Verification (Auto-approve since Face Check passed)
-            await supabase
-                .from('verifications')
-                .update({ status: 'approved', ai_notes: 'Verified via client-side face-api' })
-                .eq('user_id', currentUser.uid);
-
-            await supabase
-                .from('profiles')
-                .update({ is_verified: true, accountStatus: 'active' })
-                .eq('id', currentUser.uid);
-
-            toast.success("Verification Complete!", { id: toastId });
-            navigate('/creator/dashboard');
+                .upload(fileName, audioBlob, { contentType: 'audio/webm', upsert: true })
+                .then(({ error: uploadError }) => {
+                    if (uploadError) {
+                        console.warn("Background voice upload failed:", uploadError.message);
+                        return;
+                    }
+                    const { data: { publicUrl } } = supabase.storage
+                        .from('verifications')
+                        .getPublicUrl(fileName);
+                    // Save voice URL silently
+                    supabase.from('verifications')
+                        .update({ voice_url: publicUrl })
+                        .eq('user_id', currentUser.uid)
+                        .then(() => console.log("Voice URL saved in background."));
+                });
 
         } catch (error) {
             console.error("Voice Upload failed", error);

@@ -32,7 +32,9 @@ ALTER TABLE public.profiles
   ADD COLUMN IF NOT EXISTS birthdate date,
   ADD COLUMN IF NOT EXISTS location_city text,
   ADD COLUMN IF NOT EXISTS location_country text,
-  ADD COLUMN IF NOT EXISTS last_seen timestamptz DEFAULT now();
+  ADD COLUMN IF NOT EXISTS last_seen timestamptz DEFAULT now(),
+  ADD COLUMN IF NOT EXISTS safety_settings jsonb DEFAULT '{}'::jsonb,
+  ADD COLUMN IF NOT EXISTS match_preferences jsonb DEFAULT '{}'::jsonb;
 
 -- 4. Modify Chat Logs Table
 ALTER TABLE public.chat_logs

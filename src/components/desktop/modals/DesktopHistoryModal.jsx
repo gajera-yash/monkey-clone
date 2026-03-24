@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../../supabase';
 import { useAuth } from '../../../context/AuthContext';
+import { useCoins } from '../../../context/CoinsContext';
 import toast from 'react-hot-toast';
 
 const DesktopHistoryModal = ({ onClose }) => {
     const { currentUser } = useAuth();
+    const { coins, creatorMonetizationSettings } = useCoins();
     const [historyData, setHistoryData] = useState([]);
     const [loading, setLoading] = useState(true);
 
@@ -38,11 +40,13 @@ const DesktopHistoryModal = ({ onClose }) => {
                     const partner = item.partner;
                     return {
                         id: item.id,
+                        uid: partner?.id,
                         name: partner?.username || 'Unknown',
                         avatar: partner?.avatar_url,
                         time: new Date(item.start_time).toLocaleString(),
                         duration: item.duration ? `${Math.floor(item.duration / 60)}m ${item.duration % 60}s` : null,
-                        location: 'Global' // Supabase schema doesn't have location yet
+                        location: 'Global',
+                        gender: partner?.gender || 'Both'
                     };
                 });
                 setHistoryData(formatted);
@@ -69,6 +73,19 @@ const DesktopHistoryModal = ({ onClose }) => {
         } catch (error) {
             toast.error("Failed to delete");
         }
+    };
+
+    const handleCallUser = (item) => {
+        if (!item.uid) return;
+        
+        const callCost = creatorMonetizationSettings?.privateCallCost || 60;
+        if (coins < callCost) {
+            toast.error(`You need at least ${callCost} coins for a private call`);
+            return;
+        }
+
+        onClose();
+        window.location.href = `/chat?directCall=${item.uid}&name=${encodeURIComponent(item.name)}&photo=${encodeURIComponent(item.avatar || '')}&gender=${encodeURIComponent(item.gender || 'Female')}`;
     };
 
     const avatarColors = [
@@ -141,8 +158,12 @@ const DesktopHistoryModal = ({ onClose }) => {
                                         </div>
                                     </div>
                                 </div>
-                                <button className="w-12 h-12 rounded-full bg-yellow-400 flex items-center justify-center text-2xl shadow-lg shadow-yellow-400/20 transform hover:scale-110 active:scale-95 transition-all flex-shrink-0">
-                                    💌
+                                <button 
+                                    onClick={() => handleCallUser(item)}
+                                    className="w-12 h-12 rounded-full bg-yellow-400 flex items-center justify-center text-2xl shadow-lg shadow-yellow-400/20 transform hover:scale-110 active:scale-95 transition-all flex-shrink-0"
+                                    title="Call again"
+                                >
+                                    📞
                                 </button>
                             </div>
                         </div>

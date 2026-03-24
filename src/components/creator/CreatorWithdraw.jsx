@@ -15,7 +15,7 @@ const CreatorWithdraw = () => {
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     const MINIMUM_WITHDRAWAL = 1000;
-    const availableBalance = currentUser?.availableBalance || 0;
+    const availableBalance = currentUser?.coins || 0;
 
     const handleWithdraw = async (e) => {
         e.preventDefault();
@@ -108,27 +108,27 @@ const CreatorWithdraw = () => {
                     {/* Left Col - Balance & Stats */}
                     <div className="md:col-span-1 space-y-4">
                         <div className="bg-gradient-to-br from-dark-800 to-dark-900 border border-white/10 p-6 rounded-3xl relative overflow-hidden shadow-2xl">
-                            <div className="absolute top-0 right-0 w-32 h-32 bg-green-500/10 blur-3xl -mr-10 -mt-10 rounded-full"></div>
-                            <p className="text-gray-400 text-sm font-medium mb-2 relative z-10">Available Balance</p>
-                            <h2 className="text-4xl font-black text-green-400 relative z-10 drop-shadow-[0_0_15px_rgba(74,222,128,0.3)]">
-                                ₹{availableBalance.toLocaleString()}
+                            <div className="absolute top-0 right-0 w-32 h-32 bg-yellow-500/10 blur-3xl -mr-10 -mt-10 rounded-full"></div>
+                            <p className="text-gray-400 text-sm font-medium mb-2 relative z-10">Available Coins</p>
+                            <h2 className="text-4xl font-black text-yellow-400 relative z-10 drop-shadow-[0_0_15px_rgba(234,179,8,0.3)]">
+                                🪙 {currentUser?.coins?.toLocaleString() || 0}
                             </h2>
 
                             <div className="mt-8 pt-6 border-t border-white/5 space-y-3 relative z-10">
                                 <div className="flex justify-between text-sm">
-                                    <span className="text-gray-500">Total Earned</span>
-                                    <span className="text-white font-medium">₹{(currentUser?.totalEarnings || 0).toLocaleString()}</span>
+                                    <span className="text-gray-500">Total Coins Earned</span>
+                                    <span className="text-white font-medium">🪙 {(currentUser?.coins || 0).toLocaleString()}</span>
                                 </div>
                                 <div className="flex justify-between text-sm">
                                     <span className="text-gray-500">Withdrawn</span>
-                                    <span className="text-white font-medium">₹{(currentUser?.lifetimeWithdrawn || 0).toLocaleString()}</span>
+                                    <span className="text-white font-medium">🪙 0</span>
                                 </div>
                             </div>
                         </div>
 
                         <div className="bg-blue-500/10 border border-blue-500/30 p-5 rounded-2xl flex gap-3 text-blue-300 text-sm">
                             <span className="text-xl">ℹ️</span>
-                            <p>Withdrawals are processed manually within 24-48 business hours. Minimum payout is ₹1,000.</p>
+                            <p>Withdrawals are processed manually within 24-48 business hours. Minimum payout is 🪙 1,000.</p>
                         </div>
                     </div>
 
@@ -167,22 +167,22 @@ const CreatorWithdraw = () => {
 
                             {/* Amount Input */}
                             <div className="mb-8">
-                                <label className="block text-sm font-bold text-gray-300 mb-2">Withdrawal Amount (₹)</label>
+                                <label className="block text-sm font-bold text-gray-300 mb-2">Withdrawal Amount (Coins)</label>
                                 <div className="relative">
-                                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl text-gray-400 font-bold">₹</span>
+                                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl text-gray-400 font-bold">🪙</span>
                                     <input
                                         type="number"
                                         value={amount}
                                         onChange={(e) => setAmount(e.target.value)}
-                                        placeholder="0.00"
-                                        className="w-full bg-dark-900 border border-white/10 rounded-2xl py-4 pl-10 pr-4 text-xl font-bold text-white outline-none focus:border-accent-purple transition-colors"
+                                        placeholder="0"
+                                        className="w-full bg-dark-900 border border-white/10 rounded-2xl py-4 pl-12 pr-4 text-xl font-bold text-white outline-none focus:border-accent-purple transition-colors"
                                     />
                                 </div>
                                 <div className="flex justify-between mt-2 px-1">
-                                    <span className="text-xs text-gray-500">Min: ₹1,000</span>
+                                    <span className="text-xs text-gray-500">Min: 🪙 1,000</span>
                                     <button
                                         type="button"
-                                        onClick={() => setAmount(availableBalance.toString())}
+                                        onClick={() => setAmount(currentUser?.coins?.toString() || '0')}
                                         className="text-xs text-accent-pink font-bold hover:underline"
                                     >
                                         Withdraw Max

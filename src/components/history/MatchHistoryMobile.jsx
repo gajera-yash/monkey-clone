@@ -50,10 +50,14 @@ const MatchHistoryMobile = ({ onClose }) => {
                             {/* User row */}
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
-                                    {/* Colored Avatar */}
-                                    <div className={`w-12 h-12 rounded-full ${getColor(match.name)} flex items-center justify-center text-lg font-bold text-white shadow-lg`}>
-                                        {match.avatar || match.name?.charAt(0)?.toUpperCase()}
-                                    </div>
+                                    {/* Colored/Image Avatar */}
+                                    {match.avatar ? (
+                                        <img src={match.avatar} alt={match.name} className="w-12 h-12 rounded-full object-cover shadow-lg shrink-0" />
+                                    ) : (
+                                        <div className={`w-12 h-12 rounded-full ${getColor(match.name)} flex items-center justify-center text-lg font-bold text-white shadow-lg shrink-0`}>
+                                            {match.name?.charAt(0)?.toUpperCase()}
+                                        </div>
+                                    )}
                                     <div>
                                         <div className="flex items-center gap-1.5">
                                             <span className="font-semibold text-white">{match.name}</span>

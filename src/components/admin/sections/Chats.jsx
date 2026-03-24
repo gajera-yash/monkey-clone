@@ -12,6 +12,12 @@ const Chats = () => {
     const [loading, setLoading] = useState(true);
     const [activeView, setActiveView] = useState('active'); // active, history
     const [searchTerm, setSearchTerm] = useState('');
+    const [now, setNow] = useState(Date.now());
+
+    useEffect(() => {
+        const interval = setInterval(() => setNow(Date.now()), 1000);
+        return () => clearInterval(interval);
+    }, []);
 
     useEffect(() => {
         if (activeView === 'active') {
@@ -115,6 +121,34 @@ const Chats = () => {
         }
     };
 
+    const handleCleanup = async () => {
+        const confirm = window.confirm("Are you sure you want to mark all sessions older than 2 hours as finished? This will clean up any 'stuck' live sessions.");
+        if (!confirm) return;
+
+        try {
+            const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+            
+            // Note: We can't easily calculate duration in a bulk update without a DB function
+            // so we'll just set end_time to match start_time + some default if we really needed it, 
+            // but setting end_time is enough to move them to history.
+            const { error } = await supabase
+                .from('chat_logs')
+                .update({ 
+                    end_time: new Date().toISOString(),
+                    duration: 3600 // Default 1 hour if ended by cleanup
+                })
+                .is('end_time', null)
+                .lt('start_time', twoHoursAgo);
+
+            if (error) throw error;
+            toast.success("Cleanup successful. Old 'stuck' sessions have been closed.");
+            fetchActiveChats();
+        } catch (error) {
+            console.error('Cleanup failed:', error);
+            toast.error('Cleanup failed: ' + error.message);
+        }
+    };
+
     const filteredHistory = chatHistory.filter(log => {
         if (!searchTerm) return true;
         const term = searchTerm.toLowerCase();
@@ -173,170 +207,127 @@ const Chats = () => {
                 </div>
             </div>
 
-            {activeView === 'active' ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
-                    {loading ? (
-                        <div className="col-span-full p-20 text-center bg-white rounded-[40px] border border-slate-100">
-                            <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                            <p className="text-slate-400 font-black uppercase tracking-widest text-xs">Connecting to streams...</p>
-                        </div>
-                    ) : activeChats.length === 0 ? (
-                        <div className="col-span-full p-20 text-center bg-white rounded-[40px] border border-slate-100">
-                            <Video size={48} className="text-slate-200 mx-auto mb-4" />
-                            <p className="text-slate-400 font-black uppercase tracking-widest text-xs">No active video chats right now</p>
-                        </div>
-                    ) : activeChats.map((chat) => (
-                        <div key={chat.id} className="bg-white border border-slate-200 rounded-[32px] overflow-hidden shadow-sm hover:shadow-xl transition-all group">
-                            <div className="p-6 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                    <Globe size={14} className="text-indigo-500" />
-                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                                        {chat.room_id ? `Room: ${chat.room_id.slice(0, 12)}...` : 'Global Room'}
-                                    </span>
-                                </div>
-                                <div className="flex items-center gap-2 px-3 py-1 bg-green-100 rounded-full">
-                                    <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></div>
-                                    <span className="text-[10px] font-black text-green-600 uppercase">Live</span>
-                                </div>
-                            </div>
-
-                            <div className="p-8 relative">
-                                <div className="flex items-center justify-between gap-4 mb-8">
-                                    <div className="flex flex-col items-center gap-3 flex-1 min-w-0">
-                                        <div className="w-16 h-16 rounded-[24px] bg-slate-100 p-0.5 border border-slate-200 shadow-sm overflow-hidden">
-                                            {chat.user1?.avatar_url
-                                                ? <img src={chat.user1.avatar_url} alt="" className="w-full h-full object-cover rounded-[22px]" />
-                                                : <div className="w-full h-full flex items-center justify-center font-black text-slate-400">?</div>}
-                                        </div>
-                                        <span className="text-sm font-black text-slate-800 truncate w-full text-center">{chat.user1?.username || 'Guest'}</span>
-                                        <div className="flex gap-2 flex-wrap justify-center">
-                                            <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-md ${chat.user1?.gender === 'female' ? 'bg-pink-100 text-pink-600' : 'bg-blue-100 text-blue-600'}`}>{chat.user1?.gender || 'Unknown'}</span>
-                                            <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-md bg-slate-100 text-slate-500 max-w-[80px] truncate" title={formatLocation(chat.user1)}>{formatLocation(chat.user1)}</span>
-                                        </div>
-                                    </div>
-
-                                    <div className="flex flex-col items-center gap-2">
-                                        <div className="h-px w-12 bg-slate-200"></div>
-                                        <Clock size={16} className="text-slate-300" />
-                                        <div className="h-px w-12 bg-slate-200"></div>
-                                    </div>
-
-                                    <div className="flex flex-col items-center gap-3 flex-1 min-w-0">
-                                        <div className="w-16 h-16 rounded-[24px] bg-slate-100 p-0.5 border border-slate-200 shadow-sm overflow-hidden">
-                                            {chat.user2?.avatar_url
-                                                ? <img src={chat.user2.avatar_url} alt="" className="w-full h-full object-cover rounded-[22px]" />
-                                                : <div className="w-full h-full flex items-center justify-center font-black text-slate-400">?</div>}
-                                        </div>
-                                        <span className="text-sm font-black text-slate-800 truncate w-full text-center">{chat.user2?.username || 'Guest'}</span>
-                                        <div className="flex gap-2 flex-wrap justify-center">
-                                            <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-md ${chat.user2?.gender === 'female' ? 'bg-pink-100 text-pink-600' : 'bg-blue-100 text-blue-600'}`}>{chat.user2?.gender || 'Unknown'}</span>
-                                            <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-md bg-slate-100 text-slate-500 max-w-[80px] truncate" title={formatLocation(chat.user2)}>{formatLocation(chat.user2)}</span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="flex items-center gap-2 mb-8 bg-slate-50 p-4 rounded-2xl border border-slate-100 justify-center">
-                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Duration:</span>
-                                    <span className="text-sm font-black text-indigo-600">
-                                        {Math.floor((new Date() - new Date(chat.start_time)) / 60000)}m {Math.floor(((new Date() - new Date(chat.start_time)) % 60000) / 1000)}s
-                                    </span>
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-3">
-                                    <button className="py-3 bg-slate-100 hover:bg-slate-200 rounded-2xl font-black text-[10px] uppercase tracking-widest text-slate-600 transition-all flex items-center justify-center gap-2">
-                                        <Play size={14} /> Listen
-                                    </button>
-                                    <button
-                                        onClick={() => handleTerminate(chat.id)}
-                                        className="py-3 bg-red-50 hover:bg-red-600 hover:text-white text-red-600 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-2 border border-red-100"
-                                    >
-                                        <XCircle size={14} /> Terminate
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            ) : (
-                <div className="bg-white border border-slate-200 rounded-[40px] overflow-hidden shadow-xl shadow-slate-200/50">
-                    <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-                        <div className="relative group">
-                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500 transition-colors" size={16} />
-                            <input
-                                type="text"
-                                placeholder="Filter by user name or room ID..."
-                                className="bg-white border border-slate-200 pl-11 pr-6 py-2.5 rounded-xl w-80 focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all font-medium text-sm"
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                            />
-                        </div>
-                        <button className="px-6 py-2.5 bg-slate-900 border border-slate-900 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-slate-800 transition-all">Export Logs</button>
+            <div className="bg-white border border-slate-200 rounded-[40px] overflow-hidden shadow-xl shadow-slate-200/50">
+                <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                    <div className="relative group">
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500 transition-colors" size={16} />
+                        <input
+                            type="text"
+                            placeholder="Filter by user name or room ID..."
+                            className="bg-white border border-slate-200 pl-11 pr-6 py-2.5 rounded-xl w-80 focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all font-medium text-sm"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                        />
                     </div>
+                    <div className="flex items-center gap-3">
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest bg-white border border-slate-200 px-3 py-1.5 rounded-lg shadow-sm">
+                            {activeView === 'active' ? `Active Streams: ${activeChats.length}` : `Stored Logs: ${chatHistory.length}`}
+                        </span>
+                        {activeView === 'active' && activeChats.length > 0 && (
+                            <button 
+                                onClick={handleCleanup}
+                                className="px-4 py-2 bg-orange-50 text-orange-600 border border-orange-100 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-orange-600 hover:text-white transition-all flex items-center gap-2"
+                            >
+                                <RefreshCw size={14} /> Cleanup Inactive
+                            </button>
+                        )}
+                        <button className="px-6 py-2.5 bg-slate-900 border border-slate-900 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-slate-800 transition-all">Export</button>
+                    </div>
+                </div>
 
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left border-collapse">
-                            <thead>
-                                <tr className="border-b border-slate-50">
-                                    <th className="px-8 py-5 text-[10px] font-black uppercase text-slate-400 tracking-widest">Participants</th>
-                                    <th className="px-8 py-5 text-[10px] font-black uppercase text-slate-400 tracking-widest">Duration</th>
-                                    <th className="px-8 py-5 text-[10px] font-black uppercase text-slate-400 tracking-widest">Messages</th>
-                                    <th className="px-8 py-5 text-[10px] font-black uppercase text-slate-400 tracking-widest">Status</th>
-                                    <th className="px-8 py-5 text-[10px] font-black uppercase text-slate-400 tracking-widest text-right">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-50">
-                                {loading ? (
-                                    <tr><td colSpan="5" className="p-20 text-center"><div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto"></div></td></tr>
-                                ) : filteredHistory.length === 0 ? (
-                                    <tr><td colSpan="5" className="p-16 text-center text-slate-400 font-bold text-xs uppercase tracking-widest">No chat history found</td></tr>
-                                ) : filteredHistory.map((log) => (
-                                    <tr key={log.id} className="hover:bg-slate-50/50 transition-colors group">
-                                        <td className="px-8 py-5">
-                                            <div className="flex items-center gap-3">
-                                                <div className="flex -space-x-4">
-                                                    <div className="w-9 h-9 rounded-xl bg-slate-100 border-2 border-white shadow-sm overflow-hidden shrink-0">
-                                                        {log.user1?.avatar_url && <img src={log.user1.avatar_url} className="w-full h-full object-cover" alt="" />}
-                                                    </div>
-                                                    <div className="w-9 h-9 rounded-xl bg-slate-200 border-2 border-white shadow-sm overflow-hidden shrink-0">
-                                                        {log.user2?.avatar_url && <img src={log.user2.avatar_url} className="w-full h-full object-cover" alt="" />}
-                                                    </div>
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                        <thead>
+                            <tr className="border-b border-slate-50">
+                                <th className="px-8 py-5 text-[10px] font-black uppercase text-slate-400 tracking-widest">Participants</th>
+                                <th className="px-8 py-5 text-[10px] font-black uppercase text-slate-400 tracking-widest">Room / Session ID</th>
+                                <th className="px-8 py-5 text-[10px] font-black uppercase text-slate-400 tracking-widest">Duration</th>
+                                <th className="px-8 py-5 text-[10px] font-black uppercase text-slate-400 tracking-widest">Status / msgs</th>
+                                <th className="px-8 py-5 text-[10px] font-black uppercase text-slate-400 tracking-widest text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-50">
+                            {loading ? (
+                                <tr><td colSpan="5" className="p-20 text-center"><div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto"></div></td></tr>
+                            ) : (activeView === 'active' ? activeChats : filteredHistory).length === 0 ? (
+                                <tr><td colSpan="5" className="p-16 text-center text-slate-400 font-bold text-xs uppercase tracking-widest">No matching activities found</td></tr>
+                            ) : (activeView === 'active' ? activeChats : filteredHistory).map((chat) => (
+                                <tr key={chat.id} className="hover:bg-slate-50/50 transition-colors group">
+                                    <td className="px-8 py-5">
+                                        <div className="flex items-center gap-3">
+                                            <div className="flex -space-x-4">
+                                                <div className="w-9 h-9 rounded-xl bg-slate-100 border-2 border-white shadow-sm overflow-hidden shrink-0">
+                                                    {chat.user1?.avatar_url && <img src={chat.user1.avatar_url} className="w-full h-full object-cover" alt="" />}
                                                 </div>
-                                                <div className="truncate">
-                                                    <div className="text-[11px] font-black text-slate-700">{log.user1?.username || 'Guest'} ↔ {log.user2?.username || 'Guest'}</div>
-                                                    <div className="text-[9px] text-slate-400 font-bold uppercase">{new Date(log.start_time).toLocaleString()}</div>
-                                                    <div className="text-[8px] text-slate-300 font-bold uppercase mt-1">
-                                                        {log.user1?.gender} / {formatLocation(log.user1)} ↔ {log.user2?.gender} / {formatLocation(log.user2)}
-                                                    </div>
+                                                <div className="w-9 h-9 rounded-xl bg-slate-200 border-2 border-white shadow-sm overflow-hidden shrink-0">
+                                                    {chat.user2?.avatar_url && <img src={chat.user2.avatar_url} className="w-full h-full object-cover" alt="" />}
                                                 </div>
                                             </div>
-                                        </td>
-                                        <td className="px-8 py-5 capitalize">
-                                            <div className="text-sm font-black text-slate-700">
-                                                {log.duration ? `${Math.floor(log.duration / 60)}m ${log.duration % 60}s` : '< 1m'}
+                                            <div className="truncate">
+                                                <div className="text-[11px] font-black text-slate-700">{chat.user1?.username || 'Guest'} ↔ {chat.user2?.username || 'Guest'}</div>
+                                                <div className="text-[9px] text-slate-400 font-bold uppercase">{new Date(chat.start_time).toLocaleString()}</div>
+                                                <div className="text-[8px] text-slate-300 font-bold uppercase mt-1">
+                                                    {chat.user1?.gender || 'Unknown'} / {formatLocation(chat.user1)} ↔ {chat.user2?.gender || 'Unknown'} / {formatLocation(chat.user2)}
+                                                </div>
                                             </div>
-                                        </td>
-                                        <td className="px-8 py-5">
-                                            <div className="text-[11px] font-black text-slate-500">{log.messages_count || 0} msgs</div>
-                                        </td>
-                                        <td className="px-8 py-5">
-                                            {log.was_reported ? (
-                                                <span className="px-3 py-1 bg-red-50 text-red-600 rounded-full text-[9px] font-black uppercase tracking-widest border border-red-100">Reported</span>
+                                        </div>
+                                    </td>
+                                    <td className="px-8 py-5">
+                                        <div className="font-mono text-[10px] text-slate-500 bg-slate-50 px-2 py-1.5 rounded-lg border border-slate-100 flex flex-col gap-0.5 max-w-[150px]">
+                                            <span className="text-[8px] text-slate-300 font-black uppercase">Room</span>
+                                            <span className="truncate">{chat.room_id || 'System Room'}</span>
+                                        </div>
+                                    </td>
+                                    <td className="px-8 py-5">
+                                        <div className={`text-sm font-black ${chat.end_time ? 'text-slate-600' : 'text-indigo-600'}`}>
+                                            {chat.end_time ? (
+                                                `${Math.floor(chat.duration / 60)}m ${chat.duration % 60}s`
                                             ) : (
-                                                <span className="px-3 py-1 bg-slate-100 text-slate-500 rounded-full text-[9px] font-black uppercase tracking-widest border border-slate-200">Normal</span>
+                                                `${Math.floor((now - new Date(chat.start_time)) / 60000)}m ${Math.floor(((now - new Date(chat.start_time)) % 60000) / 1000)}s`
                                             )}
-                                        </td>
-                                        <td className="px-8 py-5 text-right">
-                                            <button className="p-2.5 hover:bg-white hover:shadow-md rounded-xl text-slate-400 hover:text-indigo-600 border border-transparent hover:border-slate-100 transition-all">
-                                                <Eye size={16} />
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
+                                        </div>
+                                        {!chat.end_time && (
+                                            <div className="flex items-center gap-1.5 mt-1">
+                                                <div className={`w-1.5 h-1.5 rounded-full animate-pulse ${((now - new Date(chat.start_time)) / 60000) > 30 ? 'bg-orange-500' : 'bg-green-500'}`}></div>
+                                                <span className={`text-[8px] font-black uppercase ${((now - new Date(chat.start_time)) / 60000) > 30 ? 'text-orange-600' : 'text-green-600'}`}>
+                                                    {((now - new Date(chat.start_time)) / 60000) > 30 ? 'POTENTIALLY STUCK' : `Live Since ${new Date(chat.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`}
+                                                </span>
+                                            </div>
+                                        )}
+                                    </td>
+                                    <td className="px-8 py-5">
+                                        <div className="flex flex-col gap-1.5">
+                                            {chat.end_time ? (
+                                                <span className="px-2.5 py-1 bg-slate-100 text-slate-500 rounded-lg text-[9px] font-black uppercase tracking-widest border border-slate-200 inline-block w-fit">Finished</span>
+                                            ) : (
+                                                <span className="px-2.5 py-1 bg-green-50 text-green-600 rounded-lg text-[9px] font-black uppercase tracking-widest border border-green-100 inline-block w-fit">Streaming</span>
+                                            )}
+                                            <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-1">{chat.messages_count || 0} messages</div>
+                                        </div>
+                                    </td>
+                                    <td className="px-8 py-5 text-right">
+                                        <div className="flex items-center justify-end gap-2">
+                                            {!chat.end_time ? (
+                                                <button 
+                                                    onClick={() => handleTerminate(chat.id)}
+                                                    className="p-2.5 bg-rose-50 hover:bg-rose-600 text-rose-600 hover:text-white rounded-xl transition-all border border-rose-100"
+                                                    title="Terminate Session"
+                                                >
+                                                    <XCircle size={16} />
+                                                </button>
+                                            ) : (
+                                                <button className="p-2.5 hover:bg-slate-100 rounded-xl text-slate-400 hover:text-slate-600 transition-all">
+                                                    <Eye size={16} />
+                                                </button>
+                                            )}
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
                 </div>
-            )}
+            </div>
         </div>
     );
 };

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { supabase } from '../supabase';
 import toast from 'react-hot-toast';
 import { getUserLocation } from '../utils/geolocation';
@@ -14,13 +14,14 @@ export const AuthProvider = ({ children }) => {
     const [blockedUsers, setBlockedUsers] = useState([]);
     const [matchHistory, setMatchHistory] = useState([]);
     const [userLocation, setUserLocation] = useState(null);
+    const activeLogId = useRef(null);
 
     // Fetch Profile from Supabase
     const fetchProfile = async (userId) => {
         try {
             const { data, error } = await supabase
                 .from('profiles')
-                .select('*')
+                .select('*, is_profile_completed')
                 .eq('id', userId)
                 .single();
 
@@ -29,6 +30,7 @@ export const AuthProvider = ({ children }) => {
             return {
                 ...data,
                 uid: data.id,
+                email: data.email,
                 isCreator: data.is_creator,
                 accountStatus: data.account_status,
                 displayName: data.username,
@@ -58,12 +60,61 @@ export const AuthProvider = ({ children }) => {
                 options: {
                     redirectTo: redirectUrl,
                     queryParams: {
-                        prompt: 'select_account' // Forces account selection to avoid auto-login loops
-                    }
+                        prompt: 'select_account', // Forces account selection to avoid auto-login loops
+                        access_type: 'offline'
+                    },
+                    scopes: 'https://www.googleapis.com/auth/user.birthday.read'
                 }
             });
             if (error) throw error;
             return data;
+        } catch (error) {
+            console.error(error);
+            toast.error(error.message);
+            throw error;
+        }
+    };
+
+    // Email Login (For Standard Users)
+    const loginWithUserEmail = async (email, password) => {
+        try {
+            const { data, error } = await supabase.auth.signInWithPassword({
+                email,
+                password
+            });
+            if (error) throw error;
+            setIsGuest(false);
+            return data.user;
+        } catch (error) {
+            console.error(error);
+            toast.error(error.message);
+            throw error;
+        }
+    };
+
+    // Email Registration
+    const signUpWithEmail = async (email, password, displayName) => {
+        try {
+            const savedGender = localStorage.getItem('userGender');
+            const { data, error } = await supabase.auth.signUp({
+                email,
+                password,
+                options: {
+                    data: {
+                        full_name: displayName,
+                        gender: savedGender || null // also store it in metadata if needed
+                    }
+                }
+            });
+            if (error) throw error;
+            
+            // If email confirmations are enabled, session will be null here
+            if (data.user && !data.session) {
+                // Return a specific structure so UI knows to show "check email"
+                return { needsVerification: true, user: data.user };
+            }
+
+            return { needsVerification: false, user: data.user };
         } catch (error) {
             console.error(error);
             toast.error(error.message);
@@ -106,25 +157,37 @@ export const AuthProvider = ({ children }) => {
     // Logout
     const logout = async () => {
         try {
-            if (!isGuest && currentUser) {
-                // Save last user info for persistent login UI
-                const lastUserInfo = {
-                    id: currentUser.id,
-                    displayName: currentUser.displayName,
-                    photoURL: currentUser.photoURL,
-                    email: currentUser.email
-                };
-                localStorage.setItem('lastLoggedUser', JSON.stringify(lastUserInfo));
+            // Always attempt to sign out from Supabase if we have a current user or not (to be safe)
+            if (!isGuest) {
+                if (currentUser) {
+                    // Save last user info for persistent login UI
+                    const lastUserInfo = {
+                        id: currentUser.id,
+                        displayName: currentUser.displayName,
+                        photoURL: currentUser.photoURL,
+                        email: currentUser.email
+                    };
+                    localStorage.setItem('lastLoggedUser', JSON.stringify(lastUserInfo));
+                }
                 await supabase.auth.signOut();
             }
+            
             setIsGuest(false);
             setCurrentUser(null);
             localStorage.removeItem('lastActivity');
             localStorage.removeItem('userGender');
+            
             toast.success("Logged out");
+            
+            // Hard redirect to home to ensure all context states are reset
+            setTimeout(() => {
+                window.location.href = '/';
+            }, 500);
         } catch (error) {
             console.error("Logout error:", error);
             toast.error("Error logging out");
+            // Still try to redirect as a fallback
+            window.location.href = '/';
         }
     };
 
@@ -298,6 +361,53 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
+    // Complete profile (new function)
+    const completeProfile = async (birthdate, gender) => {
+        if (!currentUser?.id) return;
+        try {
+            const updates = {
+                birthdate,
+                gender,
+                is_profile_completed: true
+            };
+
+            // If user selects Female, they are automatically treated as a pending creator (Female Verification)
+            if (gender === 'Female' && !currentUser.is_creator) {
+                updates.is_creator = true;
+                updates.account_status = 'pending';
+                
+                // Insert admin notification for female profile completion
+                try {
+                    await supabase.from('notifications').insert({
+                        type: 'female_signup',
+                        message: `User ${currentUser.displayName || currentUser.email} completed profile as Female — awaiting verification`,
+                        is_read: false
+                    });
+                } catch (e) { console.warn("Notif failed", e.message); }
+            }
+
+            const { error } = await supabase
+                .from('profiles')
+                .update(updates)
+                .eq('id', currentUser.id);
+
+            if (error) throw error;
+            
+            // Map updates to state (including aliased names like isCreator/accountStatus)
+            setCurrentUser(prev => ({ 
+                ...prev, 
+                ...updates,
+                isCreator: updates.is_creator !== undefined ? updates.is_creator : prev.isCreator,
+                accountStatus: updates.account_status !== undefined ? updates.account_status : prev.accountStatus
+            }));
+            
+            toast.success("Profile verified!");
+        } catch (error) {
+            console.error("Error completing profile:", error);
+            toast.error("Failed to save profile");
+        }
+    };
+
     // Auth State Listener
     useEffect(() => {
         let mounted = true;
@@ -310,6 +420,13 @@ export const AuthProvider = ({ children }) => {
                 if (session?.user) {
                     try {
                         let profile = await fetchProfile(session.user.id);
+                        
+                        // Fix for missing email on existing profiles
+                        if (profile && !profile.email && session.user.email) {
+                            console.log("Updating missing email for existing profile...");
+                            await supabase.from('profiles').update({ email: session.user.email }).eq('id', session.user.id);
+                            profile.email = session.user.email;
+                        }
 
                         // If profile doesn't exist, create it (important for new Google users)
                         if (!profile) {
@@ -318,11 +435,13 @@ export const AuthProvider = ({ children }) => {
                                 .from('profiles')
                                 .insert({
                                     id: session.user.id,
+                                    email: session.user.email,
                                     username: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'User',
                                     avatar_url: session.user.user_metadata?.avatar_url,
-                                    coins: 0,
+                                    coins: 50,
                                     is_creator: false,
-                                    account_status: 'active'
+                                    account_status: 'active',
+                                    is_profile_completed: false
                                 })
                                 .select()
                                 .single();
@@ -333,11 +452,41 @@ export const AuthProvider = ({ children }) => {
                                 profile = {
                                     ...newProfile,
                                     uid: newProfile.id,
+                                    email: newProfile.email,
                                     displayName: newProfile.username,
                                     photoURL: newProfile.avatar_url,
                                     isCreator: newProfile.is_creator,
                                     accountStatus: newProfile.account_status
                                 };
+                            }
+                        }
+
+                        // --- Google Birthday Fetch Logic ---
+                        if (session.provider_token && session.user.app_metadata.provider === 'google' && !profile.birthdate) {
+                            console.log("Attempting to fetch Google birthday...");
+                            try {
+                                const response = await fetch('https://people.googleapis.com/v1/people/me?personFields=birthdays', {
+                                    headers: { Authorization: `Bearer ${session.provider_token}` }
+                                });
+                                const data = await response.json();
+                                const birthday = data.birthdays?.find(b => b.date);
+                                if (birthday && birthday.date) {
+                                    const { year, month, day } = birthday.date;
+                                    const formattedDate = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                                    
+                                    console.log("Fetched birthday from Google:", formattedDate);
+                                    
+                                    const { error: updateError } = await supabase
+                                        .from('profiles')
+                                        .update({ birthdate: formattedDate })
+                                        .eq('id', session.user.id);
+                                    
+                                    if (!updateError) {
+                                        profile.birthdate = formattedDate;
+                                    }
+                                }
+                            } catch (e) {
+                                console.error("Failed to fetch Google birthday:", e);
                             }
                         }
 
@@ -351,11 +500,23 @@ export const AuthProvider = ({ children }) => {
 
                             if (!updateErr) {
                                 profile = { ...profile, isCreator: true, gender: 'Female', accountStatus: 'pending' };
+                                // Insert admin notification for female signup
+                                try {
+                                    await supabase.from('notifications').insert({
+                                        type: 'female_signup',
+                                        message: `New female user registered: ${profile.displayName || session.user.email} — awaiting verification`,
+                                        is_read: false
+                                    });
+                                } catch (notifErr) {
+                                    // notifications table may not exist yet — silently fail
+                                    console.warn('Could not insert notification:', notifErr.message);
+                                }
                             }
                             localStorage.removeItem('userGender');
                         } else if (savedGender) {
                             localStorage.removeItem('userGender');
                         }
+
 
                         // Check Google Profile data for first-time population
                         if (session.user.app_metadata?.provider === 'google' && profile && (!profile.location_country || !profile.birthdate)) {
@@ -438,18 +599,53 @@ export const AuthProvider = ({ children }) => {
         fetchLocation();
     }, []);
 
-    // Report User
-    const reportUser = async (reportedUserId, reason, description) => {
+    // Upload Report Evidence (Screenshot)
+    const uploadReportEvidence = async (file) => {
+        if (!file) return null;
         try {
+            const fileName = `report_${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
+            const { data, error } = await supabase.storage
+                .from('report-evidence')
+                .upload(fileName, file, {
+                    contentType: 'image/jpeg',
+                    upsert: false
+                });
+
+            if (error) throw error;
+
+            const { data: { publicUrl } } = supabase.storage
+                .from('report-evidence')
+                .getPublicUrl(fileName);
+
+            return publicUrl;
+        } catch (error) {
+            console.error("Error uploading evidence:", error);
+            return null;
+        }
+    };
+
+    // Report User
+    const reportUser = async (reportedUserId, reason, description, chatLogId = null, evidenceFile = null) => {
+        try {
+            let evidenceUrl = null;
+            if (evidenceFile) {
+                evidenceUrl = await uploadReportEvidence(evidenceFile);
+            }
+
+            const insertData = {
+                reporter_id: currentUser?.id,
+                reported_user_id: reportedUserId,
+                reason,
+                description,
+                status: 'pending',
+                evidence_url: evidenceUrl
+            };
+
+            if (chatLogId) insertData.chat_log_id = chatLogId;
+
             const { error } = await supabase
                 .from('reports')
-                .insert({
-                    reporter_id: currentUser?.id,
-                    reported_id: reportedUserId,
-                    reason,
-                    description,
-                    status: 'pending'
-                });
+                .insert(insertData);
 
             if (error) throw error;
             toast.success("User reported.");
@@ -459,10 +655,81 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
-    // Save match to history
+    // Start a new chat log (called by initiator at match start)
+    const startChatLog = async (partnerId, roomId) => {
+        // Base check for current user as initiator
+        if (!currentUser?.id || !partnerId) return null;
+
+        // --- PREVENT DUPLICATE/DANGLING LOGS FOR SAME USER ---
+        if (activeLogId.current) {
+            console.log("[Auth] Closing existing log before starting new one:", activeLogId.current);
+            updateChatLog(activeLogId.current, 0, 0); // Force close
+        }
+        // -----------------------------------------------------
+
+        try {
+            // Check if IDs are valid UUIDs for FK satisfaction
+            const isUuid = (id) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+            
+            const logData = {
+                user1_id: isUuid(currentUser.id) ? currentUser.id : null,
+                user1_guest_id: !isUuid(currentUser.id) ? currentUser.id : null,
+                user2_id: isUuid(partnerId) ? partnerId : null,
+                user2_guest_id: !isUuid(partnerId) ? partnerId : null,
+                room_id: roomId || null,
+                start_time: new Date().toISOString(),
+                end_time: null,
+                duration: 0,
+                messages_count: 0
+            };
+
+            const { data, error } = await supabase
+                .from('chat_logs')
+                .insert(logData)
+                .select()
+                .single();
+
+            if (error) throw error;
+            activeLogId.current = data.id; // Store current log ID
+            return data.id;
+        } catch (error) {
+            console.error("Error starting chat log:", error);
+            return null;
+        }
+    };
+
+    // Update an existing chat log (called at end of chat)
+    const updateChatLog = async (logId, durationSec, messagesCount = 0) => {
+        if (!logId) return;
+        try {
+            const { error } = await supabase
+                .from('chat_logs')
+                .update({
+                    end_time: new Date().toISOString(),
+                    duration: durationSec || 0,
+                    messages_count: messagesCount || 0
+                })
+                .eq('id', logId);
+
+            if (error) throw error;
+            
+            // Clear if it was the active one
+            if (activeLogId.current === logId) {
+                activeLogId.current = null;
+            }
+            
+            // Stats will be auto-calculated by database trigger
+        } catch (error) {
+            console.error("Error updating chat log:", error);
+        }
+    };
+
+    // Save match to history (compatibility wrapper / fallback)
     const saveMatchToHistory = async (partnerData, roomData = {}) => {
         if (!currentUser?.id || isGuest || !partnerData.uid) return;
         try {
+            // If logId exists, we should use updateChatLog instead. 
+            // This function is now used as a fallback or for simple history tracking.
             const { data, error } = await supabase
                 .from('chat_logs')
                 .insert({
@@ -475,10 +742,7 @@ export const AuthProvider = ({ children }) => {
                     messages_count: roomData.messagesCount || 0
                 }).select().single();
 
-            if (error) {
-                console.error("Supabase insert error:", error);
-                throw error;
-            }
+            if (error) throw error;
 
             // Immediately update local state
             const newMatch = {
@@ -492,8 +756,7 @@ export const AuthProvider = ({ children }) => {
             };
             setMatchHistory(prev => [newMatch, ...prev]);
 
-            // Update total chats
-            await supabase.rpc('increment_chats', { user_id: currentUser.id });
+            // Note: increment_chats RPC call was removed because it's now handled by DB trigger
         } catch (error) {
             console.error("Error saving match history:", error);
         }
@@ -506,29 +769,6 @@ export const AuthProvider = ({ children }) => {
             setMatchHistory(prev => prev.filter(item => item.id !== id));
         } catch(e) {
             console.error('Failed to remove from history');
-        }
-    };
-
-    // Log Creator Earnings
-    const logCreatorEarnings = async (durationSec, earnedAmount) => {
-        if (!currentUser?.id || !currentUser?.is_creator || earnedAmount <= 0) return;
-        try {
-            await supabase
-                .from('transactions')
-                .insert({
-                    user_id: currentUser.id,
-                    amount: earnedAmount,
-                    type: 'creator_earning'
-                });
-
-            // Update balance
-            await supabase.rpc('update_creator_balance', {
-                user_id: currentUser.id,
-                earned: earnedAmount,
-                duration: durationSec
-            });
-        } catch (error) {
-            console.error("Error logging creator earnings:", error);
         }
     };
 
@@ -549,16 +789,21 @@ export const AuthProvider = ({ children }) => {
         userLocation,
         loginWithGoogle,
         loginWithEmail,
+        loginWithUserEmail,
+        signUpWithEmail,
         continueAsGuest,
         logout,
         reportUser,
+        uploadReportEvidence,
         updateProfileInfo,
         updateSafetySettings,
         updateMatchPreferences,
+        completeProfile,
+        startChatLog,
+        updateChatLog,
         saveMatchToHistory,
         removeFromHistory,
         matchHistory,
-        logCreatorEarnings,
         refreshProfile
     };
 

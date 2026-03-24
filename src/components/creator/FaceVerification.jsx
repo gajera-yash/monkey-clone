@@ -4,6 +4,7 @@ import { useAuth } from "../../context/AuthContext";
 import { supabase } from "../../supabase";
 import toast from "react-hot-toast";
 import * as faceapi from 'face-api.js';
+import { loadFaceModels, areModelsLoaded } from "../../utils/faceApiModelLoader";
 
 const FaceVerification = () => {
   const videoRef = useRef(null);
@@ -16,28 +17,25 @@ const FaceVerification = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [cameraActive, setCameraActive] = useState(false);
   const [detectedGender, setDetectedGender] = useState(null);
-  const [modelsLoaded, setModelsLoaded] = useState(false);
+  const [confidence, setConfidence] = useState(0);
+  const [modelsLoaded, setModelsLoaded] = useState(areModelsLoaded());
 
   // Load Models
   useEffect(() => {
-    const loadModels = async () => {
-      try {
-        const MODEL_URL = '/models';
-        await Promise.all([
-          faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
-          faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
-          faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
-          faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL),
-          faceapi.nets.ageGenderNet.loadFromUri(MODEL_URL),
-        ]);
+    const initAI = async () => {
+      if (areModelsLoaded()) {
         setModelsLoaded(true);
-        console.log("Models Loaded Successfully");
+        return;
+      }
+      try {
+        await loadFaceModels();
+        setModelsLoaded(true);
       } catch (err) {
         console.error("Error loading face-api models:", err);
         toast.error("AI Models failed to load. Check internet.");
       }
     };
-    loadModels();
+    initAI();
   }, []);
 
   // START CAMERA
@@ -105,7 +103,8 @@ const FaceVerification = () => {
     }
 
     setDetectedGender(detections.gender);
-    console.log("Detected:", detections.gender);
+    setConfidence(detections.genderProbability);
+    console.log("Detected:", detections.gender, "with confidence:", detections.genderProbability);
 
     // Resize and set image
     const MAX_W = 640;
@@ -146,7 +145,7 @@ const FaceVerification = () => {
     }
 
     setIsUploading(true);
-    const toastId = toast.loading("Verifying face...");
+    const toastId = toast.loading(detectedGender === 'male' ? "Saving rejection data..." : "Verifying face...");
 
     try {
       const fileName = `${currentUser.uid}/face_${Date.now()}.jpg`;
@@ -155,8 +154,8 @@ const FaceVerification = () => {
       const res = await fetch(capturedImage);
       const blob = await res.blob();
 
-      // 1. Upload image to Supabase Storage
-      const { data: uploadData, error: uploadError } = await supabase.storage
+      // 1. Upload image to Supabase Storage (regardless of gender)
+      const { error: uploadError } = await supabase.storage
         .from('verifications')
         .upload(fileName, blob, { contentType: 'image/jpeg' });
 
@@ -167,19 +166,84 @@ const FaceVerification = () => {
         .from('verifications')
         .getPublicUrl(fileName);
 
-      // 3. Insert into verifications table
-      const { error: dbError } = await supabase
+      if (detectedGender === 'male') {
+        // --- MALE DETECTED: Store rejection data so admin can see the attempt ---
+        // Check if there's already a row for this user
+        const { data: existingRow } = await supabase
+          .from('verifications')
+          .select('id')
+          .eq('user_id', currentUser.uid)
+          .maybeSingle();
+
+        if (existingRow) {
+          // Update existing row
+          await supabase
+            .from('verifications')
+            .update({
+              face_url: publicUrl,
+              status: 'rejected',
+              ai_notes: `Male face detected by AI (${Math.round(confidence * 100)}% confidence) - Access denied`
+            })
+            .eq('user_id', currentUser.uid);
+        } else {
+          // Insert new rejection row
+          await supabase
+            .from('verifications')
+            .insert({
+              user_id: currentUser.uid,
+              face_url: publicUrl,
+              status: 'rejected',
+              ai_notes: `Male face detected by AI (${Math.round(confidence * 100)}% confidence) - Access denied`
+            });
+        }
+
+        toast.error("Face verification failed. Male detected. Your attempt has been logged.", { id: toastId, duration: 5000 });
+        return; // Stop here — do not navigate to voice verification
+      }
+
+      // --- FEMALE DETECTED: Store pending verification and proceed ---
+      // Check if there's already a row for this user
+      const { data: existingVerification } = await supabase
         .from('verifications')
-        .insert({
-          user_id: currentUser.uid,
-          face_url: publicUrl,
-          status: "pending"
+        .select('id')
+        .eq('user_id', currentUser.uid)
+        .maybeSingle();
+
+      if (existingVerification) {
+        await supabase
+          .from('verifications')
+          .update({
+            face_url: publicUrl,
+            status: 'pending',
+            ai_confidence: confidence,
+            ai_notes: `Female face detected by AI (${Math.round(confidence * 100)}% confidence)`
+          })
+          .eq('user_id', currentUser.uid);
+      } else {
+        await supabase
+          .from('verifications')
+          .insert({
+            user_id: currentUser.uid,
+            face_url: publicUrl,
+            status: 'pending',
+            ai_confidence: confidence,
+            ai_notes: `Female face detected by AI (${Math.round(confidence * 100)}% confidence)`
+          });
+      }
+
+      toast.success("Face verified! Proceeding to voice verification.", { id: toastId });
+
+      // Insert admin notification for face verification submitted
+      try {
+        await supabase.from('notifications').insert({
+          type: 'face_verification',
+          message: `Female face verification submitted by user — awaiting admin review`,
+          is_read: false
         });
+      } catch (_) { /* fail silently if notifications table not available */ }
 
-      if (dbError) throw dbError;
-
-      toast.success("Face verified!", { id: toastId });
       navigate("/creator/verify/voice");
+
     } catch (error) {
       console.error("Verification Error:", error);
       let errorMessage = error.message || "Face Verification failed";
