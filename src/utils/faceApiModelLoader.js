@@ -1,7 +1,12 @@
-import * as faceapi from '@vladmandic/face-api/dist/face-api.js';
+import * as faceapi from '@vladmandic/face-api';
 
 let modelsLoaded = false;
 let loadingPromise = null;
+
+// Use CDN for production reliability, local for dev
+const MODEL_URL = process.env.NODE_ENV === 'production'
+    ? 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model'
+    : '/models';
 
 /**
  * Pre-loads all required face-api models if not already loaded.
@@ -13,8 +18,7 @@ export const loadFaceModels = async () => {
 
     loadingPromise = (async () => {
         try {
-            console.log("[face-api] Starting background model load...");
-            const MODEL_URL = '/models';
+            console.log("[face-api] Loading models from:", MODEL_URL);
             await Promise.all([
                 faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
                 faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
