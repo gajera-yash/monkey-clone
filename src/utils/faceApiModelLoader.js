@@ -1,4 +1,4 @@
-import * as faceapi from '@vladmandic/face-api';
+import * as faceapi from '@vladmandic/face-api/dist/face-api.js';
 
 let modelsLoaded = false;
 let loadingPromise = null;

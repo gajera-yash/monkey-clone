@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { supabase } from "../../supabase";
 import toast from "react-hot-toast";
-import * as faceapi from '@vladmandic/face-api';
+import * as faceapi from '@vladmandic/face-api/dist/face-api.js';
 import { loadFaceModels, areModelsLoaded } from "../../utils/faceApiModelLoader";
 
 const FaceVerification = () => {
