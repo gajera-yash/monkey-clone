@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { supabase } from "../../supabase";
 import toast from "react-hot-toast";
-import * as faceapi from 'face-api.js';
+import * as faceapi from '@vladmandic/face-api';
 import { loadFaceModels, areModelsLoaded } from "../../utils/faceApiModelLoader";
 
 const FaceVerification = () => {
@@ -42,11 +42,7 @@ const FaceVerification = () => {
   const startCamera = async () => {
     try {
       const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: "user",
-          width: { ideal: 640 },
-          height: { ideal: 480 },
-        },
+        video: true,
       });
 
       setStream(mediaStream);
@@ -56,7 +52,13 @@ const FaceVerification = () => {
         setCameraActive(true);
       }
     } catch (err) {
-      toast.error("Camera access denied.");
+      if (err.name === 'NotAllowedError') {
+        toast.error("Camera blocked. Please allow access in browser settings.");
+      } else if (window.location.protocol === 'http:' && window.location.hostname !== 'localhost') {
+        toast.error("Camera requires HTTPS or localhost.");
+      } else {
+        toast.error("Camera error: " + (err.message || "Access Denied"));
+      }
       console.error(err);
     }
   };
@@ -242,7 +244,7 @@ const FaceVerification = () => {
         });
       } catch (_) { /* fail silently if notifications table not available */ }
 
-      navigate("/creator/verify/voice");
+      navigate("/creator/verify/voice", { state: { confidence } });
 
     } catch (error) {
       console.error("Verification Error:", error);

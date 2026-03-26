@@ -5,7 +5,7 @@ import { supabase } from '../../supabase';
 import toast from 'react-hot-toast';
 
 const CreatorWithdraw = () => {
-    const { currentUser, updateProfileInfo } = useAuth();
+    const { currentUser, updateProfileInfo, refreshProfile } = useAuth();
     const navigate = useNavigate();
 
     const [method, setMethod] = useState('upi'); // 'upi' | 'bank'
@@ -14,7 +14,7 @@ const CreatorWithdraw = () => {
     const [bankDetails, setBankDetails] = useState({ accountName: '', accountNumber: '', ifsc: '' });
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    const MINIMUM_WITHDRAWAL = 1000;
+    const MINIMUM_WITHDRAWAL = 50;
     const availableBalance = currentUser?.coins || 0;
 
     const handleWithdraw = async (e) => {
@@ -46,11 +46,13 @@ const CreatorWithdraw = () => {
         const toastId = toast.loading("Processing request...");
 
         try {
+            const userId = currentUser.uid || currentUser.id;
+            
             // 1. Create withdrawal request in payouts table
             const { error: payoutError } = await supabase
                 .from('payouts')
                 .insert({
-                    user_id: currentUser.uid,
+                    user_id: userId,
                     amount: withdrawAmount,
                     method,
                     details: method === 'upi' ? { upiId: paymentDetails } : bankDetails,
@@ -60,28 +62,35 @@ const CreatorWithdraw = () => {
             if (payoutError) throw payoutError;
 
             // 2. Deduct from available balance using RPC
+            // This RPC handles the atomic subtraction from profiles table
             const { error: balanceError } = await supabase.rpc('update_creator_balance', {
-                user_id: currentUser.uid,
+                user_id: userId,
                 earned: -withdrawAmount,
-                duration: 0 // Duration not relevant for withdrawal
+                duration: 0
             });
 
             if (balanceError) throw balanceError;
 
             // Update local context to reflect immediately
-            await updateProfileInfo({
-                available_balance: (currentUser.available_balance || 0) - withdrawAmount
-            });
+            // refreshProfile() from AuthContext is more reliable than manual state update
+            if (typeof refreshProfile === 'function') {
+                await refreshProfile();
+            }
 
             toast.success(`Withdrawal request for ₹${withdrawAmount} submitted!`, { id: toastId });
             setAmount('');
             setPaymentDetails('');
             setBankDetails({ accountName: '', accountNumber: '', ifsc: '' });
-            navigate('/creator/dashboard');
+            
+            // Give context/DB a moment to sync before navigating
+            setTimeout(() => {
+                navigate('/creator/dashboard');
+            }, 1500);
 
         } catch (error) {
             console.error("Withdrawal error", error);
-            toast.error("Failed to submit request", { id: toastId });
+            const msg = error.message || "Failed to submit request";
+            toast.error(msg, { id: toastId });
         } finally {
             setIsSubmitting(false);
         }
@@ -128,7 +137,7 @@ const CreatorWithdraw = () => {
 
                         <div className="bg-blue-500/10 border border-blue-500/30 p-5 rounded-2xl flex gap-3 text-blue-300 text-sm">
                             <span className="text-xl">ℹ️</span>
-                            <p>Withdrawals are processed manually within 24-48 business hours. Minimum payout is 🪙 1,000.</p>
+                            <p>Withdrawals are processed manually within 24-48 business hours. Minimum payout is 🪙 50.</p>
                         </div>
                     </div>
 
@@ -179,7 +188,7 @@ const CreatorWithdraw = () => {
                                     />
                                 </div>
                                 <div className="flex justify-between mt-2 px-1">
-                                    <span className="text-xs text-gray-500">Min: 🪙 1,000</span>
+                                    <span className="text-xs text-gray-500">Min: 🪙 50</span>
                                     <button
                                         type="button"
                                         onClick={() => setAmount(currentUser?.coins?.toString() || '0')}
@@ -206,33 +215,46 @@ const CreatorWithdraw = () => {
                                 ) : (
                                     <>
                                         <div>
-                                            <label className="block text-sm font-bold text-gray-300 mb-2">Account Holder Name</label>
+                                            <label htmlFor="accountName" className="block text-sm font-bold text-gray-300 mb-2">Account Holder Name</label>
                                             <input
+                                                id="accountName"
                                                 type="text"
+                                                inputMode="text"
+                                                autoComplete="name"
+                                                enterKeyHint="next"
                                                 value={bankDetails.accountName}
                                                 onChange={(e) => setBankDetails({ ...bankDetails, accountName: e.target.value })}
                                                 placeholder="John Doe"
-                                                className="w-full bg-dark-900 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-blue-500 transition-colors"
+                                                className="w-full bg-dark-900 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-blue-500 transition-colors text-base"
                                             />
                                         </div>
                                         <div>
-                                            <label className="block text-sm font-bold text-gray-300 mb-2">Account Number</label>
+                                            <label htmlFor="accountNumber" className="block text-sm font-bold text-gray-300 mb-2">Account Number</label>
                                             <input
+                                                id="accountNumber"
                                                 type="text"
+                                                inputMode="numeric"
+                                                autoComplete="off"
+                                                enterKeyHint="next"
                                                 value={bankDetails.accountNumber}
                                                 onChange={(e) => setBankDetails({ ...bankDetails, accountNumber: e.target.value })}
                                                 placeholder="0000 0000 0000"
-                                                className="w-full bg-dark-900 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-blue-500 transition-colors"
+                                                className="w-full bg-dark-900 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-blue-500 transition-colors text-base"
                                             />
                                         </div>
                                         <div>
-                                            <label className="block text-sm font-bold text-gray-300 mb-2">IFSC Code</label>
+                                            <label htmlFor="ifscCode" className="block text-sm font-bold text-gray-300 mb-2">IFSC Code</label>
                                             <input
+                                                id="ifscCode"
                                                 type="text"
+                                                inputMode="text"
+                                                autoComplete="off"
+                                                autoCapitalize="characters"
+                                                enterKeyHint="done"
                                                 value={bankDetails.ifsc}
                                                 onChange={(e) => setBankDetails({ ...bankDetails, ifsc: e.target.value.toUpperCase() })}
                                                 placeholder="SBIN000XXXX"
-                                                className="w-full bg-dark-900 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-blue-500 transition-colors uppercase"
+                                                className="w-full bg-dark-900 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-blue-500 transition-colors uppercase text-base"
                                             />
                                         </div>
                                     </>

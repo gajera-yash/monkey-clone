@@ -1,14 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useCoins } from '../../context/CoinsContext';
 import { useAuth } from '../../context/AuthContext';
+import { supabase } from '../../supabase';
 import toast from 'react-hot-toast';
 
-const PACKAGES = [
-    { id: 'pkg_100', coins: 100, price: 99, label: 'Starter', discount: null, icon: '🪙' },
-    { id: 'pkg_500', coins: 500, price: 449, label: 'Popular', discount: '10% OFF', icon: '💰', popular: true },
-    { id: 'pkg_1000', coins: 1000, price: 799, label: 'Best Value', discount: '20% OFF', icon: '💎' },
-    { id: 'pkg_5000', coins: 5000, price: 3499, label: 'Pro', discount: '30% OFF', icon: '👑' },
-];
+
 
 const formatCard = (val) => {
     const digits = val.replace(/\D/g, '').slice(0, 16);
@@ -27,6 +23,33 @@ const CoinStoreModal = ({ isOpen, onClose }) => {
     const [step, setStep] = useState('packages'); // 'packages' | 'payment' | 'success'
     const [selectedPkg, setSelectedPkg] = useState(null);
     const [processing, setProcessing] = useState(false);
+    const [packages, setPackages] = useState([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        if (!isOpen) return;
+        
+        const fetchPackages = async () => {
+            const { data, error } = await supabase
+                .from('subscription_plans')
+                .select('*')
+                .order('sort_order', { ascending: true });
+            
+            if (!error && data) {
+                setPackages(data.map(p => ({
+                    id: p.id,
+                    coins: p.coins,
+                    price: p.price_monthly_inr,
+                    label: p.name,
+                    discount: p.discount_label,
+                    icon: p.icon || '🪙',
+                    popular: p.is_popular
+                })));
+            }
+            setLoading(false);
+        };
+        fetchPackages();
+    }, [isOpen]);
 
     // Payment form state
     const [cardName, setCardName] = useState('');
@@ -112,46 +135,57 @@ const CoinStoreModal = ({ isOpen, onClose }) => {
 
                         {/* Packages */}
                         <div className="px-5 pb-6 space-y-3">
-                            {PACKAGES.map(pkg => (
-                                <button
-                                    key={pkg.id}
-                                    onClick={() => handleSelectPackage(pkg)}
-                                    className="w-full group relative flex items-center justify-between p-4 rounded-2xl border transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
-                                    style={{
-                                        background: pkg.popular
-                                            ? 'linear-gradient(135deg, rgba(139,92,246,0.25), rgba(109,40,217,0.15))'
-                                            : 'rgba(255,255,255,0.04)',
-                                        borderColor: pkg.popular ? 'rgba(139,92,246,0.6)' : 'rgba(255,255,255,0.08)'
-                                    }}
-                                >
-                                    {pkg.popular && (
-                                        <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 text-[10px] font-black px-3 py-0.5 rounded-full"
-                                            style={{ background: 'linear-gradient(90deg, #7c3aed, #a855f7)', color: '#fff' }}>
-                                            ⭐ MOST POPULAR
-                                        </span>
-                                    )}
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl flex-shrink-0"
-                                            style={{ background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.2)' }}>
-                                            {pkg.icon}
-                                        </div>
-                                        <div className="text-left">
-                                            <div className="text-white font-black text-lg leading-none">{pkg.coins.toLocaleString()} Coins</div>
-                                            <div className="text-xs mt-1 font-semibold">
-                                                {pkg.discount
-                                                    ? <span className="text-green-400">{pkg.discount}</span>
-                                                    : <span className="text-white/40">{pkg.label}</span>
-                                                }
+                            {loading ? (
+                                <div className="py-10 flex flex-col items-center justify-center text-white/20">
+                                    <div className="w-8 h-8 border-2 border-white/10 border-t-white/40 rounded-full animate-spin mb-2"></div>
+                                    <span className="text-xs uppercase tracking-widest font-bold">Loading...</span>
+                                </div>
+                            ) : packages.length === 0 ? (
+                                <div className="py-10 text-center text-white/30 text-xs font-bold uppercase tracking-widest">
+                                    No packages available.
+                                </div>
+                            ) : (
+                                packages.map(pkg => (
+                                    <button
+                                        key={pkg.id}
+                                        onClick={() => handleSelectPackage(pkg)}
+                                        className="w-full group relative flex items-center justify-between p-4 rounded-2xl border transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
+                                        style={{
+                                            background: pkg.popular
+                                                ? 'linear-gradient(135deg, rgba(139,92,246,0.25), rgba(109,40,217,0.15))'
+                                                : 'rgba(255,255,255,0.04)',
+                                            borderColor: pkg.popular ? 'rgba(139,92,246,0.6)' : 'rgba(255,255,255,0.08)'
+                                        }}
+                                    >
+                                        {pkg.popular && (
+                                            <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 text-[10px] font-black px-3 py-0.5 rounded-full"
+                                                style={{ background: 'linear-gradient(90deg, #7c3aed, #a855f7)', color: '#fff' }}>
+                                                ⭐ MOST POPULAR
+                                            </span>
+                                        )}
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl flex-shrink-0"
+                                                style={{ background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.2)' }}>
+                                                {pkg.icon}
+                                            </div>
+                                            <div className="text-left">
+                                                <div className="text-white font-black text-lg leading-none">{pkg.coins.toLocaleString()} Coins</div>
+                                                <div className="text-xs mt-1 font-semibold">
+                                                    {pkg.discount
+                                                        ? <span className="text-green-400">{pkg.discount}</span>
+                                                        : <span className="text-white/40">{pkg.label}</span>
+                                                    }
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                    <div className="text-right">
-                                        <div className="bg-white text-gray-900 font-black px-4 py-2 rounded-xl text-sm group-hover:bg-yellow-400 transition-colors">
-                                            ₹{pkg.price}
+                                        <div className="text-right">
+                                            <div className="bg-white text-gray-900 font-black px-4 py-2 rounded-xl text-sm group-hover:bg-yellow-400 transition-colors">
+                                                ₹{pkg.price}
+                                            </div>
                                         </div>
-                                    </div>
-                                </button>
-                            ))}
+                                    </button>
+                                ))
+                            )}
                         </div>
 
                         <div className="px-5 pb-5 text-center">

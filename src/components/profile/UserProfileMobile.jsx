@@ -287,10 +287,7 @@ const UserProfileMobile = ({ onClose }) => {
 
                 {/* Sign Out */}
                 <button
-                    onClick={async () => {
-                        await logout();
-                        onClose();
-                    }}
+                    onClick={() => logout()}
                     className="w-full bg-dark-800 border border-red-500/20 rounded-2xl px-5 py-4 text-red-400 font-medium hover:bg-red-500/10 transition-colors text-left"
                 >
                     Sign Out

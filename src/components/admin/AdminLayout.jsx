@@ -6,7 +6,7 @@ import { supabase } from '../../supabase';
 import {
     LayoutDashboard, Users as UsersIcon, MessageSquare, ShieldAlert,
     CreditCard, BarChart3, Palette, Settings,
-    Lock, Bell, LifeBuoy, Menu, X, ChevronRight, LogOut, Coins, ShieldCheck,
+    Lock, Bell, LifeBuoy, Menu, X, ChevronRight, LogOut, Coins, ShieldCheck, Wallet,
     FileText, Zap, Globe, ClipboardList, Receipt
 } from 'lucide-react';
 
@@ -28,6 +28,7 @@ import StrikeSystem from './sections/StrikeSystem';
 import GeoBlocking from './sections/GeoBlocking';
 import AdminActionLog from './sections/AdminActionLog';
 import Transactions from './sections/Transactions';
+import Withdrawals from './sections/Withdrawals';
 
 import Analytics from './sections/Analytics';
 import AdminUsers from './sections/AdminUsers';
@@ -57,7 +58,7 @@ const AdminLayout = () => {
                 supabase.from('profiles').select('id, username, email, gender, created_at').order('created_at', { ascending: false }).limit(5),
                 supabase.from('transactions').select('id, amount, type, created_at, user:profiles(username)').eq('status', 'success').order('created_at', { ascending: false }).limit(5),
                 supabase.from('reports').select('id, reason, created_at, reporter:profiles!reports_reporter_id_fkey(username), reported:profiles!reports_reported_user_id_fkey(username)').order('created_at', { ascending: false }).limit(5),
-                supabase.from('verifications').select('id, status, created_at, user_id, profiles!verifications_user_id_fkey(username, email, gender)').order('created_at', { ascending: false }).limit(5),
+                supabase.from('verifications').select('id, status, created_at, user_id, profiles(username, email, gender)').order('created_at', { ascending: false }).limit(5),
             ]);
 
             let merged = [];
@@ -81,7 +82,10 @@ const AdminLayout = () => {
             }))];
 
             if (verRes.data) merged = [...merged, ...verRes.data
-                .filter(v => v.profiles?.gender === 'Female' || v.profiles?.gender === 'female')
+                .filter(v => {
+                    const g = v.profiles?.gender?.toLowerCase()?.trim();
+                    return g === 'female';
+                })
                 .map(v => ({
                     id: `ver-${v.id}`, type: 'verification',
                     message: `Female verification ${v.status}: ${v.profiles?.username || v.profiles?.email || 'Unknown'}`,
@@ -127,6 +131,7 @@ const AdminLayout = () => {
             items: [
                 { name: 'Revenue', path: '/admin/revenue', id: 'revenue', icon: <CreditCard size={18} /> },
                 { name: 'Plans', path: '/admin/plans', id: 'revenue', icon: <CreditCard size={18} /> },
+                { name: 'Withdrawals', path: '/admin/withdrawals', id: 'revenue', icon: <Wallet size={18} /> },
                 { name: 'Coin Rewards', path: '/admin/coin-rewards', id: 'revenue', icon: <Coins size={18} /> },
                 { name: 'Coin Transactions', path: '/admin/transactions', id: 'revenue', icon: <Receipt size={18} /> },
             ]
@@ -323,6 +328,7 @@ const AdminLayout = () => {
                         <Route path="plans" element={<SubscriptionPlansAdmin />} />
                         <Route path="coin-rewards" element={<CoinRewards />} />
                         <Route path="transactions" element={<Transactions />} />
+                        <Route path="withdrawals" element={<Withdrawals />} />
                         <Route path="settings" element={<SystemSettings />} />
                         <Route path="roles" element={<AdminUsers />} />
                         <Route path="alerts" element={<Notifications />} />

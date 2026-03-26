@@ -147,8 +147,12 @@ const DesktopHistoryModal = ({ onClose }) => {
                             {/* User Profile */}
                             <div className="flex items-center justify-between px-1">
                                 <div className="flex items-center gap-4">
-                                    <div className={`w-14 h-14 rounded-full flex items-center justify-center text-xl font-bold text-white shadow-lg ${item.avatarColor || avatarColors[index % avatarColors.length]}`}>
-                                        {item.avatar || item.name?.charAt(0) || '?'}
+                                    <div className={`w-14 h-14 rounded-full flex items-center justify-center text-xl font-bold text-white shadow-lg overflow-hidden ${item.avatarColor || avatarColors[index % avatarColors.length]}`}>
+                                        {item.avatar ? (
+                                            <img src={item.avatar} alt={item.name} className="w-full h-full object-cover" />
+                                        ) : (
+                                            item.name?.charAt(0) || '?'
+                                        )}
                                     </div>
                                     <div className="min-w-0">
                                         <h4 className="text-white font-bold text-lg truncate pr-2">{item.name}</h4>

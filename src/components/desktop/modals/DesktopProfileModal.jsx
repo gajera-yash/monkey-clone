@@ -280,10 +280,7 @@ const DesktopProfileModal = ({ onClose }) => {
 
                 {/* Sign Out Button */}
                 <button
-                    onClick={async () => {
-                        await logout();
-                        onClose();
-                    }}
+                    onClick={() => logout()}
                     className="w-full bg-[#1a172e] rounded-2xl p-5 text-left text-white font-bold hover:bg-white/5 transition-colors border border-white/5"
                 >
                     Sign Out

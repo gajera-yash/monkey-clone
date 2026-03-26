@@ -37,7 +37,7 @@ const FemaleVerifications = () => {
             .from('verifications')
             .select(`
                 *,
-                profiles!verifications_user_id_fkey (
+                profiles (
                     id,
                     username,
                     email,
@@ -55,9 +55,10 @@ const FemaleVerifications = () => {
             toast.error('Failed to load verifications');
         } else {
             // Filter to only female users
-            const femaleRequests = (data || []).filter(r =>
-                r.profiles?.gender === 'Female' || r.profiles?.gender === 'female'
-            );
+            const femaleRequests = (data || []).filter(r => {
+                const g = r.profiles?.gender?.toLowerCase()?.trim();
+                return g === 'female';
+            });
             setRequests(femaleRequests);
         }
         setLoading(false);

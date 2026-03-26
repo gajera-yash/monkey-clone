@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../supabase';
 import toast from 'react-hot-toast';
@@ -7,6 +7,7 @@ import toast from 'react-hot-toast';
 const VoiceVerification = () => {
     const { currentUser, updateProfileInfo, refreshProfile } = useAuth();
     const navigate = useNavigate();
+    const location = useLocation();
 
     const [isRecording, setIsRecording] = useState(false);
     const [audioBlob, setAudioBlob] = useState(null);
@@ -56,7 +57,13 @@ const VoiceVerification = () => {
 
         } catch (error) {
             console.error("Error accessing microphone:", error);
-            toast.error("Microphone access denied or unavailable.");
+            if (error.name === 'NotAllowedError') {
+                toast.error("Microphone blocked. Please allow access in browser settings.");
+            } else if (window.location.protocol === 'http:' && window.location.hostname !== 'localhost') {
+                toast.error("Microphone requires HTTPS or localhost.");
+            } else {
+                toast.error("Microphone error: " + (error.message || "Access Denied"));
+            }
         }
     };
 
@@ -78,29 +85,25 @@ const VoiceVerification = () => {
         if (!audioBlob || !currentUser?.uid) return;
 
         setIsUploading(true);
-        const toastId = toast.loading("Completing verification...");
+        const toastId = toast.loading("Finalizing your verification...");
 
         try {
-            // Check AI confidence from face verification to decide on auto-approval
-            const { data: vData } = await supabase
-                .from('verifications')
-                .select('ai_confidence')
-                .eq('user_id', currentUser.uid)
-                .maybeSingle();
+            // Use confidence from previous step (Face Verification) to avoid extra query
+            const confidence = location.state?.confidence || 0;
+            const isHighlyConfident = confidence > 0.85;
 
-            const isHighlyConfident = vData?.ai_confidence > 0.85;
-
-            // FAST PATH: Update DB immediately
+            // Update/Upsert the verification record
             const [approveResult, profileResult] = await Promise.all([
                 supabase
                     .from('verifications')
-                    .update({
+                    .upsert({
+                        user_id: currentUser.uid,
                         status: isHighlyConfident ? 'approved' : 'pending',
                         ai_notes: isHighlyConfident 
-                            ? `Auto-approved via AI (${Math.round(vData.ai_confidence * 100)}% confidence)` 
-                            : `Pending audit (AI confidence: ${Math.round((vData?.ai_confidence || 0) * 100)}%)`
-                    })
-                    .eq('user_id', currentUser.uid),
+                            ? `Auto-approved via AI (${Math.round(confidence * 100)}% confidence)` 
+                            : `Pending audit (AI confidence: ${Math.round(confidence * 100)}%)`,
+                        ai_confidence: confidence
+                    }),
 
                 supabase
                     .from('profiles')
