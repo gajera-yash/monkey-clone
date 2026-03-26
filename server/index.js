@@ -10,7 +10,14 @@ const coinsRoutes = require('./routes/coins');
 const subscriptionsRoutes = require('./routes/subscriptions');
 
 const app = express();
-app.use(cors());
+
+// CORS: Allow Vercel frontend in production
+const FRONTEND_URL = process.env.FRONTEND_URL || '*';
+app.use(cors({
+    origin: FRONTEND_URL === '*' ? '*' : [FRONTEND_URL, 'http://localhost:3000', 'http://localhost:3001'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    credentials: true
+}));
 app.use(express.json());
 
 // Supabase admin client for server-side checks
@@ -22,14 +29,19 @@ const supabase = (supabaseUrl && supabaseServiceKey) ? createClient(supabaseUrl,
 app.use('/api/coins', coinsRoutes);
 app.use('/api/subscriptions', subscriptionsRoutes);
 
-// Serve static files from the React app
-app.use(express.static(path.join(__dirname, '../build')));
+// Serve static files from the React app (only if build folder exists - for combined deploy)
+const buildPath = path.join(__dirname, '../build');
+const fs = require('fs');
+if (fs.existsSync(buildPath)) {
+    app.use(express.static(buildPath));
+}
 
 const server = http.createServer(app);
 const io = new Server(server, {
     cors: {
-        origin: "*", // Allow all origins for dev simplicity
-        methods: ["GET", "POST"]
+        origin: FRONTEND_URL === '*' ? '*' : [FRONTEND_URL, 'http://localhost:3000', 'http://localhost:3001'],
+        methods: ["GET", "POST"],
+        credentials: true
     }
 });
 
@@ -738,11 +750,12 @@ io.on('connection', (socket) => {
     });
 });
 
-// The "catchall" handler: for any request that doesn't
-// match one above, send back React's index.html file.
-app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, '../build/index.html'));
-});
+// The "catchall" handler: only serve React app if build folder exists (combined deploy)
+if (fs.existsSync(buildPath)) {
+    app.get('*', (req, res) => {
+        res.sendFile(path.join(buildPath, 'index.html'));
+    });
+}
 
 const PORT = process.env.PORT || 3001;
 server.listen(PORT, '0.0.0.0', () => {
