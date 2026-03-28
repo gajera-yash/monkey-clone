@@ -6,7 +6,7 @@ import GenderModal from './GenderModal';
 import { RiFacebookFill, RiMailFill } from "react-icons/ri";
 
 const LoginModal = ({ isOpen, onClose }) => {
-    const { loginWithGoogle, continueAsGuest, loginWithUserEmail, signUpWithEmail } = useAuth();
+    const { loginWithGoogle, continueAsGuest, loginWithUserEmail, signUpWithEmail, verifyEmailOTP } = useAuth();
     const navigate = useNavigate();
 
     const [loading, setLoading] = useState(false);
@@ -21,6 +21,8 @@ const LoginModal = ({ isOpen, onClose }) => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [name, setName] = useState('');
+    const [otp, setOtp] = useState('');
+    const [otpLoading, setOtpLoading] = useState(false);
 
     // Get last logged user
     const lastUser = JSON.parse(localStorage.getItem('lastLoggedUser') || 'null');
@@ -28,9 +30,12 @@ const LoginModal = ({ isOpen, onClose }) => {
     // Reset forms when switching views
     const switchView = (newView) => {
         setView(newView);
-        setEmail('');
-        setPassword('');
-        setName('');
+        if (newView !== 'verify-otp') {
+            setEmail('');
+            setPassword('');
+            setName('');
+        }
+        setOtp('');
     };
 
     const handleGoogleLogin = async () => {
@@ -84,17 +89,47 @@ const LoginModal = ({ isOpen, onClose }) => {
             } else if (authMethod === 'email-signup') {
                 const res = await signUpWithEmail(email, password, name);
                 if (res?.needsVerification) {
-                    toast.success('Verification email sent! Please check your inbox before logging in.', { duration: 6000 });
-                    setView('email-login'); // switch to login view for when they come back
+                    toast.success('Check your email for the 6-digit code!', { duration: 6000 });
+                    setView('verify-otp');
                 } else {
                     toast.success('Account created successfully!');
+                    onClose();
                 }
-                onClose();
             }
         } catch (error) {
             console.error(error);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleVerifyOtp = async (e) => {
+        e.preventDefault();
+        if (otp.length !== 6) {
+            toast.error("Please enter a 6-digit code");
+            return;
+        }
+        setOtpLoading(true);
+        try {
+            await verifyEmailOTP(email, otp);
+            onClose();
+        } catch (error) {
+            console.error(error);
+        } finally {
+            setOtpLoading(false);
+        }
+    };
+
+    const handleResendOtp = async () => {
+        setOtpLoading(true);
+        try {
+            await signUpWithEmail(email, password, name);
+            toast.success("New code sent to your email!");
+            setOtp('');
+        } catch (error) {
+            console.error(error);
+        } finally {
+            setOtpLoading(false);
         }
     };
 
@@ -378,6 +413,53 @@ const LoginModal = ({ isOpen, onClose }) => {
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                                     </svg>
                                     Back to options
+                                </button>
+                            </div>
+                        </div>
+                    ) : view === 'verify-otp' ? (
+                        <div className="animate-in fade-in slide-in-from-right-4 duration-300">
+                            <h2 className="text-2xl font-bold text-white mb-2">Verify Email</h2>
+                            <p className="text-white/60 text-sm mb-8">
+                                Enter the 6-digit code sent to <br/>
+                                <span className="text-white font-mono">{email}</span>
+                            </p>
+                            
+                            <form onSubmit={handleVerifyOtp} className="space-y-6">
+                                <div className="flex justify-center gap-2">
+                                    <input
+                                        type="text"
+                                        maxLength="6"
+                                        placeholder="000000"
+                                        value={otp}
+                                        onChange={(e) => setOtp(e.target.value.replace(/[^0-9]/g, ''))}
+                                        className="w-full max-w-[200px] bg-black/20 border-2 border-white/10 rounded-2xl px-4 py-4 text-center text-3xl font-black tracking-[0.5em] text-white focus:outline-none focus:border-white/40 transition-all placeholder:text-white/10 placeholder:tracking-normal"
+                                        autoFocus
+                                        required
+                                    />
+                                </div>
+
+                                <button
+                                    type="submit"
+                                    disabled={otpLoading || otp.length !== 6}
+                                    className="w-full bg-white text-gray-900 font-black py-4 rounded-2xl hover:bg-gray-100 transition-all shadow-xl disabled:opacity-50"
+                                >
+                                    {otpLoading ? 'VERIFYING...' : 'VERIFY & CONTINUE'}
+                                </button>
+                            </form>
+
+                            <div className="mt-8 flex flex-col gap-4">
+                                <button 
+                                    onClick={handleResendOtp}
+                                    disabled={otpLoading}
+                                    className="text-white font-bold hover:underline"
+                                >
+                                    Resend Code
+                                </button>
+                                <button 
+                                    onClick={() => switchView('email-signup')}
+                                    className="text-white/40 hover:text-white text-sm font-bold transition-colors"
+                                >
+                                    Wrong email? Go back
                                 </button>
                             </div>
                         </div>

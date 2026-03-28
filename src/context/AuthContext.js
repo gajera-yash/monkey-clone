@@ -104,22 +104,39 @@ export const AuthProvider = ({ children }) => {
                 options: {
                     data: {
                         full_name: displayName,
-                        gender: savedGender || null // also store it in metadata if needed
+                        gender: savedGender || null
                     }
                 }
             });
             if (error) throw error;
             
-            // If email confirmations are enabled, session will be null here
-            if (data.user && !data.session) {
-                // Return a specific structure so UI knows to show "check email"
-                return { needsVerification: true, user: data.user };
+            if (data.user && data.user.identities?.length === 0) {
+                throw new Error("This email is already registered.");
             }
 
-            return { needsVerification: false, user: data.user };
+            return { needsVerification: true, user: data.user };
         } catch (error) {
             console.error(error);
             toast.error(error.message);
+            throw error;
+        }
+    };
+
+    // Verify OTP
+    const verifyEmailOTP = async (email, token) => {
+        try {
+            const { data, error } = await supabase.auth.verifyOtp({
+                email,
+                token,
+                type: 'signup'
+            });
+            if (error) throw error;
+            
+            toast.success("Email verified successfully!");
+            return data.session;
+        } catch (error) {
+            console.error(error);
+            toast.error(error.message || "Invalid or expired code");
             throw error;
         }
     };
@@ -836,7 +853,8 @@ export const AuthProvider = ({ children }) => {
         saveMatchToHistory,
         removeFromHistory,
         matchHistory,
-        refreshProfile
+        refreshProfile,
+        verifyEmailOTP
     };
 
     return (
