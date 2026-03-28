@@ -124,19 +124,43 @@ export const AuthProvider = ({ children }) => {
 
     // Verify OTP
     const verifyEmailOTP = async (email, token) => {
+        const cleanEmail = email.trim().toLowerCase();
+        const cleanToken = token.trim();
+        
+        console.log("🔐 Attempting OTP verification for:", cleanEmail);
+        
         try {
             const { data, error } = await supabase.auth.verifyOtp({
-                email,
-                token,
+                email: cleanEmail,
+                token: cleanToken,
                 type: 'signup'
             });
-            if (error) throw error;
+            
+            if (error) {
+                // FALLBACK: Some Supabase configs use 'email' type for confirmation
+                console.log("Signup OTP failed, trying fallback type 'email'...");
+                const fallback = await supabase.auth.verifyOtp({
+                    email: cleanEmail,
+                    token: cleanToken,
+                    type: 'email'
+                });
+                
+                if (fallback.error) throw error; // throw original signup error if both fail
+                
+                toast.success("Email verified!");
+                await refreshProfile();
+                return fallback.data.session;
+            }
             
             toast.success("Email verified successfully!");
+            await refreshProfile();
             return data.session;
         } catch (error) {
-            console.error(error);
-            toast.error(error.message || "Invalid or expired code");
+            console.error("OTP Error:", error);
+            const msg = error.message || "Invalid or expired code";
+            toast.error(msg === "Token has expired or is invalid" 
+                ? "Invalid code. Please use the LATEST code from your email." 
+                : msg);
             throw error;
         }
     };

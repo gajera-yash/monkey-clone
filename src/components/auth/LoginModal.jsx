@@ -105,16 +105,17 @@ const LoginModal = ({ isOpen, onClose }) => {
 
     const handleVerifyOtp = async (e) => {
         e.preventDefault();
-        if (otp.length !== 6) {
-            toast.error("Please enter a 6-digit code");
+        if (otp.trim().length !== 6) {
+            toast.error("Please enter the 6-digit code");
             return;
         }
         setOtpLoading(true);
         try {
             await verifyEmailOTP(email, otp);
+            toast.success("Account verified! You are now logged in.");
             onClose();
         } catch (error) {
-            console.error(error);
+            // Error is handled in AuthContext toast
         } finally {
             setOtpLoading(false);
         }
