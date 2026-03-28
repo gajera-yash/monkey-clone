@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { supabase } from '../../supabase';
+import toast from 'react-hot-toast';
 
 const ContactUs = () => {
     const [formData, setFormData] = useState({
@@ -8,11 +10,29 @@ const ContactUs = () => {
         message: ''
     });
 
-    const handleSubmit = (e) => {
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    const handleSubmit = async (e) => {
         e.preventDefault();
-        // Here you would typically handle form submission
-        alert("Thank you for your message! We'll get back to you soon.");
-        setFormData({ name: '', email: '', subject: '', message: '' });
+        setIsSubmitting(true);
+        try {
+            const { error } = await supabase.from('contact_messages').insert([{
+                name: formData.name,
+                email: formData.email,
+                subject: formData.subject,
+                message: formData.message
+            }]);
+
+            if (error) throw error;
+
+            toast.success("Thank you for your message! We'll get back to you soon.");
+            setFormData({ name: '', email: '', subject: '', message: '' });
+        } catch (error) {
+            console.error("Error submitting contact form:", error);
+            toast.error("Failed to send message. Please try again.");
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     return (
@@ -92,9 +112,10 @@ const ContactUs = () => {
                         </div>
                         <button 
                             type="submit"
-                            className="w-full py-4 bg-gradient-to-r from-pink-500 to-purple-600 rounded-xl font-bold text-lg hover:opacity-90 transition-opacity shadow-lg shadow-purple-500/20"
+                            disabled={isSubmitting}
+                            className={`w-full py-4 bg-gradient-to-r from-pink-500 to-purple-600 rounded-xl font-bold text-lg transition-all shadow-lg shadow-purple-500/20 ${isSubmitting ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-90'}`}
                         >
-                            Send Message
+                            {isSubmitting ? 'Sending...' : 'Send Message'}
                         </button>
                     </form>
                 </div>

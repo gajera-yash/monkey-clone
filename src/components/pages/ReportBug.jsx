@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { supabase } from '../../supabase';
+import toast from 'react-hot-toast';
 
 const ReportBug = () => {
     const [formData, setFormData] = useState({
@@ -9,10 +11,30 @@ const ReportBug = () => {
         steps: ''
     });
 
-    const handleSubmit = (e) => {
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    const handleSubmit = async (e) => {
         e.preventDefault();
-        alert("Bug report submitted successfully! Thank you for helping us improve.");
-        setFormData({ title: '', description: '', device: '', browser: '', steps: '' });
+        setIsSubmitting(true);
+        try {
+            const { error } = await supabase.from('bug_reports').insert([{
+                title: formData.title,
+                description: formData.description,
+                device: formData.device,
+                browser: formData.browser,
+                steps: formData.steps
+            }]);
+
+            if (error) throw error;
+
+            toast.success("Bug report submitted successfully! Thank you for helping us improve.");
+            setFormData({ title: '', description: '', device: '', browser: '', steps: '' });
+        } catch (error) {
+            console.error("Error submitting bug report:", error);
+            toast.error("Failed to submit report. Please try again.");
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     return (
@@ -93,10 +115,11 @@ const ReportBug = () => {
 
                         <button 
                             type="submit"
-                            className="w-full py-4 bg-gradient-to-r from-red-500 to-orange-600 rounded-xl font-bold text-lg hover:opacity-90 transition-opacity flex items-center justify-center space-x-2"
+                            disabled={isSubmitting}
+                            className={`w-full py-4 bg-gradient-to-r from-red-500 to-orange-600 rounded-xl font-bold text-lg flex items-center justify-center space-x-2 transition-all ${isSubmitting ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-90'}`}
                         >
                             <span>🐞</span>
-                            <span>Submit Bug Report</span>
+                            <span>{isSubmitting ? 'Submitting...' : 'Submit Bug Report'}</span>
                         </button>
                     </form>
                 </div>

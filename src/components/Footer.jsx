@@ -34,19 +34,21 @@ const Footer = () => {
                     </ul>
                 </div>
                 
-                <div className="flinks-landing">
-                    <h4>Get The App</h4>
-                    <div className="app-btns-landing">
-                        <a href="#" className="app-btn-landing">
-                            <span className="app-btn-icon-landing">🍎</span>
-                            <div><span>Download on the</span><strong>App Store</strong></div>
-                        </a>
-                        <a href="#" className="app-btn-landing">
-                            <span className="app-btn-icon-landing">🤖</span>
-                            <div><span>Get it on</span><strong>Google Play</strong></div>
-                        </a>
+                {false && (
+                    <div className="flinks-landing">
+                        <h4>Get The App</h4>
+                        <div className="app-btns-landing">
+                            <a href="#" className="app-btn-landing">
+                                <span className="app-btn-icon-landing">🍎</span>
+                                <div><span>Download on the</span><strong>App Store</strong></div>
+                            </a>
+                            <a href="#" className="app-btn-landing">
+                                <span className="app-btn-icon-landing">🤖</span>
+                                <div><span>Get it on</span><strong>Google Play</strong></div>
+                            </a>
+                        </div>
                     </div>
-                </div>
+                )}
             </div>
             
             <div className="footer-bottom-landing">

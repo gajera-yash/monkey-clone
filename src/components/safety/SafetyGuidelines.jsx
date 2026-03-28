@@ -82,7 +82,7 @@ const SafetyGuidelines = () => {
                             <ShieldAlert size={12} />
                             <span>Safety First Protocol</span>
                         </div>
-                        <h1 className="text-6xl md:text-8xl font-black mb-8 tracking-tighter leading-none italic">
+                        <h1 className="text-4xl md:text-6xl lg:text-8xl font-black mb-8 tracking-tighter leading-none italic">
                             Safety <span className="text-rose-500">Guidelines</span>
                         </h1>
                         <p className="text-xl text-white/50 font-medium leading-relaxed mb-12 max-w-lg">
@@ -116,7 +116,7 @@ const SafetyGuidelines = () => {
 
                 <div className="flex flex-col lg:flex-row gap-12 items-start h-full">
                     {/* Sticky Sidebar Navigation */}
-                    <div className="lg:w-72 shrink-0 sticky top-32 self-start">
+                    <div className="hidden lg:block lg:w-72 shrink-0 sticky top-32 self-start">
                         <div className="space-y-1 bg-white/[0.02] backdrop-blur-3xl border border-white/5 p-4 rounded-[32px]">
                             <h4 className="px-4 text-[10px] font-black uppercase tracking-[0.3em] text-rose-500 mb-6 py-2 border-b border-rose-500/10">Navigation</h4>
                             {sections.map((section) => (
@@ -148,7 +148,7 @@ const SafetyGuidelines = () => {
                             <div className="flex items-center gap-6 mb-12">
                                 <span className={`text-7xl font-black italic transition-colors duration-500 ${activeSection === 'age' ? 'text-rose-500' : 'text-white/5'}`}>01</span>
                                 <div>
-                                    <h2 className="text-4xl font-black italic uppercase tracking-tight">Age Verification</h2>
+                                    <h2 className="text-3xl md:text-4xl font-black italic uppercase tracking-tight">Age Verification</h2>
                                     <div className="h-1.5 w-12 bg-rose-500 rounded-full mt-2" />
                                 </div>
                             </div>
@@ -182,7 +182,7 @@ const SafetyGuidelines = () => {
                             <div className="flex items-center gap-6 mb-12">
                                 <span className={`text-7xl font-black italic transition-colors duration-500 ${activeSection === 'behavior' ? 'text-blue-500' : 'text-white/5'}`}>02</span>
                                 <div>
-                                    <h2 className="text-4xl font-black italic uppercase tracking-tight">Prohibited Behavior</h2>
+                                    <h2 className="text-3xl md:text-4xl font-black italic uppercase tracking-tight">Prohibited Behavior</h2>
                                     <div className="h-1.5 w-12 bg-blue-500 rounded-full mt-2" />
                                 </div>
                             </div>
@@ -236,7 +236,7 @@ const SafetyGuidelines = () => {
                             <div className="flex items-center gap-6 mb-12">
                                 <span className={`text-7xl font-black italic transition-colors duration-500 ${activeSection === 'personal' ? 'text-purple-500' : 'text-white/5'}`}>03</span>
                                 <div>
-                                    <h2 className="text-4xl font-black italic uppercase tracking-tight">Personal Safety</h2>
+                                    <h2 className="text-3xl md:text-4xl font-black italic uppercase tracking-tight">Personal Safety</h2>
                                     <div className="h-1.5 w-12 bg-purple-500 rounded-full mt-2" />
                                 </div>
                             </div>
@@ -256,7 +256,7 @@ const SafetyGuidelines = () => {
                                             ))}
                                         </ul>
                                     </div>
-                                    <div className="border-l border-white/5 pl-16">
+                                    <div className="md:border-l md:border-white/5 md:pl-16">
                                         <h4 className="text-2xl font-black mb-10 italic uppercase tracking-tighter text-blue-500 underline underline-offset-[12px]">Stay Vigilant</h4>
                                         <ul className="space-y-6">
                                             {['Trust your core instinct', 'Watch for red flag behavior', 'Ignore money requests', 'Stay on-platform only'].map((item, i) => (
@@ -275,12 +275,12 @@ const SafetyGuidelines = () => {
                         <section id="reporting" className="scroll-mt-24">
                             <div className="bg-gradient-to-br from-rose-600 to-rose-900 rounded-[80px] p-20 text-center relative overflow-hidden group shadow-[0_0_120px_rgba(225,29,72,0.15)]">
                                 <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-10"></div>
-                                <ShieldAlert size={100} className="mx-auto mb-10 text-white group-hover:scale-110 transition-transform duration-700" />
-                                <h2 className="text-6xl md:text-8xl font-black italic uppercase tracking-tighter mb-10 leading-none">Emergency Report</h2>
-                                <p className="text-3xl text-white/90 font-black italic leading-[1.2] mb-16 max-w-3xl mx-auto uppercase">
+                                <ShieldAlert size={80} className="mx-auto mb-10 text-white group-hover:scale-110 transition-transform duration-700 md:w-[100px] md:h-[100px]" />
+                                <h2 className="text-4xl md:text-6xl lg:text-8xl font-black italic uppercase tracking-tighter mb-10 leading-none">Emergency Report</h2>
+                                <p className="text-xl md:text-3xl text-white/90 font-black italic leading-[1.2] mb-16 max-w-3xl mx-auto uppercase">
                                     Click the <span className="text-black bg-white px-4 py-1 rounded-2xl not-italic">REPORT</span> button immediately. 
                                     <br />
-                                    <span className="text-xl text-white/60">Priority investigation within 60 minutes.</span>
+                                    <span className="text-lg md:text-xl text-white/60">Priority investigation within 60 minutes.</span>
                                 </p>
                                 <div className="flex flex-wrap justify-center gap-8">
                                     <div className="flex items-center gap-4 bg-white/10 px-8 py-5 rounded-[32px] backdrop-blur-2xl border border-white/20 hover:bg-white/20 transition-all cursor-pointer">
@@ -297,8 +297,8 @@ const SafetyGuidelines = () => {
 
                         {/* section 5: mental */}
                         <section id="mental" className="text-center py-20 pb-0 scroll-mt-24">
-                            <Heart size={64} className={`mx-auto mb-10 transition-all duration-700 ${activeSection === 'mental' ? 'text-rose-500 scale-125' : 'text-white/10'}`} />
-                            <h2 className="text-5xl font-black italic uppercase tracking-tighter mb-10">Well-being</h2>
+                            <Heart size={48} className={`mx-auto mb-10 transition-all duration-700 md:w-[64px] md:h-[64px] ${activeSection === 'mental' ? 'text-rose-500 scale-125' : 'text-white/10'}`} />
+                            <h2 className="text-4xl md:text-5xl font-black italic uppercase tracking-tighter mb-10">Well-being</h2>
                             <p className="text-white/30 font-black uppercase text-sm tracking-widest leading-relaxed max-w-2xl mx-auto mb-20 italic">
                                 Your peace of mind matters more than our platform. Block liberally. Take breaks. 
                                 <br />

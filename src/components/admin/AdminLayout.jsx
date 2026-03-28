@@ -34,6 +34,8 @@ import Analytics from './sections/Analytics';
 import AdminUsers from './sections/AdminUsers';
 import Support from './sections/Support';
 import Notifications from './sections/Notifications';
+import AdminContactMessages from './sections/AdminContactMessages';
+import AdminBugReports from './sections/AdminBugReports';
 
 const AdminLayout = () => {
     const location = useLocation();
@@ -151,6 +153,8 @@ const AdminLayout = () => {
             items: [
                 { name: 'Notifications', path: '/admin/alerts', id: 'reports', icon: <Bell size={18} /> },
                 { name: 'Support', path: '/admin/support', id: 'reports', icon: <LifeBuoy size={18} /> },
+                { name: 'Contact Msgs', path: '/admin/contact-messages', id: 'reports', icon: <MessageSquare size={18} /> },
+                { name: 'Bug Reports', path: '/admin/bug-reports', id: 'reports', icon: <ShieldAlert size={18} /> },
             ]
         }
     ];
@@ -333,6 +337,8 @@ const AdminLayout = () => {
                         <Route path="roles" element={<AdminUsers />} />
                         <Route path="alerts" element={<Notifications />} />
                         <Route path="support" element={<Support />} />
+                        <Route path="contact-messages" element={<AdminContactMessages />} />
+                        <Route path="bug-reports" element={<AdminBugReports />} />
 
                         {/* Verifications & Creators */}
                         <Route path="verifications" element={<Verifications />} />

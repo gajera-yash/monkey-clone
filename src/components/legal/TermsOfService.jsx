@@ -51,11 +51,11 @@ const TermsOfService = () => {
                     <span className="font-medium">Back to Home</span>
                 </button>
 
-                <div className="mb-16">
-                    <h1 className="text-5xl md:text-6xl font-black mb-6 tracking-tight">
+                <div className="mb-16 mt-8 md:mt-0">
+                    <h1 className="text-4xl md:text-5xl lg:text-6xl font-black mb-6 tracking-tight">
                         Terms of <span className="text-gradient">Service</span>
                     </h1>
-                    <p className="text-xl text-white/60 font-medium">Last updated: March 22, 2026</p>
+                    <p className="text-lg md:text-xl text-white/60 font-medium">Last updated: March 22, 2026</p>
                 </div>
 
                 {/* Content Sections */}
@@ -67,8 +67,8 @@ const TermsOfService = () => {
                                     {section.icon}
                                 </div>
                                 <div>
-                                    <h3 className="text-2xl font-bold mb-4">{section.title}</h3>
-                                    <p className="text-white/60 leading-relaxed text-lg">
+                                    <h3 className="text-xl md:text-2xl font-bold mb-4">{section.title}</h3>
+                                    <p className="text-white/60 leading-relaxed text-base md:text-lg">
                                         {section.content}
                                     </p>
                                 </div>

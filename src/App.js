@@ -67,6 +67,11 @@ const AppContent = () => {
 
   const bonusCheckedForUser = useRef(null);
 
+  // Scroll to top on route change
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [location.pathname]);
+
   // Check maintenance mode from database
   useEffect(() => {
       const checkMaintenance = async () => {
