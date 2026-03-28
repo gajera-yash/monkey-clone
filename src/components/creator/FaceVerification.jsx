@@ -9,8 +9,13 @@ import { loadFaceModels, areModelsLoaded } from "../../utils/faceApiModelLoader"
 const FaceVerification = () => {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
-  const { currentUser } = useAuth();
+  const { currentUser, logout } = useAuth();
   const navigate = useNavigate();
+
+  const handleExit = async () => {
+    await logout();
+    navigate('/');
+  };
 
   const [stream, setStream] = useState(null);
   const [capturedImage, setCapturedImage] = useState(null);
@@ -261,7 +266,15 @@ const FaceVerification = () => {
   };
 
   return (
-    <div className="min-h-screen bg-dark-900 text-white flex flex-col items-center justify-center p-6">
+    <div className="min-h-screen bg-dark-900 text-white flex flex-col items-center justify-center p-6 relative">
+      <button 
+        onClick={handleExit}
+        className="absolute top-6 left-6 flex items-center gap-2 text-gray-500 hover:text-white transition-colors uppercase font-black text-[10px] tracking-widest"
+      >
+        <div className="w-8 h-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center">✕</div>
+        Exit
+      </button>
+
       <div className="max-w-md w-full text-center">
         <h2 className="text-3xl font-black mb-2">Face Verification</h2>
 

@@ -252,14 +252,7 @@ const DesktopProfileModal = ({ onClose }) => {
                     </div>
                 </div>
 
-                {/* More Section */}
-                <button className="w-full bg-[#1a172e] rounded-2xl p-4 flex items-center justify-between border border-white/5 hover:bg-white/5 transition-colors">
-                    <div className="flex items-center gap-3">
-                        <RiSmartphoneLine size={20} className="text-white/60" />
-                        <span className="text-white font-medium">More</span>
-                    </div>
-                    <RiArrowRightSLine className="w-5 h-5 text-white/20" />
-                </button>
+
 
                 {/* Creator Dashboard (Only for verified creators) */}
                 {currentUser?.isCreator && (

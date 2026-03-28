@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import toast from 'react-hot-toast';
 
 const DailyBonusModal = ({ isOpen, onClose }) => {
-    const { claimDailyBonus, getDailyStreakInfo, streakRewards } = useCoins();
+    const { claimDailyBonus, getDailyStreakInfo, streakRewards, isSettingsLoading } = useCoins();
     const { currentUser } = useAuth();
     const [loading, setLoading] = useState(false);
     const [streakInfo, setStreakInfo] = useState({ currentDay: 1, claimedDays: [] });
@@ -76,9 +76,14 @@ const DailyBonusModal = ({ isOpen, onClose }) => {
                 </div>
 
                 {/* 7-Day Grid */}
-                <div className="mx-4 mb-4 rounded-2xl p-4" style={{ background: 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)' }}>
-                    <div className="grid grid-cols-7 gap-2">
-                        {streakRewards.map((coins, index) => {
+                {isSettingsLoading ? (
+                    <div className="mx-4 mb-4 rounded-2xl p-12 flex justify-center items-center" style={{ background: 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)' }}>
+                        <div className="w-10 h-10 border-4 border-white/20 border-t-white rounded-full animate-spin"></div>
+                    </div>
+                ) : (
+                    <div className="mx-4 mb-4 rounded-2xl p-4" style={{ background: 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)' }}>
+                        <div className="grid grid-cols-7 gap-2">
+                            {streakRewards.map((coins, index) => {
                             const day = index + 1;
                             const isClaimed = claimedDays.includes(day);
                             const isCurrent = day === currentDay;
@@ -134,19 +139,20 @@ const DailyBonusModal = ({ isOpen, onClose }) => {
                         })}
                     </div>
                 </div>
+                )}
 
                 {/* Claim Button */}
                 <div className="pb-6 px-4 flex justify-center">
                     <button
                         onClick={handleClaim}
-                        disabled={loading || isAlreadyClaimed}
+                        disabled={loading || isAlreadyClaimed || isSettingsLoading}
                         className={`px-24 py-3.5 font-black text-xl rounded-2xl transition-all shadow-lg tracking-widest border-b-4 
-                            ${isAlreadyClaimed 
+                            ${isAlreadyClaimed || isSettingsLoading
                                 ? 'bg-gray-400 text-gray-700 border-gray-500 cursor-not-allowed' 
                                 : 'bg-gradient-to-b from-yellow-300 to-yellow-500 hover:from-yellow-200 hover:to-yellow-400 text-yellow-950 shadow-yellow-600/40 hover:-translate-y-0.5 active:scale-95 border-yellow-600'
                             }`}
                     >
-                        {loading ? 'Claiming...' : isAlreadyClaimed ? 'CLAIMED' : 'CLAIM'}
+                        {isSettingsLoading ? 'LOADING...' : loading ? 'CLAIMING...' : isAlreadyClaimed ? 'CLAIMED' : 'CLAIM'}
                     </button>
                 </div>
             </div>

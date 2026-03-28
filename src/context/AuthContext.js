@@ -11,6 +11,7 @@ export const AuthProvider = ({ children }) => {
     const [currentUser, setCurrentUser] = useState(null);
     const [loading, setLoading] = useState(true);
     const [isGuest, setIsGuest] = useState(false);
+    const [isAdmin, setIsAdmin] = useState(false);
     const [blockedUsers, setBlockedUsers] = useState([]);
     const [matchHistory, setMatchHistory] = useState([]);
     const [userLocation, setUserLocation] = useState(null);
@@ -34,7 +35,8 @@ export const AuthProvider = ({ children }) => {
                 isCreator: data.is_creator,
                 accountStatus: data.account_status,
                 displayName: data.username,
-                photoURL: data.avatar_url
+                photoURL: data.avatar_url,
+                role: data.role || 'user'
             };
         } catch (error) {
             console.error("Error fetching profile:", error);
@@ -157,7 +159,11 @@ export const AuthProvider = ({ children }) => {
     // Logout
     const logout = async () => {
         try {
-            // Always attempt to sign out from Supabase if we have a current user or not (to be safe)
+            // Close any active chat log before logging out
+            if (activeLogId.current) {
+                updateChatLog(activeLogId.current, 0, 0);
+            }
+
             if (!isGuest) {
                 if (currentUser) {
                     // Save last user info for persistent login UI
@@ -169,9 +175,26 @@ export const AuthProvider = ({ children }) => {
                     };
                     localStorage.setItem('lastLoggedUser', JSON.stringify(lastUserInfo));
                 }
-                await supabase.auth.signOut();
+                
+                // Attempt to sign out from Supabase server
+                // We wrap this inside try-catch so if network fails, we STILL clear local session
+                try {
+                    await supabase.auth.signOut();
+                } catch (signOutError) {
+                    console.error("Supabase signOut error:", signOutError);
+                }
             }
             
+            // Aggressive local state cleanup
+            // 1. Manually prune all Supabase sb- keys to guarantee local removal
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && key.startsWith('sb-') && key.endsWith('-auth-token')) {
+                    localStorage.removeItem(key);
+                }
+            }
+
+            // 2. Clear application memory 
             setIsGuest(false);
             setCurrentUser(null);
             localStorage.removeItem('lastActivity');
@@ -179,14 +202,21 @@ export const AuthProvider = ({ children }) => {
             
             toast.success("Logged out");
             
-            // Hard redirect to home to ensure all context states are reset
+            // Hard redirect to home to forcefully unmount private routes
             setTimeout(() => {
                 window.location.href = '/';
             }, 500);
         } catch (error) {
             console.error("Logout error:", error);
-            toast.error("Error logging out");
-            // Still try to redirect as a fallback
+            
+            // Catastrophic fallback cleanup
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && key.startsWith('sb-') && key.endsWith('-auth-token')) {
+                    localStorage.removeItem(key);
+                }
+            }
+            setCurrentUser(null);
             window.location.href = '/';
         }
     };
@@ -547,6 +577,7 @@ export const AuthProvider = ({ children }) => {
                         }
 
                         setCurrentUser({ ...session.user, ...profile });
+                        setIsAdmin(profile?.role === 'admin');
 
                         // Update last user info OR clear if it's a new login
                         const lastUserInfo = {
@@ -784,6 +815,7 @@ export const AuthProvider = ({ children }) => {
     const value = {
         currentUser,
         isGuest,
+        isAdmin,
         loading,
         blockedUsers,
         userLocation,

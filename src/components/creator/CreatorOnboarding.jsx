@@ -4,7 +4,12 @@ import { useAuth } from '../../context/AuthContext';
 
 const CreatorOnboarding = () => {
     const navigate = useNavigate();
-    const { currentUser } = useAuth();
+    const { currentUser, logout } = useAuth();
+
+    const handleExit = async () => {
+        await logout();
+        navigate('/');
+    };
 
     return (
         <div className="min-h-screen bg-dark-900 text-white flex flex-col items-center justify-center p-6 relative overflow-hidden">
@@ -54,6 +59,13 @@ const CreatorOnboarding = () => {
                     className="w-full py-4 bg-gradient-to-r from-accent-pink to-accent-purple rounded-2xl font-bold text-white shadow-lg shadow-accent-purple/30 hover:scale-[1.02] active:scale-[0.98] transition-all"
                 >
                     Start Verification
+                </button>
+
+                <button
+                    onClick={handleExit}
+                    className="w-full mt-4 py-4 bg-white/5 border border-white/10 rounded-2xl font-bold text-gray-400 hover:bg-white/10 transition-all uppercase tracking-widest text-[10px]"
+                >
+                    Exit & Logout
                 </button>
             </div>
         </div>

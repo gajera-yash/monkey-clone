@@ -12,6 +12,7 @@ export const CoinsProvider = ({ children }) => {
     const [coins, setCoins] = useState(0);
     const [transactions, setTransactions] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [isSettingsLoading, setIsSettingsLoading] = useState(true);
     const [onOpenCoinStore, setOnOpenCoinStore] = useState(null);
     const [onOpenSubscription, setOnOpenSubscription] = useState(null);
     const [onOpenDailyBonus, setOnOpenDailyBonus] = useState(null);
@@ -38,7 +39,12 @@ export const CoinsProvider = ({ children }) => {
 
     // Fetch initial data (transactions & settings)
     const fetchInitialData = async () => {
-        if (!currentUser?.id) return;
+        if (!currentUser?.id) {
+            setIsSettingsLoading(false);
+            return;
+        }
+
+        setIsSettingsLoading(true);
 
         try {
             // 1. Fetch Transactions
@@ -101,6 +107,8 @@ export const CoinsProvider = ({ children }) => {
 
         } catch (error) {
             console.error("Error fetching initial data:", error);
+        } finally {
+            setIsSettingsLoading(false);
         }
     };
 
@@ -335,45 +343,40 @@ export const CoinsProvider = ({ children }) => {
     const claimDailyBonus = async () => {
         if (!currentUser?.id) return false;
 
-        const { currentDay, canClaim } = getDailyStreakInfo(currentUser);
-
+        const { canClaim } = getDailyStreakInfo(currentUser);
         if (!canClaim) {
-            toast.error("Reward already claimed. Come back later!");
+            toast.error("Already claimed! Come back tomorrow.");
             return false;
         }
 
-        const reward = streakRewards[currentDay - 1] || dailyCoinsBase;
+        const toastId = toast.loading("Claiming your reward...");
+        
+        try {
+            // Call the secure RPC function instead of client-side logic
+            const { data, error } = await supabase.rpc('claim_daily_bonus_secure');
 
-        const success = await addCoins(reward, `Day ${currentDay} Daily Bonus`);
-        if (success) {
-            try {
-                // Update profile in Supabase
-                const { error } = await supabase
-                    .from('profiles')
-                    .update({
-                        last_reward_claim: new Date().toISOString(),
-                        reward_streak: currentDay
-                    })
-                    .eq('id', currentUser.id);
+            if (error) throw error;
 
-                if (error) throw error;
-
-                // Cleanup old localStorage items (migration)
-                localStorage.removeItem(`dailyBonus_lastTime_${currentUser.id}`);
-                localStorage.removeItem(`dailyBonus_lastDay_${currentUser.id}`);
-
+            if (data?.success) {
+                toast.success(`+${data.reward} Coins! (Day ${data.day})`, { id: toastId });
                 await refreshProfile();
-            } catch (error) {
-                console.error("Error updating streak in DB:", error);
+                return true;
+            } else {
+                toast.error(data?.message || "Failed to claim reward", { id: toastId });
+                return false;
             }
+        } catch (error) {
+            console.error("Error claiming daily bonus via RPC:", error);
+            toast.error("Security check failed or system error", { id: toastId });
+            return false;
         }
-        return success;
     };
 
     const value = {
         coins,
         transactions,
         loading,
+        isSettingsLoading,
         addCoins,
         spendCoins,
         purchaseCoins,

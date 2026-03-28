@@ -259,14 +259,7 @@ const UserProfileMobile = ({ onClose }) => {
                     </div>
                 </div>
 
-                {/* More */}
-                <button className="w-full bg-dark-800 border border-white/10 rounded-2xl px-5 py-4 flex items-center justify-between hover:bg-white/5 transition-colors">
-                    <div className="flex items-center gap-3">
-                        <RiGridLine size={18} className="text-gray-400" />
-                        <span className="text-gray-300">More</span>
-                    </div>
-                    <span className="text-gray-500">›</span>
-                </button>
+
 
                 {/* Creator Dashboard (Only for verified creators) */}
                 {currentUser?.isCreator && (

@@ -5,8 +5,13 @@ import { supabase } from '../../supabase';
 import toast from 'react-hot-toast';
 
 const VoiceVerification = () => {
-    const { currentUser, updateProfileInfo, refreshProfile } = useAuth();
+    const { currentUser, updateProfileInfo, refreshProfile, logout } = useAuth();
     const navigate = useNavigate();
+
+    const handleExit = async () => {
+        await logout();
+        navigate('/');
+    };
     const location = useLocation();
 
     const [isRecording, setIsRecording] = useState(false);
@@ -180,6 +185,13 @@ const VoiceVerification = () => {
 
     return (
         <div className="min-h-screen bg-dark-900 text-white flex flex-col items-center justify-center p-6 relative">
+            <button 
+                onClick={handleExit}
+                className="absolute top-6 left-6 flex items-center gap-2 text-gray-500 hover:text-white transition-colors uppercase font-black text-[10px] tracking-widest"
+            >
+                <div className="w-8 h-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center">✕</div>
+                Exit
+            </button>
             <div className="max-w-md w-full relative z-10 text-center">
                 <div className="w-20 h-20 bg-dark-800 rounded-full mx-auto flex items-center justify-center mb-6 shadow-lg shadow-blue-500/20">
                     <span className="text-4xl">🎙️</span>

@@ -3,7 +3,7 @@ import { useAuth } from '../../../context/AuthContext';
 
 const DesktopSafetyModal = ({ onClose }) => {
     const { currentUser, updateSafetySettings } = useAuth();
-    const settings = currentUser?.safetySettings || {
+    const settings = currentUser?.safety_settings || {
         disableFriendRequests: false,
         invisibleMode: false
     };
