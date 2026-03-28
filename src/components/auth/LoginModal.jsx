@@ -23,6 +23,7 @@ const LoginModal = ({ isOpen, onClose }) => {
     const [name, setName] = useState('');
     const [otp, setOtp] = useState('');
     const [otpLoading, setOtpLoading] = useState(false);
+    const [resendTimer, setResendTimer] = useState(0);
 
     // Get last logged user
     const lastUser = JSON.parse(localStorage.getItem('lastLoggedUser') || 'null');
@@ -122,17 +123,31 @@ const LoginModal = ({ isOpen, onClose }) => {
     };
 
     const handleResendOtp = async () => {
+        if (resendTimer > 0) return;
+        
         setOtpLoading(true);
         try {
             await signUpWithEmail(email, password, name);
             toast.success("New code sent to your email!");
             setOtp('');
+            setResendTimer(60); // Start 60s cooldown
         } catch (error) {
             console.error(error);
         } finally {
             setOtpLoading(false);
         }
     };
+
+    // Resend Timer logic
+    React.useEffect(() => {
+        let interval;
+        if (resendTimer > 0) {
+            interval = setInterval(() => {
+                setResendTimer((prev) => prev - 1);
+            }, 1000);
+        }
+        return () => clearInterval(interval);
+    }, [resendTimer]);
 
     const handleLastUserLogin = async () => {
         setLoading(true);
@@ -451,10 +466,10 @@ const LoginModal = ({ isOpen, onClose }) => {
                             <div className="mt-8 flex flex-col gap-4">
                                 <button 
                                     onClick={handleResendOtp}
-                                    disabled={otpLoading}
-                                    className="text-white font-bold hover:underline"
+                                    disabled={otpLoading || resendTimer > 0}
+                                    className={`font-bold transition-all ${resendTimer > 0 ? 'text-white/20 cursor-not-allowed' : 'text-white hover:underline'}`}
                                 >
-                                    Resend Code
+                                    {resendTimer > 0 ? `Resend Code in ${resendTimer}s` : 'Resend Code'}
                                 </button>
                                 <button 
                                     onClick={() => switchView('email-signup')}
