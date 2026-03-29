@@ -3,6 +3,7 @@ import { Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext';
 import { useAdmin } from '../../context/AdminContext';
 import { supabase } from '../../supabase';
+import toast from 'react-hot-toast';
 import {
     LayoutDashboard, Users as UsersIcon, MessageSquare, ShieldAlert,
     CreditCard, BarChart3, Palette, Settings,
@@ -47,9 +48,70 @@ const AdminLayout = () => {
     const [notifications, setNotifications] = useState([]);
     const [unreadCount, setUnreadCount] = useState(0);
 
+    const handleNewNotification = (notif) => {
+        setNotifications(prev => {
+            const match = prev.find(n => n.id === notif.id);
+            if(match) return prev;
+            return [notif, ...prev].sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).slice(0, 5);
+        });
+        setUnreadCount(prev => prev + 1);
+    };
+
     useEffect(() => {
+        if (!adminRole) return;
+
         fetchNotifications();
-    }, []);
+
+        // 1. OneSignal Initialization & Prompt for Admins
+        if (window.OneSignalDeferred) {
+            window.OneSignalDeferred.push(async function(OneSignal) {
+                if (currentUser?.id) {
+                    await OneSignal.login(currentUser.id);
+                }
+                await OneSignal.User.addTag("role", "admin");
+                // Ask for permission directly!
+                await OneSignal.Slidedown.promptPush();
+            });
+        }
+
+        // 2. Supabase Realtime for In-App Popups
+        const channel = supabase.channel('admin_notifications');
+
+        channel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'profiles' }, (payload) => {
+            const user = payload.new;
+            const msg = `New user joined: ${user.username || 'Unknown'}`;
+            handleNewNotification({ id: `usr-${user.id}`, type: 'user', message: msg, created_at: user.created_at || new Date().toISOString(), is_read: false });
+            toast(msg, { icon: '👋' });
+        });
+
+        channel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'payouts' }, (payload) => {
+            const payout = payload.new;
+            const msg = `New withdrawal request: ₹${payout.amount}`;
+            handleNewNotification({ id: `pay-${payout.id}`, type: 'revenue', message: msg, created_at: payout.created_at || new Date().toISOString(), is_read: false });
+            toast.success(msg, { icon: '💸', duration: 5000 });
+        });
+
+        channel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'reports' }, (payload) => {
+            const report = payload.new;
+            const msg = `New user report received!`;
+            handleNewNotification({ id: `rpt-${report.id}`, type: 'report', message: msg, created_at: report.created_at || new Date().toISOString(), is_read: false });
+            toast.error(msg, { icon: '🚨', duration: 5000 });
+        });
+
+        channel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'verifications' }, (payload) => {
+            const v = payload.new;
+            const msg = `New identity verification submitted.`;
+            handleNewNotification({ id: `ver-${v.id}`, type: 'verification', message: msg, created_at: v.created_at || new Date().toISOString(), is_read: false });
+            toast(msg, { icon: '✅', duration: 5000 });
+        });
+
+        channel.subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [adminRole, currentUser]);
 
     const fetchNotifications = async () => {
         try {
