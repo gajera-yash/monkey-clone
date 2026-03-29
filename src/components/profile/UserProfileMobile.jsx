@@ -40,19 +40,28 @@ const UserProfileMobile = ({ onClose }) => {
             const fileExt = file.name?.split('.').pop() || 'jpg';
             const fileName = `${currentUser.id}/avatar_${Date.now()}.${fileExt}`;
             
-            const { error } = await supabase.storage
+            const { error: uploadError } = await supabase.storage
                 .from('avatars')
                 .upload(fileName, file, {
                     contentType: file.type || 'image/jpeg',
                     upsert: true
                 });
 
-            if (error) throw error;
+            if (uploadError) throw uploadError;
 
             const { data: { publicUrl } } = supabase.storage
                 .from('avatars')
                 .getPublicUrl(fileName);
 
+            // Save to DB (profiles table) — same as Desktop version
+            const { error: dbError } = await supabase
+                .from('profiles')
+                .update({ avatar_url: publicUrl })
+                .eq('id', currentUser.id);
+
+            if (dbError) throw dbError;
+
+            // Also update local context
             await updateProfileInfo({ photoURL: publicUrl });
             toast.success("Profile photo updated!", { id: toastId });
         } catch (error) {

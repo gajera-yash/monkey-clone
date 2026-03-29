@@ -1039,6 +1039,13 @@ const VideoChat = ({ onEndChat }) => {
 
               {/* Match History Overlay */}
               {showMatchHistory && <MatchHistoryMobile onClose={() => setShowMatchHistory(false)} />}
+
+              {/* Search Modal Overlay (Mobile) */}
+              {showSearchModal && (
+                <div className="fixed inset-0 z-[100] flex flex-col animate-slide-up">
+                  <DesktopSearchModal onClose={() => setShowSearchModal(false)} />
+                </div>
+              )}
             </div>
 
             {/* ===== DESKTOP IDLE SCREEN ===== */}

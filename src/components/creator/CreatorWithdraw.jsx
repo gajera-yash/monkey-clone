@@ -14,16 +14,22 @@ const CreatorWithdraw = () => {
     const [bankDetails, setBankDetails] = useState({ accountName: '', accountNumber: '', ifsc: '' });
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    const MINIMUM_WITHDRAWAL = 50;
+    const COINS_PER_RUPEE = 100;         // 100 coins = ₹1
+    const MINIMUM_WITHDRAWAL_COINS = 5000; // Minimum 5000 coins = ₹50
     const availableBalance = currentUser?.coins || 0;
+    const availableRupees = availableBalance / COINS_PER_RUPEE;
+
+    // Live rupee preview from coin input
+    const coinAmount = Number(amount) || 0;
+    const rupeeAmount = parseFloat((coinAmount / COINS_PER_RUPEE).toFixed(2));
 
     const handleWithdraw = async (e) => {
         e.preventDefault();
 
         const withdrawAmount = Number(amount);
 
-        if (!withdrawAmount || withdrawAmount < MINIMUM_WITHDRAWAL) {
-            toast.error(`Minimum withdrawal is ₹${MINIMUM_WITHDRAWAL}`);
+        if (!withdrawAmount || withdrawAmount < MINIMUM_WITHDRAWAL_COINS) {
+            toast.error(`Minimum withdrawal is 🪙 ${MINIMUM_WITHDRAWAL_COINS.toLocaleString()} coins (₹${MINIMUM_WITHDRAWAL_COINS / COINS_PER_RUPEE})`);
             return;
         }
 
@@ -49,11 +55,14 @@ const CreatorWithdraw = () => {
             const userId = currentUser.uid || currentUser.id;
             
             // 1. Create withdrawal request in payouts table
+            // amount stored as ₹ (rupees) = coins / COINS_PER_RUPEE
+            const rupeeValue = parseFloat((withdrawAmount / COINS_PER_RUPEE).toFixed(2));
             const { error: payoutError } = await supabase
                 .from('payouts')
                 .insert({
                     user_id: userId,
-                    amount: withdrawAmount,
+                    amount: rupeeValue,         // ₹ amount stored
+                    coins_redeemed: withdrawAmount, // coins deducted
                     method,
                     details: method === 'upi' ? { upiId: paymentDetails } : bankDetails,
                     status: 'pending'
@@ -77,7 +86,8 @@ const CreatorWithdraw = () => {
                 await refreshProfile();
             }
 
-            toast.success(`Withdrawal request for ₹${withdrawAmount} submitted!`, { id: toastId });
+            const finalRupees = (withdrawAmount / COINS_PER_RUPEE).toFixed(2);
+            toast.success(`Withdrawal request for ₹${finalRupees} submitted! (🪙 ${withdrawAmount.toLocaleString()} coins)`, { id: toastId });
             setAmount('');
             setPaymentDetails('');
             setBankDetails({ accountName: '', accountNumber: '', ifsc: '' });
@@ -120,24 +130,27 @@ const CreatorWithdraw = () => {
                             <div className="absolute top-0 right-0 w-32 h-32 bg-yellow-500/10 blur-3xl -mr-10 -mt-10 rounded-full"></div>
                             <p className="text-gray-400 text-sm font-medium mb-2 relative z-10">Available Coins</p>
                             <h2 className="text-4xl font-black text-yellow-400 relative z-10 drop-shadow-[0_0_15px_rgba(234,179,8,0.3)]">
-                                🪙 {currentUser?.coins?.toLocaleString() || 0}
+                                🪙 {availableBalance.toLocaleString()}
                             </h2>
+                            <p className="text-green-400 text-lg font-bold relative z-10 mt-1">
+                                = ₹{availableRupees.toFixed(2)}
+                            </p>
 
-                            <div className="mt-8 pt-6 border-t border-white/5 space-y-3 relative z-10">
+                            <div className="mt-6 pt-4 border-t border-white/5 space-y-2 relative z-10">
                                 <div className="flex justify-between text-sm">
-                                    <span className="text-gray-500">Total Coins Earned</span>
-                                    <span className="text-white font-medium">🪙 {(currentUser?.coins || 0).toLocaleString()}</span>
+                                    <span className="text-gray-500">Conversion Rate</span>
+                                    <span className="text-white font-medium">🪙 100 = ₹1</span>
                                 </div>
                                 <div className="flex justify-between text-sm">
-                                    <span className="text-gray-500">Withdrawn</span>
-                                    <span className="text-white font-medium">🪙 0</span>
+                                    <span className="text-gray-500">Min. Withdrawal</span>
+                                    <span className="text-white font-medium">🪙 5,000 (₹50)</span>
                                 </div>
                             </div>
                         </div>
 
                         <div className="bg-blue-500/10 border border-blue-500/30 p-5 rounded-2xl flex gap-3 text-blue-300 text-sm">
                             <span className="text-xl">ℹ️</span>
-                            <p>Withdrawals are processed manually within 24-48 business hours. Minimum payout is 🪙 50.</p>
+                            <p>Withdrawals processed within 24-48 hours. Rate: <strong>🪙 100 = ₹1</strong>. Minimum payout: 🪙 5,000 coins (₹50).</p>
                         </div>
                     </div>
 
@@ -176,25 +189,39 @@ const CreatorWithdraw = () => {
 
                             {/* Amount Input */}
                             <div className="mb-8">
-                                <label className="block text-sm font-bold text-gray-300 mb-2">Withdrawal Amount (Coins)</label>
+                                <label className="block text-sm font-bold text-gray-300 mb-2">Coins to Redeem</label>
                                 <div className="relative">
                                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl text-gray-400 font-bold">🪙</span>
                                     <input
                                         type="number"
                                         value={amount}
                                         onChange={(e) => setAmount(e.target.value)}
-                                        placeholder="0"
+                                        placeholder="Enter coins (min 5,000)"
+                                        min={MINIMUM_WITHDRAWAL_COINS}
+                                        step={100}
                                         className="w-full bg-dark-900 border border-white/10 rounded-2xl py-4 pl-12 pr-4 text-xl font-bold text-white outline-none focus:border-accent-purple transition-colors"
                                     />
                                 </div>
+
+                                {/* Live ₹ Preview */}
+                                <div className={`mt-3 flex items-center justify-center gap-2 py-3 rounded-xl font-bold transition-all ${
+                                    coinAmount >= MINIMUM_WITHDRAWAL_COINS
+                                        ? 'bg-green-500/10 border border-green-500/20 text-green-300'
+                                        : 'bg-white/5 border border-white/10 text-gray-500'
+                                }`}>
+                                    <span className="text-sm">🪙 {coinAmount.toLocaleString()} coins</span>
+                                    <span className="text-white/30">→</span>
+                                    <span className="text-lg">₹{rupeeAmount.toFixed(2)}</span>
+                                </div>
+
                                 <div className="flex justify-between mt-2 px-1">
-                                    <span className="text-xs text-gray-500">Min: 🪙 50</span>
+                                    <span className="text-xs text-gray-500">Min: 🪙 5,000 coins = ₹50</span>
                                     <button
                                         type="button"
-                                        onClick={() => setAmount(currentUser?.coins?.toString() || '0')}
+                                        onClick={() => setAmount(availableBalance.toString())}
                                         className="text-xs text-accent-pink font-bold hover:underline"
                                     >
-                                        Withdraw Max
+                                        Withdraw Max (🪙{availableBalance.toLocaleString()} = ₹{availableRupees.toFixed(2)})
                                     </button>
                                 </div>
                             </div>
@@ -263,16 +290,18 @@ const CreatorWithdraw = () => {
 
                             <button
                                 type="submit"
-                                disabled={isSubmitting || !amount || Number(amount) < MINIMUM_WITHDRAWAL}
-                                className={`w-full py-4 rounded-2xl font-black text-lg shadow-xl flex items-center justify-center transition-all ${isSubmitting || !amount || Number(amount) < MINIMUM_WITHDRAWAL
+                                disabled={isSubmitting || !amount || coinAmount < MINIMUM_WITHDRAWAL_COINS}
+                                className={`w-full py-4 rounded-2xl font-black text-lg shadow-xl flex items-center justify-center gap-2 transition-all ${isSubmitting || !amount || coinAmount < MINIMUM_WITHDRAWAL_COINS
                                     ? 'bg-dark-900 text-gray-500 cursor-not-allowed'
                                     : 'bg-gradient-to-r from-green-400 to-emerald-500 text-black hover:scale-[1.02] active:scale-95 shadow-green-500/20'
                                     }`}
                             >
                                 {isSubmitting ? (
                                     <span className="animate-spin text-2xl">⏳</span>
+                                ) : coinAmount >= MINIMUM_WITHDRAWAL_COINS ? (
+                                    <>Withdraw ₹{rupeeAmount.toFixed(2)} <span className="text-sm font-medium opacity-70">(🪙 {coinAmount.toLocaleString()})</span></>
                                 ) : (
-                                    `Submit Withdrawal Request`
+                                    `Enter at least 🪙 5,000 coins`
                                 )}
                             </button>
 

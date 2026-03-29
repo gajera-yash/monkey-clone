@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../supabase';
 import toast from 'react-hot-toast';
+import { analyzeVoiceGender } from '../../utils/voiceGenderDetection';
 
 const VoiceVerification = () => {
     const { currentUser, updateProfileInfo, refreshProfile, logout } = useAuth();
@@ -19,6 +20,8 @@ const VoiceVerification = () => {
     const [audioUrl, setAudioUrl] = useState(null);
     const [isUploading, setIsUploading] = useState(false);
     const [recordingTime, setRecordingTime] = useState(0);
+    const [isAnalyzing, setIsAnalyzing] = useState(false);
+    const [voiceResult, setVoiceResult] = useState(null); // { gender, pitchHz, confidence }
 
     const mediaRecorderRef = useRef(null);
     const audioChunksRef = useRef([]);
@@ -37,18 +40,39 @@ const VoiceVerification = () => {
                 }
             };
 
-            mediaRecorder.onstop = () => {
+            mediaRecorder.onstop = async () => {
                 const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
                 setAudioBlob(blob);
                 setAudioUrl(URL.createObjectURL(blob));
 
                 // Stop all tracks
                 stream.getTracks().forEach(track => track.stop());
+
+                // --- Run Voice AI Analysis automatically after recording ---
+                setIsAnalyzing(true);
+                try {
+                    const result = await analyzeVoiceGender(blob);
+                    setVoiceResult(result);
+                    if (result.gender === 'female') {
+                        toast.success(`Female voice detected! (${result.pitchHz}Hz)`, { icon: '✅' });
+                    } else if (result.gender === 'male') {
+                        toast.error(`Male voice detected (${result.pitchHz}Hz). You can retake.`, { duration: 4000 });
+                    } else {
+                        toast('Could not analyze voice clearly. Try recording again in a quiet place.', { icon: '⚠️' });
+                    }
+                } catch (err) {
+                    console.error("Voice analysis error:", err);
+                    setVoiceResult({ gender: 'unknown', pitchHz: 0, confidence: 0 });
+                    toast('Voice analysis failed. You can still submit for manual review.', { icon: '⚠️' });
+                } finally {
+                    setIsAnalyzing(false);
+                }
             };
 
             mediaRecorder.start();
             setIsRecording(true);
             setRecordingTime(0);
+            setVoiceResult(null);
 
             timerIntervalRef.current = setInterval(() => {
                 setRecordingTime(prev => {
@@ -84,6 +108,7 @@ const VoiceVerification = () => {
         setAudioBlob(null);
         setAudioUrl(null);
         setRecordingTime(0);
+        setVoiceResult(null);
     };
 
     const submitAudio = async () => {
@@ -93,28 +118,36 @@ const VoiceVerification = () => {
         const toastId = toast.loading("Finalizing your verification...");
 
         try {
-            // Use confidence from previous step (Face Verification) to avoid extra query
-            const confidence = location.state?.confidence || 0;
-            const isHighlyConfident = confidence > 0.85;
+            // Face AI confidence from previous step
+            const faceConfidence = location.state?.confidence || 0;
+            const facePassedAsFemale = faceConfidence > 0.85;
 
-            // Update/Upsert the verification record
+            // Voice AI result from local analysis
+            const voicePassedAsFemale = voiceResult?.gender === 'female' && voiceResult?.confidence > 0.55;
+
+            // AUTO-APPROVE: Both Face AI AND Voice AI must confirm female
+            const isAutoApproved = facePassedAsFemale && voicePassedAsFemale;
+
+            const aiNotes = isAutoApproved
+                ? `Auto-approved: Face AI ${Math.round(faceConfidence * 100)}% female + Voice AI ${voiceResult?.pitchHz}Hz (${Math.round((voiceResult?.confidence || 0) * 100)}% confidence)`
+                : `Pending review: Face AI ${Math.round(faceConfidence * 100)}%${voiceResult ? `, Voice ${voiceResult.pitchHz}Hz (${voiceResult.gender})` : ', Voice not analyzed'}`;
+
+            // Update/Upsert the verification record + profile in parallel
             const [approveResult, profileResult] = await Promise.all([
                 supabase
                     .from('verifications')
                     .upsert({
                         user_id: currentUser.uid,
-                        status: isHighlyConfident ? 'approved' : 'pending',
-                        ai_notes: isHighlyConfident 
-                            ? `Auto-approved via AI (${Math.round(confidence * 100)}% confidence)` 
-                            : `Pending audit (AI confidence: ${Math.round(confidence * 100)}%)`,
-                        ai_confidence: confidence
+                        status: isAutoApproved ? 'approved' : 'pending',
+                        ai_notes: aiNotes,
+                        ai_confidence: faceConfidence
                     }),
 
                 supabase
                     .from('profiles')
                     .update({ 
-                        is_verified: isHighlyConfident, 
-                        account_status: isHighlyConfident ? 'active' : 'pending', 
+                        is_verified: isAutoApproved, 
+                        account_status: isAutoApproved ? 'active' : 'pending', 
                         is_creator: true 
                     })
                     .eq('id', currentUser.uid)
@@ -123,19 +156,18 @@ const VoiceVerification = () => {
             if (approveResult.error) throw approveResult.error;
             if (profileResult.error) throw profileResult.error;
 
-            // Trigger navigation as soon as DB is updated — don't await refreshProfile
+            // Trigger profile refresh (non-blocking)
             refreshProfile(); 
             
-            if (isHighlyConfident) {
+            if (isAutoApproved) {
                 toast.success("Identity Verified! Welcome! 🎉", { id: toastId });
                 navigate('/creator/dashboard');
             } else {
                 toast.success("Verification submitted! Awaiting admin review.", { id: toastId });
-                navigate('/'); // Send to home or a "thank you" page
+                navigate('/');
             }
 
-            // BACKGROUND UPLOAD: Upload audio file AFTER user is already on dashboard
-            // This keeps the voice recording in storage for admin review
+            // BACKGROUND UPLOAD: Upload audio file AFTER user is already navigated
             const fileName = `${currentUser.uid}/voice_${Date.now()}.webm`;
             supabase.storage
                 .from('verifications')
@@ -148,7 +180,6 @@ const VoiceVerification = () => {
                     const { data: { publicUrl } } = supabase.storage
                         .from('verifications')
                         .getPublicUrl(fileName);
-                    // Save voice URL silently
                     supabase.from('verifications')
                         .update({ voice_url: publicUrl })
                         .eq('user_id', currentUser.uid)
@@ -230,32 +261,69 @@ const VoiceVerification = () => {
                             </p>
                         </div>
                     ) : (
-                        <div className="w-full bg-dark-800 p-4 rounded-xl border border-white/10">
-                            <audio src={audioUrl} controls className="w-full h-12 outline-none" />
+                        <div className="space-y-4">
+                            <div className="w-full bg-dark-800 p-4 rounded-xl border border-white/10">
+                                <audio src={audioUrl} controls className="w-full h-12 outline-none" />
+                            </div>
+
+                            {/* Voice AI Result Badge */}
+                            {isAnalyzing && (
+                                <div className="flex items-center justify-center gap-2 py-3 bg-blue-500/10 border border-blue-500/20 rounded-xl">
+                                    <div className="w-5 h-5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
+                                    <span className="text-blue-300 text-sm font-bold">Analyzing voice...</span>
+                                </div>
+                            )}
+                            {voiceResult && !isAnalyzing && (
+                                <div className={`flex items-center justify-center gap-2 py-3 rounded-xl border ${
+                                    voiceResult.gender === 'female' 
+                                        ? 'bg-green-500/10 border-green-500/20 text-green-300' 
+                                        : voiceResult.gender === 'male'
+                                        ? 'bg-red-500/10 border-red-500/20 text-red-300'
+                                        : 'bg-yellow-500/10 border-yellow-500/20 text-yellow-300'
+                                }`}>
+                                    <span className="text-lg">
+                                        {voiceResult.gender === 'female' ? '✅' : voiceResult.gender === 'male' ? '🚫' : '⚠️'}
+                                    </span>
+                                    <span className="text-sm font-bold">
+                                        {voiceResult.gender === 'female' 
+                                            ? `Female Voice Detected (${voiceResult.pitchHz}Hz)`
+                                            : voiceResult.gender === 'male'
+                                            ? `Male Voice Detected (${voiceResult.pitchHz}Hz)`
+                                            : 'Voice unclear — will be reviewed manually'}
+                                    </span>
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>
 
-                {audioBlob && (
-                    <div className="flex gap-4">
-                        <button
-                            onClick={retakeAudio}
-                            disabled={isUploading}
-                            className="flex-1 py-4 bg-dark-800 rounded-2xl font-bold border border-white/10 hover:bg-white/5 disabled:opacity-50"
-                        >
-                            Retake
-                        </button>
-                        <button
-                            onClick={submitAudio}
-                            disabled={isUploading}
-                            className="flex-1 py-4 bg-blue-600 hover:bg-blue-500 rounded-2xl font-bold shadow-lg shadow-blue-600/30 disabled:opacity-50 flex items-center justify-center transition-colors"
-                        >
-                            {isUploading ? (
-                                <span className="animate-spin text-xl">⏳</span>
-                            ) : (
-                                "Submit Verification"
-                            )}
-                        </button>
+                {audioBlob && !isAnalyzing && (
+                    <div className="flex flex-col gap-4">
+                        {voiceResult?.gender === 'male' && (
+                            <p className="text-red-400 text-sm font-bold bg-red-400/10 py-3 rounded-xl border border-red-400/20">
+                                Male voice detected. You can retake or submit for manual review.
+                            </p>
+                        )}
+                        <div className="flex gap-4">
+                            <button
+                                onClick={retakeAudio}
+                                disabled={isUploading}
+                                className="flex-1 py-4 bg-dark-800 rounded-2xl font-bold border border-white/10 hover:bg-white/5 disabled:opacity-50"
+                            >
+                                Retake
+                            </button>
+                            <button
+                                onClick={submitAudio}
+                                disabled={isUploading}
+                                className="flex-1 py-4 bg-blue-600 hover:bg-blue-500 rounded-2xl font-bold shadow-lg shadow-blue-600/30 disabled:opacity-50 flex items-center justify-center transition-colors"
+                            >
+                                {isUploading ? (
+                                    <span className="animate-spin text-xl">⏳</span>
+                                ) : (
+                                    "Submit Verification"
+                                )}
+                            </button>
+                        </div>
                     </div>
                 )}
             </div>
