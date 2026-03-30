@@ -36,7 +36,8 @@ const Dashboard = () => {
         };
         initDashboard();
 
-        // Optional: Real-time subscription could be added here
+        window.addEventListener('focus', initDashboard);
+        return () => window.removeEventListener('focus', initDashboard);
     }, []);
 
     const fetchDashboardStats = async () => {

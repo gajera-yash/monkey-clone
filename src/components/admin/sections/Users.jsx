@@ -50,6 +50,9 @@ const Users = () => {
 
     useEffect(() => {
         fetchUsers();
+
+        window.addEventListener('focus', fetchUsers);
+        return () => window.removeEventListener('focus', fetchUsers);
     }, []);
 
     useEffect(() => {

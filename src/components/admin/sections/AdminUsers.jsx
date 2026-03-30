@@ -100,30 +100,38 @@ const AdminUsers = () => {
                 // CREATE NEW
                 const password = newAdmin.password || generatePassword();
                 
-                // 1. Sign up via Temp Supabase client so it doesn't log out current admin
-                const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL || 'https://xzveyvqflkzqzthmnnud.supabase.co';
-                const SUPABASE_ANON_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh6dmV5dnFmbGt6cXp0aG1ubnVkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI4OTA5MzYsImV4cCI6MjA4ODQ2NjkzNn0.wQY31c5BoqwegIeqx86CevsIiAUhbNIw6QlWu7LjO2s';
-                
-                const tempClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-                    auth: { persistSession: false, autoRefreshToken: false }
+                // 1. Get session token for authentication
+                const { data: { session } } = await supabase.auth.getSession();
+                if (!session) throw new Error('You must be logged in as an admin to do this.');
+
+                // 2. Call backend to create confirmed user
+                const response = await fetch(`${process.env.REACT_APP_SERVER_URL || 'http://localhost:3001'}/api/admin/create-user`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${session.access_token}`
+                    },
+                    body: JSON.stringify({
+                        email: newAdmin.email,
+                        password,
+                        metadata: { role: newAdmin.role, username: newAdmin.email.split('@')[0] }
+                    })
                 });
 
-                const { data: authData, error: signupError } = await tempClient.auth.signUp({
-                    email: newAdmin.email,
-                    password,
-                    options: {
-                        data: { role: newAdmin.role, username: newAdmin.email.split('@')[0] }
-                    }
-                });
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Server failed to create user');
+                }
 
-                if (signupError) throw signupError;
+                const { user: authUser } = await response.json();
 
-                // 2. Insert into admin_team_members table (not profiles)
-                if (authData?.user?.id) {
+                // 3. Sync to admin_team_members AND profiles
+                if (authUser?.id) {
+                    // Update admin_team_members
                     const { error: teamError } = await supabase
                         .from('admin_team_members')
                         .insert({
-                            user_id: authData.user.id,
+                            user_id: authUser.id,
                             email: newAdmin.email,
                             username: newAdmin.email.split('@')[0],
                             role: newAdmin.role,
@@ -131,13 +139,26 @@ const AdminUsers = () => {
                             is_active: true
                         });
 
-                    if (teamError) {
-                        throw teamError;
-                    }
+                    if (teamError) throw teamError;
+
+                    // Update profiles (critical for frontend role detection)
+                    const { error: profileError } = await supabase
+                        .from('profiles')
+                        .upsert({
+                            id: authUser.id,
+                            email: newAdmin.email,
+                            username: newAdmin.email.split('@')[0],
+                            role: newAdmin.role,
+                            is_creator: false,
+                            account_status: 'active',
+                            is_profile_completed: true
+                        });
+                    
+                    if (profileError) console.error("Profile sync failed:", profileError);
                 }
 
                 toast.dismiss(toastId);
-                toast.success('Team member created successfully!');
+                toast.success('Team member created & auto-confirmed!');
                 setGeneratedCreds({ email: newAdmin.email, password });
                 setIsAdding(false);
                 fetchAdmins();

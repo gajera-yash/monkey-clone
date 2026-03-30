@@ -24,6 +24,9 @@ const Transactions = () => {
 
     useEffect(() => {
         fetchTransactions();
+
+        window.addEventListener('focus', fetchTransactions);
+        return () => window.removeEventListener('focus', fetchTransactions);
     }, []);
 
     const fetchTransactions = async () => {

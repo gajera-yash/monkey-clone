@@ -124,6 +124,64 @@ app.get('/api/geo-blocks', async (req, res) => {
     res.json({ blocked_countries: blocks });
 });
 
+// Helper for admin verification
+const verifyAdmin = async (req) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return { error: 'No authorization header' };
+    
+    const token = authHeader.split(' ')[1];
+    if (!token) return { error: 'Invalid token format' };
+
+    try {
+        const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+        if (authError || !user) return { error: 'Invalid session' };
+
+        const { data: admin, error: dbError } = await supabase
+            .from('admin_team_members')
+            .select('role')
+            .eq('user_id', user.id)
+            .eq('is_active', true)
+            .single();
+
+        if (dbError || !admin || admin.role !== 'admin') {
+             // Second fallback: check profiles if they are super user
+             const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+             if (profile?.role === 'admin') return { user };
+             return { error: 'Access denied' };
+        }
+
+        return { user };
+    } catch (e) {
+        return { error: 'Verification failed' };
+    }
+};
+
+// Create Admin User endpoint (bypass confirmation)
+app.post('/api/admin/create-user', async (req, res) => {
+    const { user, error: verifyError } = await verifyAdmin(req);
+    if (verifyError) return res.status(403).json({ error: verifyError });
+
+    const { email, password, role, metadata } = req.body;
+    if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
+
+    console.log(`[Admin] Admin ${user.id} is creating new team member: ${email}`);
+
+    try {
+        const { data, error } = await supabase.auth.admin.createUser({
+            email,
+            password,
+            email_confirm: true, // AUTO-CONFIRM
+            user_metadata: metadata || {}
+        });
+
+        if (error) throw error;
+        res.json({ user: data.user });
+    } catch (err) {
+        console.error('[Admin] Failed to create user:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // Flag report endpoint — called by frontend after report is filed
 // Checks report count and emits auto-disconnect if threshold exceeded
 app.post('/api/flag-report', async (req, res) => {

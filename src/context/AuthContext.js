@@ -369,7 +369,24 @@ export const AuthProvider = ({ children }) => {
 
         fetchHistory();
 
-        return () => clearInterval(heartbeat);
+        // --- Profile Real-time Subscription ---
+        const profileSubscription = supabase
+            .channel(`profile-${currentUser.id}`)
+            .on('postgres_changes', { 
+                event: 'UPDATE', 
+                schema: 'public', 
+                table: 'profiles', 
+                filter: `id=eq.${currentUser.id}` 
+            }, (payload) => {
+                console.log("[Auth] Profile update received:", payload.new);
+                setCurrentUser(prev => ({ ...prev, ...payload.new }));
+            })
+            .subscribe();
+
+        return () => {
+            clearInterval(heartbeat);
+            supabase.removeChannel(profileSubscription);
+        };
     }, [currentUser, isGuest]);
 
     // Update Profile Info

@@ -43,6 +43,9 @@ const Revenue = () => {
             setLoading(false);
         };
         initRevenue();
+
+        window.addEventListener('focus', initRevenue);
+        return () => window.removeEventListener('focus', initRevenue);
     }, []);
 
     const [segments, setSegments] = useState({
