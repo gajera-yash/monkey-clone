@@ -36,7 +36,7 @@ const formatDistance = (distanceKm) => {
     return `${distanceKm.toLocaleString()} km away`;
 };
 
-// Fetch user location from IP geolocation API
+// Fetch user location from IP geolocation API (using IPInfo as requested)
 export const getUserLocation = async () => {
     try {
         // Check if location is cached in localStorage
@@ -54,36 +54,53 @@ export const getUserLocation = async () => {
             }
         }
 
-        // Fetch fresh location data
-        console.log('Fetching location from ipapi.co...');
-        const response = await axios.get('https://ipapi.co/json/', {
+        // Fetch fresh location data from IPInfo
+        const API_TOKEN = "c3aceba5644587";
+        console.log('Fetching location from ipinfo.io...');
+        
+        // Use ipinfo.io with the provided token
+        const response = await axios.get(`https://ipinfo.io/json?token=${API_TOKEN}`, {
             timeout: 5000
         });
 
+        const data = response.data;
+        const [lat, lon] = (data.loc || "0,0").split(',');
+
+        // Convert country code to full name (e.g. IN -> India)
+        let countryFullName = data.country || 'Unknown';
+        try {
+            const regions = new Intl.DisplayNames(['en'], { type: 'region' });
+            countryFullName = regions.of(data.country) || data.country;
+        } catch (e) {
+            console.warn('Could not localize country name', e);
+        }
+
         const locationData = {
-            country: response.data.country_name,
-            countryCode: response.data.country_code,
-            city: response.data.city,
-            latitude: response.data.latitude,
-            longitude: response.data.longitude,
-            flag: countryCodeToFlag(response.data.country_code)
+            country: countryFullName,
+            countryCode: data.country || 'XX',
+            city: data.city || 'Unknown',
+            region: data.region || 'Unknown',
+            latitude: parseFloat(lat),
+            longitude: parseFloat(lon),
+            flag: countryCodeToFlag(data.country)
         };
 
         // Cache the location data
         localStorage.setItem('userLocation', JSON.stringify(locationData));
         localStorage.setItem('userLocationTimestamp', Date.now().toString());
 
-        console.log('Location fetched:', locationData);
+        console.log('Location fetched from IPInfo:', locationData);
         return locationData;
 
     } catch (error) {
-        console.error('Error fetching location:', error);
+        console.error('Error fetching location from IPInfo:', error);
 
         // Return fallback location
         return {
             country: 'Unknown',
             countryCode: 'XX',
             city: 'Unknown',
+            region: 'Unknown',
             latitude: 0,
             longitude: 0,
             flag: '🌍'

@@ -237,13 +237,10 @@ const AdminLayout = () => {
             {/* Sidebar */}
             <aside className={`${isSidebarOpen ? 'w-[280px]' : 'w-[80px]'} bg-[#0F172A] text-white transition-all duration-300 flex flex-col z-30 shadow-2xl shrink-0`}>
                 <div className="h-20 flex items-center px-6 border-b border-white/5">
-                    <div className="w-9 h-9 rounded-xl bg-indigo-500 flex items-center justify-center font-black text-white shadow-lg shadow-indigo-500/20 shrink-0">
-                        M
-                    </div>
+                    <img src="/logo.png" alt="Strangy Logo" className={`h-8 w-auto object-contain transition-all ${isSidebarOpen ? '' : 'mx-auto'}`} />
                     {isSidebarOpen && (
                         <div className="ml-3 truncate">
-                            <span className="font-black tracking-tighter text-xl text-white">MONKEY</span>
-                            <span className="text-[10px] block text-indigo-400 font-bold -mt-1 uppercase tracking-widest">Admin Panel</span>
+                            <span className="text-[10px] block text-indigo-400 font-bold uppercase tracking-widest">Admin Panel</span>
                         </div>
                     )}
                 </div>

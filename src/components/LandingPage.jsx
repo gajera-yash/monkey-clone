@@ -140,8 +140,7 @@ const LandingPage = ({ onStartChat }) => {
       {/* NAV */}
       <nav className="main-nav-landing">
         <Link to="/" className="nav-logo-landing">
-          <div className="nav-logo-box-landing">🐵</div>
-          <span className="grad-text">Strangy</span>
+          <img src="/logo.png" alt="Strangy Logo" className="h-10 md:h-12 w-auto object-contain" />
         </Link>
 
         <ul className="nav-links-landing">
@@ -319,8 +318,7 @@ const LandingPage = ({ onStartChat }) => {
         <div className="footer-top-landing">
           <div className="fbrand-landing">
             <Link to="/" className="nav-logo-landing">
-              <div className="nav-logo-box-landing">🐵</div>
-              <span className="grad-text">Strangy</span>
+              <img src="/logo.png" alt="Strangy Logo" className="h-8 md:h-10 w-auto object-contain" />
             </Link>
 
             <p>Connecting people globally through spontaneous video chat.</p>

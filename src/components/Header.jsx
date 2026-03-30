@@ -36,21 +36,19 @@ const Header = ({ onStartChat }) => {
                 {/* Logo */}
                 <Link
                     to="/"
-                    className="flex items-center space-x-3 cursor-pointer group"
+                    className="flex items-center cursor-pointer group"
                     onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
                 >
-                    <div className="relative">
-                        <span className="text-3xl filter drop-shadow-lg group-hover:scale-110 transition-transform duration-200 inline-block">
-                            🐵
-                        </span>
-                        <div className="absolute inset-0 bg-accent-purple/20 blur-lg rounded-full opacity-50"></div>
-                    </div>
-                    <div className="flex flex-col">
-                        <h1 className="text-2xl font-bold tracking-tight leading-none text-white">
-                            Strangy
-                        </h1>
-                        {isPremium && <span className="text-[10px] text-yellow-400 font-bold tracking-widest uppercase">Premium</span>}
-                    </div>
+                    <img 
+                        src="/logo.png" 
+                        alt="Strangy Logo" 
+                        className="h-10 md:h-12 w-auto object-contain transition-transform duration-200 group-hover:scale-105"
+                    />
+                    {isPremium && (
+                        <div className="ml-2 flex flex-col justify-center">
+                            <span className="text-[10px] text-yellow-400 font-bold tracking-widest uppercase">Premium</span>
+                        </div>
+                    )}
                 </Link>
 
 

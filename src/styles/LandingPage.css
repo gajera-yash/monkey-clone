@@ -109,24 +109,15 @@ nav.main-nav-landing {
 .nav-logo-landing {
   display: flex;
   align-items: center;
-  gap: 9px;
-  font-family: 'Syne', sans-serif;
-  font-weight: 800;
-  font-size: 1.3rem;
+  gap: 0;
+  transition: opacity .2s;
 }
 
-.nav-logo-box-landing {
-  width: 34px;
-  height: 34px;
-  border-radius: 9px;
-  background: var(--grad);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1rem;
-  box-shadow: 0 0 16px var(--gp);
-  flex-shrink: 0;
+.nav-logo-landing:hover {
+  opacity: .9;
 }
+
+/* Legacy logo box removed */
 
 .nav-links-landing {
   display: flex;
