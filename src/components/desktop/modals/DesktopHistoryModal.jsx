@@ -24,7 +24,14 @@ const DesktopHistoryModal = ({ onClose }) => {
                         duration,
                         user1_id,
                         user2_id,
-                        partner:profiles!chat_logs_user2_id_fkey (
+                        user1:profiles!chat_logs_user1_id_fkey (
+                            id,
+                            username,
+                            avatar_url,
+                            gender
+                        ),
+                        user2:profiles!chat_logs_user2_id_fkey (
+                            id,
                             username,
                             avatar_url,
                             gender
@@ -37,11 +44,13 @@ const DesktopHistoryModal = ({ onClose }) => {
                 if (error) throw error;
 
                 const formatted = data.map(item => {
-                    const partner = item.partner;
+                    const isUser1 = item.user1_id === currentUser.id;
+                    const partner = isUser1 ? item.user2 : item.user1;
+                    
                     return {
                         id: item.id,
                         uid: partner?.id,
-                        name: partner?.username || 'Unknown',
+                        name: partner?.username || 'Stranger',
                         avatar: partner?.avatar_url,
                         time: new Date(item.start_time).toLocaleString(),
                         duration: item.duration ? `${Math.floor(item.duration / 60)}m ${item.duration % 60}s` : null,

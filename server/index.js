@@ -158,23 +158,34 @@ const verifyAdmin = async (req) => {
 
 // Create Admin User endpoint (bypass confirmation)
 app.post('/api/admin/create-user', async (req, res) => {
-    const { user, error: verifyError } = await verifyAdmin(req);
+    const { user: requester, error: verifyError } = await verifyAdmin(req);
     if (verifyError) return res.status(403).json({ error: verifyError });
 
-    const { email, password, role, metadata } = req.body;
+    const { email, password, metadata } = req.body;
     if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
 
-    console.log(`[Admin] Admin ${user.id} is creating new team member: ${email}`);
+    console.log(`[Admin] Admin ${requester.id} is creating new team member: ${email}`);
 
     try {
+        // 1. Create User with email_confirm: true
         const { data, error } = await supabase.auth.admin.createUser({
             email,
             password,
-            email_confirm: true, // AUTO-CONFIRM
+            email_confirm: true,
             user_metadata: metadata || {}
         });
 
         if (error) throw error;
+        const newUserId = data.user.id;
+
+        // 2. EXTRA SAFETY: Explicitly update the user to be confirmed (fallback for some Supabase configs)
+        const { error: confirmError } = await supabase.auth.admin.updateUserById(newUserId, { 
+            email_confirm: true 
+        });
+
+        if (confirmError) console.warn('[Admin] Manual confirmation fallback failed:', confirmError.message);
+        
+        console.log(`[Admin] Successfully created confirmed user: ${email} (ID: ${newUserId})`);
         res.json({ user: data.user });
     } catch (err) {
         console.error('[Admin] Failed to create user:', err);

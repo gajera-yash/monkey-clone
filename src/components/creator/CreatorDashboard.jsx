@@ -22,6 +22,42 @@ const CreatorDashboard = () => {
     const [isLoadingStats, setIsLoadingStats] = useState(true);
     const [incomingCallData, setIncomingCallData] = useState(null);
 
+    // Transactions Menu State
+    const [showTransactions, setShowTransactions] = useState(false);
+    const [activeTab, setActiveTab] = useState('earnings');
+    const [isFetchingLists, setIsFetchingLists] = useState(false);
+    const [earningsList, setEarningsList] = useState([]);
+    const [withdrawalsList, setWithdrawalsList] = useState([]);
+
+    const fetchTransactionLists = async () => {
+        if (!currentUser?.id) return;
+        setIsFetchingLists(true);
+        try {
+            // Fetch Earnings
+            const { data: eData } = await supabase
+                .from('coin_transactions')
+                .select('*')
+                .eq('user_id', currentUser.id)
+                .eq('transaction_type', 'earned')
+                .order('created_at', { ascending: false });
+            
+            setEarningsList(eData || []);
+
+            // Fetch Withdrawals
+            const { data: wData } = await supabase
+                .from('payouts')
+                .select('*')
+                .eq('user_id', currentUser.id)
+                .order('created_at', { ascending: false });
+
+            setWithdrawalsList(wData || []);
+        } catch (err) {
+            console.error("Error fetching transaction lists:", err);
+        } finally {
+            setIsFetchingLists(false);
+        }
+    };
+
     // Handle Direct Calls via Socket
     useEffect(() => {
         if (!socket.connected) socket.connect();
@@ -392,7 +428,7 @@ const CreatorDashboard = () => {
                     </div>
                 </div>
 
-                {/* 5. QUICK ACTIONS */}
+                {/* 5. QUICK ACTIONS & TRANSACTIONS */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <button onClick={() => navigate('/creator/withdraw')} className="bg-dark-800 hover:bg-white/5 transition-colors p-6 rounded-3xl border border-white/5 flex flex-col items-center justify-center gap-3 text-center group">
                         <div className="w-12 h-12 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center text-xl group-hover:scale-110 transition-transform">🏦</div>
@@ -402,15 +438,122 @@ const CreatorDashboard = () => {
                         <div className="w-12 h-12 rounded-full bg-pink-500/20 text-pink-400 flex items-center justify-center text-xl group-hover:scale-110 transition-transform">🎁</div>
                         <span className="font-semibold text-sm">My Gifts</span>
                     </button>
-                    <button className="bg-dark-800 hover:bg-white/5 transition-colors p-6 rounded-3xl border border-white/5 flex flex-col items-center justify-center gap-3 text-center group">
-                        <div className="w-12 h-12 rounded-full bg-yellow-500/20 text-yellow-400 flex items-center justify-center text-xl group-hover:scale-110 transition-transform">⭐</div>
-                        <span className="font-semibold text-sm">Subscribers</span>
+                    <button 
+                        onClick={() => {
+                            setShowTransactions(true);
+                            fetchTransactionLists();
+                        }}
+                        className="bg-dark-800 hover:bg-white/5 transition-colors p-6 rounded-3xl border border-white/5 flex flex-col items-center justify-center gap-3 text-center group"
+                    >
+                        <div className="w-12 h-12 rounded-full bg-orange-500/20 text-orange-400 flex items-center justify-center text-xl group-hover:scale-110 transition-transform">📜</div>
+                        <span className="font-semibold text-sm">Transactions</span>
                     </button>
-                    <button className="bg-dark-800 hover:bg-white/5 transition-colors p-6 rounded-3xl border border-white/5 flex flex-col items-center justify-center gap-3 text-center group">
+                    <button onClick={() => navigate('/creator/settings')} className="bg-dark-800 hover:bg-white/5 transition-colors p-6 rounded-3xl border border-white/5 flex flex-col items-center justify-center gap-3 text-center group">
                         <div className="w-12 h-12 rounded-full bg-purple-500/20 text-purple-400 flex items-center justify-center text-xl group-hover:scale-110 transition-transform">⚙️</div>
                         <span className="font-semibold text-sm">Creator Settings</span>
                     </button>
                 </div>
+
+                {/* 6. TRANSACTIONS MODAL/SECTION */}
+                {showTransactions && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-fade-in">
+                        <div className="bg-dark-800 border border-white/10 rounded-[32px] w-full max-w-2xl h-[80vh] flex flex-col shadow-2xl overflow-hidden animate-slide-up">
+                            {/* Modal Header */}
+                            <div className="p-6 border-b border-white/5 flex items-center justify-between">
+                                <h2 className="text-xl font-bold flex items-center gap-3">
+                                    <span className="w-10 h-10 rounded-full bg-orange-500/20 flex items-center justify-center text-lg text-orange-500">📜</span>
+                                    My Transactions
+                                </h2>
+                                <button 
+                                    onClick={() => setShowTransactions(false)}
+                                    className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-white/10 transition-colors"
+                                >
+                                    <span className="text-xl">✕</span>
+                                </button>
+                            </div>
+
+                            {/* Tab Switcher */}
+                            <div className="flex p-2 gap-2 bg-dark-900 mx-6 mt-6 rounded-2xl border border-white/5">
+                                <button 
+                                    onClick={() => setActiveTab('earnings')}
+                                    className={`flex-1 py-3 rounded-xl font-bold transition-all ${activeTab === 'earnings' ? 'bg-accent-purple text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}
+                                >
+                                    💰 Earnings
+                                </button>
+                                <button 
+                                    onClick={() => setActiveTab('withdrawals')}
+                                    className={`flex-1 py-3 rounded-xl font-bold transition-all ${activeTab === 'withdrawals' ? 'bg-accent-purple text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}
+                                >
+                                    🏦 Withdrawals
+                                </button>
+                            </div>
+
+                            {/* List Content */}
+                            <div className="flex-1 overflow-y-auto p-6 scrollbar-thin scrollbar-thumb-white/10">
+                                {isFetchingLists ? (
+                                    <div className="h-full flex flex-col items-center justify-center text-gray-500 gap-4">
+                                        <div className="w-12 h-12 border-4 border-accent-purple border-t-white rounded-full animate-spin"></div>
+                                        <p>Fetching your records...</p>
+                                    </div>
+                                ) : activeTab === 'earnings' ? (
+                                    <div className="space-y-3">
+                                        {earningsList.length === 0 ? (
+                                            <div className="text-center py-20 text-gray-500">No earnings found yet</div>
+                                        ) : (
+                                            earningsList.map((tx, idx) => (
+                                                <div key={idx} className="bg-dark-900 border border-white/5 p-4 rounded-2xl flex items-center justify-between group hover:border-white/10 transition-colors">
+                                                    <div className="flex items-center gap-4">
+                                                        <div className="w-10 h-10 rounded-full bg-green-500/10 text-green-500 flex items-center justify-center">🪙</div>
+                                                        <div>
+                                                            <p className="font-bold text-sm">{tx.description || 'Earnings from Session'}</p>
+                                                            <p className="text-[10px] text-gray-500">{new Date(tx.created_at).toLocaleString()}</p>
+                                                        </div>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <p className="text-lg font-black text-green-400">+{tx.coins_amount?.toLocaleString()}</p>
+                                                    </div>
+                                                </div>
+                                            ))
+                                        )}
+                                    </div>
+                                ) : (
+                                    <div className="space-y-3">
+                                        {withdrawalsList.length === 0 ? (
+                                            <div className="text-center py-20 text-gray-500">No withdrawal requests found</div>
+                                        ) : (
+                                            withdrawalsList.map((tx, idx) => (
+                                                <div key={idx} className="bg-dark-900 border border-white/5 p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 group hover:border-white/10 transition-colors">
+                                                    <div className="flex items-center gap-4">
+                                                        <div className="w-10 h-10 rounded-full bg-blue-500/10 text-blue-500 flex items-center justify-center text-xl">🏦</div>
+                                                        <div>
+                                                            <div className="flex items-center gap-2">
+                                                                <p className="font-bold text-sm">Withdrawal ₹{tx.amount?.toFixed(2)}</p>
+                                                                <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${
+                                                                    tx.status === 'pending' ? 'bg-yellow-500/20 text-yellow-500 border border-yellow-500/30' :
+                                                                    tx.status === 'completed' || tx.status === 'approved' ? 'bg-green-500/20 text-green-500 border border-green-500/30' :
+                                                                    'bg-red-500/20 text-red-500 border border-red-500/30'
+                                                                }`}>
+                                                                    {tx.status}
+                                                                </span>
+                                                            </div>
+                                                            <p className="text-[10px] text-gray-500">{new Date(tx.created_at).toLocaleString()} • 🪙 {tx.coins_redeemed?.toLocaleString()} coins</p>
+                                                        </div>
+                                                    </div>
+                                                    <div className="text-left sm:text-right">
+                                                        <p className="text-[10px] text-gray-500 mb-0.5 uppercase font-bold tracking-widest">Detail</p>
+                                                        <p className="text-xs font-mono text-gray-300">
+                                                            {tx.method === 'upi' ? tx.details?.upiId : `${tx.details?.accountNumber?.slice(-4).padStart(8, 'X')}`}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            ))
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                )}
 
             </div>
         </div>

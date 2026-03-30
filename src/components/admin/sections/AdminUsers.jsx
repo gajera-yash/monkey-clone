@@ -105,7 +105,7 @@ const AdminUsers = () => {
                 if (!session) throw new Error('You must be logged in as an admin to do this.');
 
                 // 2. Call backend to create confirmed user
-                const response = await fetch(`${process.env.REACT_APP_SERVER_URL || 'http://localhost:3001'}/api/admin/create-user`, {
+                const response = await fetch(`${process.env.REACT_APP_SERVER_URL || 'http://localhost:3000'}/api/admin/create-user`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
