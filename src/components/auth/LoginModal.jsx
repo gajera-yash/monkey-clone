@@ -182,9 +182,9 @@ const LoginModal = ({ isOpen, onClose }) => {
                         </svg>
                     </button>
 
-                    {/* App Logo or Name Could Go Here */}
-                    <div className="mb-12">
-                        <h1 className="text-4xl font-extrabold text-white tracking-tight">Strangy</h1>
+                    {/* App Logo */}
+                    <div className="mb-12 flex justify-center">
+                        <img src="/logo.png" alt="Strangy Logo" className="h-12 w-auto object-contain" />
                     </div>
 
                     {!showOptions && lastUser && view === 'social' ? (

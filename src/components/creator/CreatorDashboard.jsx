@@ -28,6 +28,12 @@ const CreatorDashboard = () => {
     const [isFetchingLists, setIsFetchingLists] = useState(false);
     const [earningsList, setEarningsList] = useState([]);
     const [withdrawalsList, setWithdrawalsList] = useState([]);
+    
+    // Referral Data State
+    const [showReferrals, setShowReferrals] = useState(false);
+    const [referralStats, setReferralStats] = useState({ totalUsers: 0, totalEarned: 0 });
+    const [referralList, setReferralList] = useState([]);
+    const [isFetchingReferrals, setIsFetchingReferrals] = useState(false);
 
     const fetchTransactionLists = async () => {
         if (!currentUser?.id) return;
@@ -55,6 +61,37 @@ const CreatorDashboard = () => {
             console.error("Error fetching transaction lists:", err);
         } finally {
             setIsFetchingLists(false);
+        }
+    };
+
+    const fetchReferralData = async () => {
+        if (!currentUser?.id) return;
+        setIsFetchingReferrals(true);
+        try {
+            // 1. Fetch total users referred
+            const { count, error: countError } = await supabase
+                .from('profiles')
+                .select('*', { count: 'exact', head: true })
+                .eq('referred_by', currentUser.id);
+            
+            // 2. Fetch total coins earned from referrals
+            const { data: earningsData, error: earningsError } = await supabase
+                .from('referral_earnings')
+                .select('amount, referred_user_id, created_at, profiles:referred_user_id(username, avatar_url)')
+                .eq('referrer_id', currentUser.id)
+                .order('created_at', { ascending: false });
+            
+            const totalEarned = (earningsData || []).reduce((sum, item) => sum + (item.amount || 0), 0);
+            
+            setReferralStats({
+                totalUsers: count || 0,
+                totalEarned: totalEarned
+            });
+            setReferralList(earningsData || []);
+        } catch (err) {
+            console.error("Error fetching referral data:", err);
+        } finally {
+            setIsFetchingReferrals(false);
         }
     };
 
@@ -440,19 +477,124 @@ const CreatorDashboard = () => {
                     </button>
                     <button 
                         onClick={() => {
-                            setShowTransactions(true);
-                            fetchTransactionLists();
+                            setShowReferrals(true);
+                            fetchReferralData();
                         }}
                         className="bg-dark-800 hover:bg-white/5 transition-colors p-6 rounded-3xl border border-white/5 flex flex-col items-center justify-center gap-3 text-center group"
                     >
-                        <div className="w-12 h-12 rounded-full bg-orange-500/20 text-orange-400 flex items-center justify-center text-xl group-hover:scale-110 transition-transform">📜</div>
-                        <span className="font-semibold text-sm">Transactions</span>
+                        <div className="w-12 h-12 rounded-full bg-accent-pink/20 text-accent-pink flex items-center justify-center text-xl group-hover:scale-110 transition-transform">🔗</div>
+                        <span className="font-semibold text-sm">Referral Program</span>
                     </button>
                     <button onClick={() => navigate('/creator/settings')} className="bg-dark-800 hover:bg-white/5 transition-colors p-6 rounded-3xl border border-white/5 flex flex-col items-center justify-center gap-3 text-center group">
                         <div className="w-12 h-12 rounded-full bg-purple-500/20 text-purple-400 flex items-center justify-center text-xl group-hover:scale-110 transition-transform">⚙️</div>
                         <span className="font-semibold text-sm">Creator Settings</span>
                     </button>
                 </div>
+
+                {/* 6. REFERRAL PROGRAM MODAL */}
+                {showReferrals && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 backdrop-blur-xl p-4 animate-fade-in">
+                        <div className="bg-dark-800 border border-white/10 rounded-[32px] w-full max-w-2xl h-[85vh] flex flex-col shadow-2xl overflow-hidden animate-slide-up">
+                            {/* Modal Header */}
+                            <div className="p-8 border-b border-white/5 flex items-center justify-between bg-dark-800/50">
+                                <h2 className="text-2xl font-black flex items-center gap-4">
+                                    <span className="w-12 h-12 rounded-2xl bg-accent-pink/20 flex items-center justify-center text-2xl text-accent-pink shadow-lg shadow-pink-500/10">🔗</span>
+                                    Refer & Earn 5%
+                                </h2>
+                                <button 
+                                    onClick={() => setShowReferrals(false)}
+                                    className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center hover:bg-white/10 transition-all hover:rotate-90"
+                                >
+                                    <span className="text-xl">✕</span>
+                                </button>
+                            </div>
+
+                            <div className="flex-1 overflow-y-auto p-8 space-y-8 scrollbar-thin scrollbar-thumb-white/10">
+                                {/* Referral Statistics */}
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="bg-dark-900 border border-white/5 p-6 rounded-3xl text-center group">
+                                        <p className="text-gray-500 text-xs font-black uppercase tracking-widest mb-2">Total Reffered Users</p>
+                                        <h3 className="text-4xl font-black text-white group-hover:scale-110 transition-transform">{referralStats.totalUsers}</h3>
+                                    </div>
+                                    <div className="bg-dark-900 border border-white/5 p-6 rounded-3xl text-center group">
+                                        <p className="text-gray-500 text-xs font-black uppercase tracking-widest mb-2">Total Coins Earned</p>
+                                        <h3 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-500 group-hover:scale-110 transition-transform">🪙 {referralStats.totalEarned.toLocaleString()}</h3>
+                                    </div>
+                                </div>
+
+                                {/* Referral Link Card */}
+                                <div className="bg-gradient-to-br from-accent-purple/20 to-accent-pink/10 border border-white/10 p-8 rounded-[32px] relative overflow-hidden group">
+                                    <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 blur-3xl -mr-16 -mt-16 rounded-full group-hover:bg-white/10 transition-colors"></div>
+                                    <h4 className="text-lg font-bold mb-3 flex items-center gap-2">
+                                        Your Referral Link
+                                    </h4>
+                                    <p className="text-white/60 text-sm mb-6 max-w-sm">
+                                        Invite other creators to Strangy. You'll receive a <span className="text-accent-pink font-bold">5% commission</span> from all their coin earnings forever!
+                                    </p>
+                                    <div className="flex flex-col sm:flex-row items-center gap-3">
+                                        <div className="flex-1 w-full bg-black/40 border border-white/10 rounded-2xl px-5 py-4 font-mono text-sm text-gray-300 truncate">
+                                            {`https://strangy.app/ref/${currentUser?.uid?.substring(0, 8)}`}
+                                        </div>
+                                        <button 
+                                            onClick={() => {
+                                                navigator.clipboard.writeText(`https://strangy.app/ref/${currentUser?.uid?.substring(0, 8)}`);
+                                                toast.success("Referral link copied!");
+                                            }}
+                                            className="w-full sm:w-auto px-8 py-4 bg-white text-dark-900 rounded-2xl font-black hover:bg-gray-200 transition-all active:scale-95 shadow-xl shadow-white/5"
+                                        >
+                                            COPY
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Referral Activity List */}
+                                <div className="space-y-4">
+                                    <h4 className="text-sm font-black text-gray-500 uppercase tracking-[0.2em] px-2 flex items-center justify-between">
+                                        Recent Earning Activity
+                                        <span className="text-[10px] bg-white/5 px-2 py-0.5 rounded-full font-bold">{referralList.length} LOGS</span>
+                                    </h4>
+
+                                    {isFetchingReferrals ? (
+                                        <div className="py-20 flex flex-col items-center justify-center text-gray-500 gap-4">
+                                            <div className="w-10 h-10 border-2 border-accent-pink border-t-white rounded-full animate-spin"></div>
+                                            <p className="text-xs font-bold uppercase tracking-widest">Updating stats...</p>
+                                        </div>
+                                    ) : referralList.length === 0 ? (
+                                        <div className="bg-dark-900 border border-white/5 rounded-[32px] p-20 text-center flex flex-col items-center gap-4">
+                                            <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center text-3xl">📭</div>
+                                            <div className="space-y-1">
+                                                <p className="text-gray-400 font-bold">No activity yet</p>
+                                                <p className="text-gray-600 text-xs">Share your link to start earning commissions!</p>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-2">
+                                            {referralList.map((ref, idx) => (
+                                                <div key={idx} className="bg-dark-900 border border-white/5 p-5 rounded-2xl flex items-center justify-between group hover:border-white/10 transition-all hover:bg-dark-800">
+                                                    <div className="flex items-center gap-4">
+                                                        <img 
+                                                            src={ref.profiles?.avatar_url || `https://ui-avatars.com/api/?name=${ref.profiles?.username}&background=random`} 
+                                                            alt="" 
+                                                            className="w-10 h-10 rounded-full object-cover shadow-lg border border-white/5"
+                                                        />
+                                                        <div>
+                                                            <p className="font-bold text-sm">{ref.profiles?.username || 'Unknown User'}</p>
+                                                            <p className="text-[10px] text-gray-500 uppercase tracking-widest font-bold">Registration Event</p>
+                                                        </div>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <p className="text-lg font-black text-green-400">🪙 {ref.amount}</p>
+                                                        <p className="text-[10px] text-gray-500 font-medium">{new Date(ref.created_at).toLocaleDateString()}</p>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 {/* 6. TRANSACTIONS MODAL/SECTION */}
                 {showTransactions && (

@@ -11,9 +11,8 @@ const MaintenancePage = () => {
                 </div>
 
                 {/* Logo */}
-                <div className="mb-6">
-                    <span className="text-4xl font-black tracking-tighter text-white">STRANGY</span>
-                    <div className="text-[10px] font-black text-indigo-400 uppercase tracking-[6px] mt-1">Video Chat</div>
+                <div className="mb-8 flex justify-center">
+                    <img src="/logo.png" alt="Strangy Logo" className="h-12 w-auto object-contain" />
                 </div>
 
                 {/* Main Message */}

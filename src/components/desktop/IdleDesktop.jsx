@@ -124,10 +124,7 @@ const IdleDesktop = ({ localVideoRef, isCamOn, isMicOn, onStartChat, onToggleCam
                         )}
                         {!isCamOn && (
                             <div className="absolute inset-0 flex items-center justify-center bg-[#0d0d0d]">
-                                <div className="flex items-center gap-3">
-                                    <span className="text-7xl">🐵</span>
-                                    <span className="text-7xl">👑</span>
-                                </div>
+                                <img src="/logo.png" alt="Strangy Logo" className="w-40 h-auto opacity-40 grayscale brightness-200" />
                             </div>
                         )}
 
@@ -167,8 +164,10 @@ const IdleDesktop = ({ localVideoRef, isCamOn, isMicOn, onStartChat, onToggleCam
                     {/* Right Panel - Controls */}
                     <div className="flex-1 bg-[#6c3fcf]/70 backdrop-blur-xl rounded-2xl p-7 flex flex-col border border-white/10 shadow-2xl min-h-[480px]">
                         {/* Title */}
-                        <h1 className="text-white font-extrabold text-3xl mb-1">Strangy</h1>
-                        <p className="text-white/60 text-sm mb-5">Make new friends face-to-face</p>
+                        <div className="mb-2">
+                            <img src="/logo.png" alt="Strangy Logo" className="h-10 w-auto object-contain" />
+                        </div>
+                        <p className="text-white/60 text-sm mb-5 font-medium">Make new friends face-to-face</p>
 
                         {/* Coin balance indicator */}
                         <div className="flex items-center gap-2 mb-4 bg-white/5 rounded-xl px-3 py-2 border border-white/10 w-fit">

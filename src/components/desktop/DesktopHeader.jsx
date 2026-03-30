@@ -28,11 +28,8 @@ const DesktopHeader = ({ onShowSubscription }) => {
 
             <header className="fixed top-0 left-0 right-0 h-16 flex items-center justify-between px-6 z-[100]">
                 {/* Left - Logo */}
-                <div className="flex items-center gap-2.5">
-                    <div className="w-9 h-9 rounded-full bg-purple-700 flex items-center justify-center border-2 border-purple-400/50">
-                        <span className="text-white font-black text-sm">M</span>
-                    </div>
-                    <span className="text-white font-extrabold text-lg tracking-wide">STRANGY</span>
+                <div className="flex items-center gap-2.5 cursor-pointer" onClick={() => window.location.href = '/'}>
+                    <img src="/logo.png" alt="Strangy Logo" className="h-9 w-auto object-contain" />
                 </div>
 
                 {/* Center - Navigation */}

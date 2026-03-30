@@ -72,6 +72,16 @@ const AppContent = () => {
     window.scrollTo(0, 0);
   }, [location.pathname]);
 
+  // Capture Referral Code
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const ref = params.get('ref');
+    if (ref) {
+      console.log("[App] Referral code detected:", ref);
+      localStorage.setItem('referralCode', ref);
+    }
+  }, []);
+
   // Check maintenance mode from database
   useEffect(() => {
       const checkMaintenance = async () => {

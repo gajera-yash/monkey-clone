@@ -529,7 +529,8 @@ export const AuthProvider = ({ children }) => {
                                     coins: 50,
                                     is_creator: false,
                                     account_status: 'active',
-                                    is_profile_completed: false
+                                    is_profile_completed: false,
+                                    referral_code: session.user.id.substring(0, 8)
                                 })
                                 .select()
                                 .single();
@@ -576,6 +577,36 @@ export const AuthProvider = ({ children }) => {
                             } catch (e) {
                                 console.error("Failed to fetch Google birthday:", e);
                             }
+                        }
+
+                        // Handle referral logic for new users
+                        const referralCode = localStorage.getItem('referralCode');
+                        if (referralCode && profile && !profile.referred_by) {
+                            console.log("[Auth] Attempting to link referrer with code:", referralCode);
+                            try {
+                                // 1. Find referrer by referral_code
+                                const { data: referrer, error: refError } = await supabase
+                                    .from('profiles')
+                                    .select('id')
+                                    .eq('referral_code', referralCode)
+                                    .single();
+                                
+                                if (!refError && referrer && referrer.id !== session.user.id) {
+                                    // 2. Update new user profile with referred_by
+                                    await supabase
+                                        .from('profiles')
+                                        .update({ referred_by: referrer.id })
+                                        .eq('id', session.user.id);
+                                    
+                                    console.log("[Auth] Successfully linked referrer:", referrer.id);
+                                    profile.referred_by = referrer.id;
+                                    
+                                    // 3. Optional: Notify referrer (can be added later)
+                                }
+                            } catch (e) {
+                                console.warn("[Auth] Referral linking failed:", e.message);
+                            }
+                            localStorage.removeItem('referralCode');
                         }
 
                         // Handle female creator registration logic
