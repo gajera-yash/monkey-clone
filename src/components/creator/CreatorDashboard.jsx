@@ -467,7 +467,7 @@ const CreatorDashboard = () => {
                 </div>
 
                 {/* 5. QUICK ACTIONS & TRANSACTIONS */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
                     <button onClick={() => navigate('/creator/withdraw')} className="bg-dark-800 hover:bg-white/5 transition-colors p-6 rounded-3xl border border-white/5 flex flex-col items-center justify-center gap-3 text-center group">
                         <div className="w-12 h-12 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center text-xl group-hover:scale-110 transition-transform">🏦</div>
                         <span className="font-semibold text-sm">Withdraw Funds</span>
@@ -475,6 +475,16 @@ const CreatorDashboard = () => {
                     <button className="bg-dark-800 hover:bg-white/5 transition-colors p-6 rounded-3xl border border-white/5 flex flex-col items-center justify-center gap-3 text-center group">
                         <div className="w-12 h-12 rounded-full bg-pink-500/20 text-pink-400 flex items-center justify-center text-xl group-hover:scale-110 transition-transform">🎁</div>
                         <span className="font-semibold text-sm">My Gifts</span>
+                    </button>
+                    <button 
+                        onClick={() => {
+                            setShowTransactions(true);
+                            fetchTransactionLists();
+                        }}
+                        className="bg-dark-800 hover:bg-white/5 transition-colors p-6 rounded-3xl border border-white/5 flex flex-col items-center justify-center gap-3 text-center group"
+                    >
+                        <div className="w-12 h-12 rounded-full bg-orange-500/20 text-orange-400 flex items-center justify-center text-xl group-hover:scale-110 transition-transform">📜</div>
+                        <span className="font-semibold text-sm">Transactions</span>
                     </button>
                     <button 
                         onClick={() => {
