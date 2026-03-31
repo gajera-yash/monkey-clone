@@ -4,19 +4,29 @@
 -- 1. VERIFICATIONS TABLE
 CREATE TABLE IF NOT EXISTS public.verifications (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    user_id UUID REFERENCES auth.users(id) NOT NULL,
+    user_id UUID REFERENCES auth.users(id) NOT NULL UNIQUE, -- Added UNIQUE for proper upsert
     face_url TEXT,
+    voice_url TEXT,
     status TEXT DEFAULT 'pending',
     ai_confidence FLOAT,
     ai_notes TEXT,
     created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- Ensure all columns exist (Fixes: "could not find ai_confidence column")
+-- Ensure all columns and constraints exist
 ALTER TABLE public.verifications ADD COLUMN IF NOT EXISTS ai_confidence FLOAT;
 ALTER TABLE public.verifications ADD COLUMN IF NOT EXISTS ai_notes TEXT;
 ALTER TABLE public.verifications ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'pending';
 ALTER TABLE public.verifications ADD COLUMN IF NOT EXISTS face_url TEXT;
+ALTER TABLE public.verifications ADD COLUMN IF NOT EXISTS voice_url TEXT;
+
+-- Enable Unique constraint if not already present
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'verifications_user_id_key') THEN
+        ALTER TABLE public.verifications ADD CONSTRAINT verifications_user_id_key UNIQUE (user_id);
+    END IF;
+END $$;
 
 -- 2. NOTIFICATIONS TABLE
 CREATE TABLE IF NOT EXISTS public.notifications (
@@ -27,12 +37,12 @@ CREATE TABLE IF NOT EXISTS public.notifications (
     created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- 3. STORAGE BUCKET (Fixes: "Bucket not found")
+-- 3. STORAGE BUCKET
 INSERT INTO storage.buckets (id, name, public) 
 VALUES ('verifications', 'verifications', true)
 ON CONFLICT (id) DO NOTHING;
 
--- STORAGE POLICIES (Fixes: "RLS policy violation" on upload)
+-- STORAGE POLICIES
 DROP POLICY IF EXISTS "Allow public upload" ON storage.objects;
 CREATE POLICY "Allow public upload" 
 ON storage.objects FOR INSERT 
@@ -45,7 +55,7 @@ ON storage.objects FOR SELECT
 TO public 
 USING (bucket_id = 'verifications');
 
--- 4. DATABASE POLICIES (Fixes: "RLS policy violation" on save)
+-- 4. DATABASE POLICIES
 ALTER TABLE public.verifications ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "Users can view their own verification" ON public.verifications;

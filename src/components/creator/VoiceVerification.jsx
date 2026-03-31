@@ -118,6 +118,7 @@ const VoiceVerification = () => {
         const toastId = toast.loading("Finalizing your verification...");
 
         try {
+            console.log("[VoiceSubmission] Step 1: Checking previous verification confidence...");
             // Face AI confidence from previous step
             const faceConfidence = location.state?.confidence || 0;
             const facePassedAsFemale = faceConfidence > 0.85;
@@ -132,30 +133,38 @@ const VoiceVerification = () => {
                 ? `Auto-approved: Face AI ${Math.round(faceConfidence * 100)}% female + Voice AI ${voiceResult?.pitchHz}Hz (${Math.round((voiceResult?.confidence || 0) * 100)}% confidence)`
                 : `Pending review: Face AI ${Math.round(faceConfidence * 100)}%${voiceResult ? `, Voice ${voiceResult.pitchHz}Hz (${voiceResult.gender})` : ', Voice not analyzed'}`;
 
-            // Update/Upsert the verification record + profile in parallel
-            const [approveResult, profileResult] = await Promise.all([
-                supabase
-                    .from('verifications')
-                    .upsert({
-                        user_id: currentUser.uid,
-                        status: isAutoApproved ? 'approved' : 'pending',
-                        ai_notes: aiNotes,
-                        ai_confidence: faceConfidence
-                    }),
+            console.log("[VoiceSubmission] Step 2: Saving verification data to database...");
+            // Update/Upsert the verification record (Sequential for better error tracing)
+            const { error: verifyError } = await supabase
+                .from('verifications')
+                .upsert({
+                    user_id: currentUser.uid,
+                    status: isAutoApproved ? 'approved' : 'pending',
+                    ai_notes: aiNotes,
+                    ai_confidence: faceConfidence
+                }, { onConflict: 'user_id' });
 
-                supabase
-                    .from('profiles')
-                    .update({ 
-                        is_verified: isAutoApproved, 
-                        account_status: isAutoApproved ? 'active' : 'pending', 
-                        is_creator: true 
-                    })
-                    .eq('id', currentUser.uid)
-            ]);
+            if (verifyError) {
+                console.error("[VoiceSubmission] Verification Table Error:", verifyError);
+                throw verifyError;
+            }
 
-            if (approveResult.error) throw approveResult.error;
-            if (profileResult.error) throw profileResult.error;
+            console.log("[VoiceSubmission] Step 3: Updating user profile status...");
+            const { error: profileError } = await supabase
+                .from('profiles')
+                .update({ 
+                    is_verified: isAutoApproved, 
+                    account_status: isAutoApproved ? 'active' : 'pending', 
+                    is_creator: true 
+                })
+                .eq('id', currentUser.uid);
 
+            if (profileError) {
+                console.error("[VoiceSubmission] Profile Update Error:", profileError);
+                throw profileError;
+            }
+
+            console.log("[VoiceSubmission] Step 4: Verification data saved. Refreshing profile...");
             // Trigger profile refresh (non-blocking)
             refreshProfile(); 
             
@@ -168,6 +177,7 @@ const VoiceVerification = () => {
             }
 
             // BACKGROUND UPLOAD: Upload audio file AFTER user is already navigated
+            console.log("[VoiceSubmission] Step 5: Starting background audio upload...");
             const fileName = `${currentUser.uid}/voice_${Date.now()}.webm`;
             supabase.storage
                 .from('verifications')
@@ -177,21 +187,22 @@ const VoiceVerification = () => {
                         console.warn("Background voice upload failed:", uploadError.message);
                         return;
                     }
+                    console.log("[VoiceSubmission] Audio upload successful.");
                     const { data: { publicUrl } } = supabase.storage
                         .from('verifications')
                         .getPublicUrl(fileName);
                     supabase.from('verifications')
                         .update({ voice_url: publicUrl })
                         .eq('user_id', currentUser.uid)
-                        .then(() => console.log("Voice URL saved in background."));
+                        .then(() => console.log("[VoiceSubmission] Voice URL saved in background."));
                 });
 
         } catch (error) {
-            console.error("Voice Upload failed", error);
-            let errorMessage = "Voice verification upload failed.";
+            console.error("[VoiceSubmission] Critical Error:", error);
+            let errorMessage = error.message || "Voice verification upload failed.";
 
-            if (error.message?.includes("bucket_not_found") || error.message?.includes("Bucket not found")) {
-                errorMessage = "Storage Bucket 'verifications' not found. Please create it in Supabase.";
+            if (errorMessage.includes("bucket_not_found") || errorMessage.includes("Bucket not found")) {
+                errorMessage = "Storage Bucket 'verifications' not found. Please ensure it exists in Supabase.";
             }
 
             toast.error(errorMessage, { id: toastId });
