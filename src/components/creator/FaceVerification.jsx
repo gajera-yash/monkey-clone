@@ -155,27 +155,43 @@ const FaceVerification = () => {
     const toastId = toast.loading(detectedGender === 'male' ? "Saving rejection data..." : "Verifying face...");
 
     try {
+      console.log("[Verification] Step 1: Converting image data...");
       const fileName = `${currentUser.uid}/face_${Date.now()}.jpg`;
 
-      // Convert base64 to blob
-      const res = await fetch(capturedImage);
-      const blob = await res.blob();
+      // Convert base64 to blob manually (avoids 'Failed to fetch' for data URLs)
+      const base64Parts = capturedImage.split(',');
+      const base64Data = base64Parts[1];
+      const binaryString = atob(base64Data);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      const blob = new Blob([bytes], { type: 'image/jpeg' });
+      console.log("[Verification] Image conversion successful. Size:", blob.size, "bytes");
 
-      // 1. Upload image to Supabase Storage (regardless of gender)
+      // 1. Upload image to Supabase Storage
+      console.log("[Verification] Step 2: Uploading to storage bucket 'verifications'...");
       const { error: uploadError } = await supabase.storage
         .from('verifications')
-        .upload(fileName, blob, { contentType: 'image/jpeg' });
+        .upload(fileName, blob, { 
+          contentType: 'image/jpeg',
+          upsert: true 
+        });
 
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        console.error("[Verification] Storage Upload Error:", uploadError);
+        throw uploadError;
+      }
+      console.log("[Verification] Upload successful.");
 
       // 2. Get Public URL
       const { data: { publicUrl } } = supabase.storage
         .from('verifications')
         .getPublicUrl(fileName);
 
+      console.log("[Verification] Step 3: Recording verification in database...");
       if (detectedGender === 'male') {
-        // --- MALE DETECTED: Store rejection data so admin can see the attempt ---
-        // Check if there's already a row for this user
+        // --- MALE DETECTED: Store rejection data ---
         const { data: existingRow } = await supabase
           .from('verifications')
           .select('id')
@@ -183,7 +199,6 @@ const FaceVerification = () => {
           .maybeSingle();
 
         if (existingRow) {
-          // Update existing row
           await supabase
             .from('verifications')
             .update({
@@ -193,7 +208,6 @@ const FaceVerification = () => {
             })
             .eq('user_id', currentUser.uid);
         } else {
-          // Insert new rejection row
           await supabase
             .from('verifications')
             .insert({
@@ -204,12 +218,11 @@ const FaceVerification = () => {
             });
         }
 
-        toast.error("Face verification failed. Male detected. Your attempt has been logged.", { id: toastId, duration: 5000 });
-        return; // Stop here — do not navigate to voice verification
+        toast.error("Face verification failed. Male detected.", { id: toastId, duration: 5000 });
+        return;
       }
 
       // --- FEMALE DETECTED: Store pending verification and proceed ---
-      // Check if there's already a row for this user
       const { data: existingVerification } = await supabase
         .from('verifications')
         .select('id')
@@ -217,7 +230,7 @@ const FaceVerification = () => {
         .maybeSingle();
 
       if (existingVerification) {
-        await supabase
+        const { error: updateError } = await supabase
           .from('verifications')
           .update({
             face_url: publicUrl,
@@ -226,8 +239,9 @@ const FaceVerification = () => {
             ai_notes: `Female face detected by AI (${Math.round(confidence * 100)}% confidence)`
           })
           .eq('user_id', currentUser.uid);
+        if (updateError) throw updateError;
       } else {
-        await supabase
+        const { error: insertError } = await supabase
           .from('verifications')
           .insert({
             user_id: currentUser.uid,
@@ -236,11 +250,13 @@ const FaceVerification = () => {
             ai_confidence: confidence,
             ai_notes: `Female face detected by AI (${Math.round(confidence * 100)}% confidence)`
           });
+        if (insertError) throw insertError;
       }
 
+      console.log("[Verification] Database update successful.");
       toast.success("Face verified! Proceeding to voice verification.", { id: toastId });
 
-      // Insert admin notification for face verification submitted
+      // Insert admin notification
       try {
         await supabase.from('notifications').insert({
           type: 'face_verification',
@@ -252,11 +268,13 @@ const FaceVerification = () => {
       navigate("/creator/verify/voice", { state: { confidence } });
 
     } catch (error) {
-      console.error("Verification Error:", error);
+      console.error("[Verification] Critical Error:", error);
       let errorMessage = error.message || "Face Verification failed";
 
-      if (errorMessage.includes("bucket_not_found") || errorMessage.includes("Bucket not found")) {
-        errorMessage = "Storage Bucket 'verifications' not found. Please create it in Supabase dashboard.";
+      if (errorMessage === 'Failed to fetch') {
+        errorMessage = "Network error: Failed to connect to server. Please check your connection and try again.";
+      } else if (errorMessage.includes("bucket_not_found") || errorMessage.includes("Bucket not found")) {
+        errorMessage = "Storage Bucket 'verifications' not found. Please ensure it exists in Supabase.";
       }
 
       toast.error(errorMessage, { id: toastId });
