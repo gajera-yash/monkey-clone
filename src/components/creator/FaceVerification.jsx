@@ -36,8 +36,8 @@ const FaceVerification = () => {
         await loadFaceModels();
         setModelsLoaded(true);
       } catch (err) {
-        console.error("Error loading face-api models:", err);
-        toast.error("AI Models failed to load. Check internet.");
+        console.error("Critical: AI Models failed to load:", err);
+        toast.error("Ai model failed to load. Check internet connection.");
       }
     };
     initAI();

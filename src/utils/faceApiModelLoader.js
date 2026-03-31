@@ -3,10 +3,8 @@ import * as faceapi from '@vladmandic/face-api';
 let modelsLoaded = false;
 let loadingPromise = null;
 
-// Use CDN for production reliability, local for dev
-const MODEL_URL = process.env.NODE_ENV === 'production'
-    ? 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model'
-    : '/models';
+// Always use local models from public/models for reliability
+const MODEL_URL = '/models';
 
 /**
  * Pre-loads all required face-api models if not already loaded.
