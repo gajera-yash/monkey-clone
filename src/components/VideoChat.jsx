@@ -103,7 +103,25 @@ const VideoChat = ({ onEndChat }) => {
   // Filter state (set from IdleDesktop)
   const [chatFilters, setChatFilters] = useState({ gender: 'Both', location: 'Global', ageRange: 'Any' });
   const [isLocalNsfw, setIsLocalNsfw] = useState(false);
+  const [socketStatus, setSocketStatus] = useState(socket.connected ? 'Connected' : 'Disconnected');
   const nsfwViolations = useRef(0);
+
+  // Monitor socket status
+  useEffect(() => {
+    const onConnect = () => { console.log("[VideoChat] Socket Connected"); setSocketStatus('Connected'); };
+    const onConnectError = (err) => { console.error("[VideoChat] Socket Connection Error", err); setSocketStatus('Error'); };
+    const onDisconnect = () => { console.log("[VideoChat] Socket Disconnected"); setSocketStatus('Disconnected'); };
+
+    socket.on('connect', onConnect);
+    socket.on('connect_error', onConnectError);
+    socket.on('disconnect', onDisconnect);
+
+    return () => {
+      socket.off('connect', onConnect);
+      socket.off('connect_error', onConnectError);
+      socket.off('disconnect', onDisconnect);
+    };
+  }, []);
 
   // Refs to avoid stale closures in interval
   const coinsRef = useRef(coins);
@@ -279,10 +297,17 @@ const VideoChat = ({ onEndChat }) => {
     if (hasEmittedJoin.current) return;
     if (!userInitiatedJoin.current) return; // Only join if user clicked Start
     
+    if (!socket.connected) {
+        console.log("[SocketDebug] Connecting socket...");
+        socket.connect();
+    }
+
     if (socket.connected && stream && currentUser) {
+      console.log("[SocketDebug] Emitting join query with filters:", chatFilters);
       hasEmittedJoin.current = true;
       
       if (incomingDirectCall) {
+        console.log("[SocketDebug] Accepting direct call from:", incomingDirectCall.callerData?.name);
         setStatus(`Connecting to ${incomingDirectCall.callerData?.name || 'User'}...`);
         socket.emit('accept-direct-call', {
             callerSocketId: incomingDirectCall.callerSocketId,
@@ -299,6 +324,7 @@ const VideoChat = ({ onEndChat }) => {
         navigate(location.pathname, { replace: true });
         
       } else if (directCallTarget) {
+        console.log("[SocketDebug] Requesting direct call to:", directCallTarget);
         setStatus(`Calling ${directCallName || 'Creator'}...`);
         socket.emit('request-direct-call', {
             targetUid: directCallTarget,
@@ -571,7 +597,10 @@ const VideoChat = ({ onEndChat }) => {
 
   // --- Stable Socket Listeners (Run once on mount) ---
   useEffect(() => {
-    const handleMatched = async ({ roomId, initiator, partnerId, partnerName, partnerLocation, partnerIsPremium, partnerGender, partnerBirthdate, isDirectCall }) => {
+    const handleMatched = async (data) => {
+      console.log("[SocketDebug] Received 'matched' event:", data);
+      const { roomId, initiator, partnerName, partnerLocation, partnerIsPremium, partnerGender, partnerBirthdate, partnerId, isDirectCall } = data;
+      
       roomIdRef.current = roomId;
       partnerIdRef.current = partnerId;
       setPartnerName(partnerName || 'Stranger');
@@ -579,7 +608,9 @@ const VideoChat = ({ onEndChat }) => {
       setPartnerIsPremium(partnerIsPremium || false);
       setPartnerGender(partnerGender || null);
       setPartnerAge(calculateAge(partnerBirthdate));
-      setStatus('Connected');
+      
+      console.log(`[SocketDebug] Matching with ${partnerName || 'Stranger'}. Initiator: ${initiator}`);
+      setStatus(`Connected to ${partnerName || 'Stranger'}`);
       setStartTime(Date.now());
       setMessages([]);
       setChatTimer(0);
@@ -1204,6 +1235,19 @@ const VideoChat = ({ onEndChat }) => {
                     <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
                     <p className="text-accent-purple font-bold text-xs uppercase tracking-widest">{waitingCount} users online</p>
                   </div>
+                  
+                  {/* Connection Debug Indicator */}
+                  <div className="flex items-center justify-center gap-2 mb-6">
+                    <div className={`w-3 h-3 rounded-full ${
+                      socketStatus === 'Connected' ? 'bg-green-500' : 
+                      socketStatus === 'Connecting' ? 'bg-yellow-500 animate-pulse' : 'bg-red-500'
+                    }`}></div>
+                    <span className="text-[10px] text-gray-400 font-mono uppercase tracking-tighter">
+                      {socketStatus === 'Connected' ? 'Server Online' : 
+                       socketStatus === 'Error' ? 'Connection Failed' : 'Connecting To Signaling...'}
+                    </span>
+                  </div>
+
                   <button
                     onClick={() => {
                       setStatus('Idle');

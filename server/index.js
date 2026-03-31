@@ -439,12 +439,12 @@ io.on('connection', (socket) => {
             waitingUsers[existingIdx] = user; // Update info if already in queue
         }
 
-        console.log(`[Queue] Waiting pool: ${waitingUsers.length} | Total online: ${io.engine.clientsCount}`);
+        console.log(`[Queue] User ${user.uid || user.id} (${user.name}) joined. Pool: ${waitingUsers.length}`);
         io.emit('waiting-count', io.engine.clientsCount);
-
+        
         // Check if we can match
         if (waitingUsers.length >= 2) {
-            console.log(`[Match] Attempting to match from pool of ${waitingUsers.length}`);
+            console.log(`[MatchEngine] Attempting to match from pool of ${waitingUsers.length}...`);
 
             // 1. Sort users: priority users (paid filters) first
             const isPriority = (u) => {
@@ -608,7 +608,7 @@ io.on('connection', (socket) => {
                     partnerBirthdate: u1.birthdate
                 });
             } else {
-                console.log(`[Match] No suitable pairs found in current pool.`);
+                console.log(`[MatchEngine] No suitable pairs found in current pool. Queue status: ${waitingUsers.length} waiting.`);
             }
         }
     });
