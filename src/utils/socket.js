@@ -20,19 +20,26 @@ if (hostname === 'localhost' || hostname.startsWith('192.168.')) {
     SOCKET_URL = '/';
 }
 
-// Ensure URL has protocol
-if (SOCKET_URL !== '/' && !SOCKET_URL.startsWith('http')) {
-    SOCKET_URL = `https://${SOCKET_URL}`;
+// Ensure URL has protocol and NO trailing slash
+if (SOCKET_URL !== '/') {
+    // Remove trailing slash if present
+    SOCKET_URL = SOCKET_URL.replace(/\/+$/, "");
+    
+    if (!SOCKET_URL.startsWith('http')) {
+        SOCKET_URL = `https://${SOCKET_URL}`;
+    }
 }
 
-console.log("[SocketDebug] Final SOCKET_URL used:", SOCKET_URL);
+console.log("[SocketDebug] Connecting to:", SOCKET_URL);
 
+// Forcing polling first is the "Perfect Solution" for Railway/Vercel handshake issues
 const socket = io(SOCKET_URL, {
-    autoConnect: false, // We will connect manually when the chat starts
+    autoConnect: false,
     reconnection: true,
-    reconnectionAttempts: 5,
+    reconnectionAttempts: 10,
     reconnectionDelay: 1000,
-    transports: SOCKET_URL.includes('ngrok') ? ['polling', 'websocket'] : ['websocket', 'polling'],
+    transports: ['polling', 'websocket'], // Polling first is most stable for handshake
+    withCredentials: true,
     extraHeaders: {
         "ngrok-skip-browser-warning": "true"
     }
