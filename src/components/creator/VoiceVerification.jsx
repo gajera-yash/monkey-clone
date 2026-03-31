@@ -164,7 +164,36 @@ const VoiceVerification = () => {
                 throw profileError;
             }
 
-            console.log("[VoiceSubmission] Step 4: Verification data saved. Refreshing profile...");
+            console.log("[VoiceSubmission] Step 4: Uploading audio to storage...");
+            const fileName = `${currentUser.uid}/voice_${Date.now()}.webm`;
+            const { error: uploadError } = await supabase.storage
+                .from('verifications')
+                .upload(fileName, audioBlob, { 
+                    contentType: 'audio/webm', 
+                    upsert: true 
+                });
+
+            if (uploadError) {
+                console.error("[VoiceSubmission] Audio Upload Error:", uploadError);
+                throw uploadError;
+            }
+
+            console.log("[VoiceSubmission] Step 5: Getting public URL and updating database...");
+            const { data: { publicUrl } } = supabase.storage
+                .from('verifications')
+                .getPublicUrl(fileName);
+
+            const { error: urlUpdateError } = await supabase
+                .from('verifications')
+                .update({ voice_url: publicUrl })
+                .eq('user_id', currentUser.uid);
+
+            if (urlUpdateError) {
+                console.error("[VoiceSubmission] Voice URL Update Error:", urlUpdateError);
+                throw urlUpdateError;
+            }
+
+            console.log("[VoiceSubmission] Step 6: All data saved. Finalizing...");
             // Trigger profile refresh (non-blocking)
             refreshProfile(); 
             
@@ -175,27 +204,6 @@ const VoiceVerification = () => {
                 toast.success("Verification submitted! Awaiting admin review.", { id: toastId });
                 navigate('/');
             }
-
-            // BACKGROUND UPLOAD: Upload audio file AFTER user is already navigated
-            console.log("[VoiceSubmission] Step 5: Starting background audio upload...");
-            const fileName = `${currentUser.uid}/voice_${Date.now()}.webm`;
-            supabase.storage
-                .from('verifications')
-                .upload(fileName, audioBlob, { contentType: 'audio/webm', upsert: true })
-                .then(({ error: uploadError }) => {
-                    if (uploadError) {
-                        console.warn("Background voice upload failed:", uploadError.message);
-                        return;
-                    }
-                    console.log("[VoiceSubmission] Audio upload successful.");
-                    const { data: { publicUrl } } = supabase.storage
-                        .from('verifications')
-                        .getPublicUrl(fileName);
-                    supabase.from('verifications')
-                        .update({ voice_url: publicUrl })
-                        .eq('user_id', currentUser.uid)
-                        .then(() => console.log("[VoiceSubmission] Voice URL saved in background."));
-                });
 
         } catch (error) {
             console.error("[VoiceSubmission] Critical Error:", error);
