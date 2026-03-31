@@ -14,7 +14,7 @@ const app = express();
 // CORS: Allow Vercel frontend in production
 const FRONTEND_URL = process.env.FRONTEND_URL || '*';
 app.use(cors({
-    origin: FRONTEND_URL === '*' ? '*' : [FRONTEND_URL, 'http://localhost:3000', 'http://localhost:3001'],
+    origin: true, // This allows any origin that sends credentials
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
     credentials: true
 }));
@@ -39,7 +39,7 @@ if (fs.existsSync(buildPath)) {
 const server = http.createServer(app);
 const io = new Server(server, {
     cors: {
-        origin: FRONTEND_URL === '*' ? '*' : [FRONTEND_URL, 'http://localhost:3000', 'http://localhost:3001'],
+        origin: true, // Allow all origins for the socket connection
         methods: ["GET", "POST"],
         credentials: true
     }
