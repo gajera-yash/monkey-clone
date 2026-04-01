@@ -1,7 +1,6 @@
 const express = require('express');
 const router = express.Router();
 const { createClient } = require('@supabase/supabase-js');
-const Razorpay = require('razorpay');
 const crypto = require('crypto');
 
 const supabase = createClient(
@@ -9,10 +8,8 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_KEY
 );
 
-const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID,
-  key_secret: process.env.RAZORPAY_KEY_SECRET
-});
+// Razorpay integration removed (no active account)
+const razorpay = null;
 
 // ============ COIN PACKAGES ============
 
@@ -36,126 +33,14 @@ router.get('/packages', async (req, res) => {
 
 // ============ PURCHASE COINS ============
 
-// Create Razorpay order for coin purchase
+// Create Razorpay order for coin purchase (DISABLED)
 router.post('/purchase/create-order', async (req, res) => {
-  try {
-    const { userId, packageId } = req.body;
-    
-    // Get package details
-    const { data: package, error: pkgError } = await supabase
-      .from('coin_packages')
-      .select('*')
-      .eq('id', packageId)
-      .single();
-    
-    if (pkgError || !package) {
-      return res.status(404).json({ error: 'Package not found' });
-    }
-    
-    // Create Razorpay order
-    const options = {
-      amount: package.price_inr * 100, // Amount in paise
-      currency: 'INR',
-      receipt: `coin_${userId}_${Date.now()}`,
-      notes: {
-        userId: userId,
-        packageId: packageId,
-        coins: package.coins
-      }
-    };
-    
-    const order = await razorpay.orders.create(options);
-    
-    res.json({
-      orderId: order.id,
-      amount: order.amount,
-      currency: order.currency,
-      packageDetails: package
-    });
-    
-  } catch (error) {
-    console.error('Error creating order:', error);
-    res.status(500).json({ error: 'Failed to create order' });
-  }
+  return res.status(403).json({ error: 'Payments are currently disabled. Please contact support.' });
 });
 
-// Verify payment and add coins
+// Verify payment and add coins (DISABLED)
 router.post('/purchase/verify', async (req, res) => {
-  try {
-    const {
-      orderId,
-      paymentId,
-      signature,
-      userId,
-      packageId
-    } = req.body;
-    
-    // Verify Razorpay signature
-    const text = orderId + '|' + paymentId;
-    const expectedSignature = crypto
-      .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
-      .update(text)
-      .digest('hex');
-    
-    if (signature !== expectedSignature) {
-      return res.status(400).json({ error: 'Invalid signature' });
-    }
-    
-    // Get package details
-    const { data: package } = await supabase
-      .from('coin_packages')
-      .select('*')
-      .eq('id', packageId)
-      .single();
-    
-    // Get current user coins
-    const { data: user } = await supabase
-      .from('profiles')
-      .select('coins, total_coins_purchased')
-      .eq('id', userId)
-      .single();
-    
-    const newCoins = (user.coins || 0) + package.coins;
-    const newTotalPurchased = (user.total_coins_purchased || 0) + package.coins;
-    
-    // Update user coins
-    await supabase
-      .from('profiles')
-      .update({
-        coins: newCoins,
-        total_coins_purchased: newTotalPurchased,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', userId);
-    
-    // Record transaction
-    await supabase
-      .from('coin_transactions')
-      .insert({
-        user_id: userId,
-        transaction_type: 'purchase',
-        coins_amount: package.coins,
-        coins_balance_after: newCoins,
-        description: `Purchased ${package.name}`,
-        payment_id: paymentId,
-        payment_status: 'completed',
-        metadata: {
-          package_id: packageId,
-          order_id: orderId,
-          amount_paid: package.price_inr
-        }
-      });
-    
-    res.json({
-      success: true,
-      coinsAdded: package.coins,
-      newBalance: newCoins
-    });
-    
-  } catch (error) {
-    console.error('Error verifying payment:', error);
-    res.status(500).json({ error: 'Failed to verify payment' });
-  }
+  return res.status(403).json({ error: 'Payments are currently disabled.' });
 });
 
 // ============ SPEND COINS ============

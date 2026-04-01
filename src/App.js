@@ -37,6 +37,7 @@ import CreatorDashboard from './components/creator/CreatorDashboard';
 import CreatorWithdraw from './components/creator/CreatorWithdraw';
 import CreatorSettings from './components/creator/CreatorSettings';
 import { loadFaceModels } from './utils/faceApiModelLoader';
+import { useParams } from 'react-router-dom';
 
 // Static Pages
 import About from './components/pages/About';
@@ -72,7 +73,7 @@ const AppContent = () => {
     window.scrollTo(0, 0);
   }, [location.pathname]);
 
-  // Capture Referral Code
+  // Capture Referral Code from ?ref= query param on ANY page
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const ref = params.get('ref');
@@ -473,6 +474,9 @@ const AppContent = () => {
             <Footer />
           </>
         } />
+        {/* Referral Link Route: /ref/:code stores code and redirects home */}
+        <Route path="/ref/:code" element={<ReferralRedirect />} />
+
       </Routes>
 
     </div>
@@ -532,3 +536,26 @@ const ChatLayout = () => {
 };
 
 export default App;
+
+// =============================================
+// Referral Redirect Handler
+// Captures code from URL path and redirects to landing page
+// =============================================
+const ReferralRedirect = () => {
+  const { code } = useParams();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (code) {
+      console.log('[ReferralRedirect] Captured code from path:', code);
+      localStorage.setItem('referralCode', code);
+    }
+    navigate('/', { replace: true });
+  }, [code, navigate]);
+
+  return (
+    <div className="min-h-screen bg-dark-900 flex items-center justify-center">
+      <div className="w-12 h-12 rounded-full border-4 border-t-accent-purple border-white/10 animate-spin" />
+    </div>
+  );
+};

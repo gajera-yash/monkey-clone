@@ -163,59 +163,9 @@ export const CoinsProvider = ({ children }) => {
                 throw txError;
             }
 
-            // 3. Handle Referral Commission (5%) if this is earned income
-            if (type === 'earn' && currentUser.referred_by && amount > 0) {
-                const commission = Math.floor(amount * 0.05); // 5% commission
-                if (commission > 0) {
-                    console.log(`[Referral] Granting ${commission} coins to referrer ${currentUser.referred_by}`);
-                    try {
-                        // We use a separate transaction to add coins to the referrer
-                        // Note: This is simplified. Ideally, this would be a database trigger or server-side logic
-                        // to ensure consistency and avoid client-side manipulation.
-                        
-                        // Fetch referrer's current coins to update correctly
-                        const { data: refProfile } = await supabase
-                            .from('profiles')
-                            .select('coins')
-                            .eq('id', currentUser.referred_by)
-                            .single();
-                        
-                        if (refProfile) {
-                            const newRefBalance = (refProfile.coins || 0) + commission;
-                            
-                            // Update referrer's balance
-                            await supabase
-                                .from('profiles')
-                                .update({ coins: newRefBalance })
-                                .eq('id', currentUser.referred_by);
-                            
-                            // Log the referral earning
-                            await supabase
-                                .from('referral_earnings')
-                                .insert({
-                                    referrer_id: currentUser.referred_by,
-                                    referred_user_id: currentUser.id,
-                                    amount: commission,
-                                    earnings_type: 'commission'
-                                });
-                            
-                            // Also log a coin_transaction for the referrer so it shows in their history
-                            await supabase
-                                .from('coin_transactions')
-                                .insert({
-                                    user_id: currentUser.referred_by,
-                                    transaction_type: 'earned', // Use 'earned' so it shows up in creator dashboard
-                                    coins_amount: commission,
-                                    coins_balance_after: newRefBalance,
-                                    description: `Referral commission from ${currentUser.displayName || 'Creator'}`,
-                                    payment_status: 'completed'
-                                });
-                        }
-                    } catch (refE) {
-                        console.error("[Referral] Error processing commission:", refE);
-                    }
-                }
-            }
+            // Note: Referral commission (5%) is now handled automatically via
+            // the `trigger_referral_commission` database trigger on coin_transactions.
+            // No client-side logic needed here.
 
             await refreshProfile();
             toast.success(`+${amount} Coins! ${reason}`);

@@ -544,11 +544,11 @@ const CreatorDashboard = () => {
                                     </p>
                                     <div className="flex flex-col sm:flex-row items-center gap-3">
                                         <div className="flex-1 w-full bg-black/40 border border-white/10 rounded-2xl px-5 py-4 font-mono text-sm text-gray-300 truncate">
-                                            {`https://strangy.app/ref/${currentUser?.uid?.substring(0, 8)}`}
+                                            {`https://strangy.app/ref/${currentUser?.referral_code || currentUser?.uid?.substring(0, 8)}`}
                                         </div>
                                         <button 
                                             onClick={() => {
-                                                navigator.clipboard.writeText(`https://strangy.app/ref/${currentUser?.uid?.substring(0, 8)}`);
+                                                navigator.clipboard.writeText(`https://strangy.app/ref/${currentUser?.referral_code || currentUser?.uid?.substring(0, 8)}`);
                                                 toast.success("Referral link copied!");
                                             }}
                                             className="w-full sm:w-auto px-8 py-4 bg-white text-dark-900 rounded-2xl font-black hover:bg-gray-200 transition-all active:scale-95 shadow-xl shadow-white/5"
