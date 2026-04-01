@@ -12,12 +12,11 @@ if (hostname === 'localhost' || hostname.startsWith('192.168.')) {
 } else if (process.env.REACT_APP_SOCKET_URL) {
     SOCKET_URL = process.env.REACT_APP_SOCKET_URL;
 } else if (hostname.includes('vercel.app')) {
-    // Fallback for Vercel if env var is missing - check common railway patterns
-    // Better to default to '/' and let it fail gracefully with a log
-    SOCKET_URL = '/';
+    // Railway Production URL for Vercel
+    SOCKET_URL = 'https://strangy-production-664f.up.railway.app';
 } else {
-    // Production mode (Served by Backend) - Ngrok or deployed
-    SOCKET_URL = '/';
+    // Railway Production URL
+    SOCKET_URL = 'https://strangy-production-664f.up.railway.app';
 }
 
 // Ensure URL has protocol and NO trailing slash
