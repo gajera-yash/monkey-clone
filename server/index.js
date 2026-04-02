@@ -3,6 +3,23 @@ const path = require('path');
 if (fs.existsSync(path.join(__dirname, '.env'))) {
     require('dotenv').config({ path: path.join(__dirname, '.env') });
 }
+
+// Global Exception Handlers
+process.on('uncaughtException', (err) => {
+    console.error('========================================');
+    console.error('UNCAUGHT EXCEPTION! Server Crashing...');
+    console.error('Error:', err.message);
+    console.error('Stack:', err.stack);
+    console.error('========================================');
+    process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('========================================');
+    console.error('UNHANDLED REJECTION AT:', promise);
+    console.error('Reason:', reason);
+    console.error('========================================');
+});
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -855,7 +872,14 @@ server.listen(PORT, '0.0.0.0', () => {
     console.log(`Signaling server running on PORT: ${PORT}`);
     console.log(`Interface: 0.0.0.0 (Publicly Reachable)`);
     console.log(`Frontend URL: ${FRONTEND_URL}`);
+    console.log(`Current Time: ${new Date().toISOString()}`);
     console.log(`========================================`);
+}).on('error', (err) => {
+    console.error('========================================');
+    console.error('SERVER LISTEN ERROR!');
+    console.error('Error Code:', err.code);
+    console.error('Error Message:', err.message);
+    console.error('========================================');
 });
 
 // Deployment Trigger: 2026-04-02 21:40
