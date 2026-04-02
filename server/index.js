@@ -7,7 +7,6 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
-const path = require('path');
 const { createClient } = require('@supabase/supabase-js');
 
 const coinsRoutes = require('./routes/coins');
@@ -52,7 +51,6 @@ app.use('/api/subscriptions', subscriptionsRoutes);
 
 // Serve static files from the React app (only if build folder exists - for combined deploy)
 const buildPath = path.join(__dirname, '../build');
-const fs = require('fs');
 if (fs.existsSync(buildPath)) {
     app.use(express.static(buildPath));
 }
