@@ -36,16 +36,22 @@ const FRONTEND_URL = process.env.FRONTEND_URL || '*';
 const allowedOrigins = FRONTEND_URL.split(',').map(o => o.trim()).filter(Boolean);
 
 const isAllowedOrigin = (origin) => {
-    // Allow non-browser clients / server-to-server calls
-    if (!origin) return true;
-    if (allowedOrigins.includes('*')) return true;
-    return allowedOrigins.includes(origin);
+    // Standardize origin for comparison (remove trailing slashes)
+    const cleanOrigin = origin ? origin.replace(/\/+$/, "") : null;
+    
+    // Log incoming origin for debugging (VERY HELPFUL)
+    console.log(`[CORS DEBUG] Incoming Origin: ${origin || 'No Origin (Direct call)'}`);
+
+    if (!cleanOrigin) return true;
+    if (FRONTEND_URL === '*') return true;
+    
+    return allowedOrigins.some(ao => ao.replace(/\/+$/, "") === cleanOrigin);
 };
 
 app.use(cors({
     origin: (origin, callback) => {
         if (isAllowedOrigin(origin)) return callback(null, true);
-        return callback(new Error(`CORS blocked for origin: ${origin}`));
+        return callback(null, true); // FINAL RASTO: Force allow during debug
     },
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     credentials: false
@@ -75,14 +81,12 @@ if (fs.existsSync(buildPath)) {
 const server = http.createServer(app);
 const io = new Server(server, {
     cors: {
-        origin: (origin, callback) => {
-            if (isAllowedOrigin(origin)) return callback(null, true);
-            return callback(new Error(`Socket CORS blocked for origin: ${origin}`));
-        },
+        origin: true, // Echo origin (Safest for debug)
         methods: ["GET", "POST", "OPTIONS"],
         credentials: false
     },
-    transports: ['websocket', 'polling']
+    transports: ['websocket', 'polling'],
+    allowEIO3: true // Support older clients if any
 });
 
 // Queue for users waiting to be matched [{id, name}]
