@@ -22,6 +22,7 @@ import { RiMagicLine, RiChat3Line, RiFlagLine, RiHeartLine, RiEmotionHappyLine, 
 import CoinStoreModal from './coins/CoinStoreModal';
 import SafetyInfoModal from './safety/SafetyInfoModal';
 import { loadNsfwModel, checkVideoForNsfw } from '../utils/nsfwDetector';
+import StrangyIcon from './common/StrangyIcon';
 
 const buildRtcConfig = () => {
   const iceServers = [
@@ -897,14 +898,14 @@ const VideoChat = ({ onEndChat }) => {
       {status === 'Idle' && (
         <div className="absolute inset-0 hidden md:block opacity-20 pointer-events-none overflow-hidden">
           <div className="absolute top-1/4 left-1/4 transform -translate-x-1/2 -translate-y-1/2 rotate-12">
-            <span className="text-[200px]">🐵</span>
+            <StrangyIcon className="w-[200px] h-[200px] rounded-[40px] opacity-40" size="text-[120px]" />
           </div>
           <div className="absolute bottom-1/4 right-1/4 transform translate-x-1/2 translate-y-1/2 -rotate-12">
-            <span className="text-[200px]">🐵</span>
+            <StrangyIcon className="w-[200px] h-[200px] rounded-[40px] opacity-40" size="text-[120px]" />
           </div>
           <div className="absolute top-1/2 left-3/4 transform -translate-x-1/2 -translate-y-1/2 flex items-center gap-8">
-            <span className="text-[120px]">🐵</span>
-            <span className="text-[120px]">🐵</span>
+            <StrangyIcon className="w-[120px] h-[120px] rounded-[24px] opacity-30" size="text-[72px]" />
+            <StrangyIcon className="w-[120px] h-[120px] rounded-[24px] opacity-30" size="text-[72px]" />
           </div>
         </div>
       )}
@@ -1209,10 +1210,34 @@ const VideoChat = ({ onEndChat }) => {
                   <video ref={remoteVideoRef} autoPlay playsInline className="w-full h-full object-cover" />
                   {/* strangy.app watermark */}
                   <div className="absolute bottom-3 left-3 flex items-center gap-2 md:hidden z-20">
-                    <div className="w-7 h-7 rounded-lg bg-indigo-600 flex items-center justify-center shadow-lg">
-                      <span className="text-[14px]">🐵</span>
+                    <StrangyIcon className="w-7 h-7 rounded-lg" size="text-[14px]" />
+                    <span className="text-white/90 text-[13px] font-bold tracking-tight opacity-50">strangy.app</span>
+                  </div>
+
+                  {/* INSTAGRAM LIVE STYLE FLOATING CHAT (Mobile Only) */}
+                  <div className="absolute bottom-[20px] left-4 right-16 z-30 flex flex-col md:hidden pointer-events-none">
+                    <div 
+                      className="flex flex-col gap-2 overflow-y-auto max-h-[160px] scrollbar-hide"
+                      style={{ maskImage: 'linear-gradient(to top, black 80%, transparent 100%)', WebkitMaskImage: 'linear-gradient(to top, black 80%, transparent 100%)' }}
+                    >
+                      {messages.slice(-8).map((msg) => (
+                        <div key={msg.id} className="flex items-start gap-2 animate-fade-in-up">
+                          <div className="bg-black/30 backdrop-blur-md px-3 py-1.5 rounded-[18px] flex items-center gap-2 max-w-[90%] border border-white/5">
+                            <span className="text-[12px] font-black text-white/90 whitespace-nowrap">
+                              {msg.senderId === currentUser.uid ? 'You' : (partnerName || 'Stranger')}
+                            </span>
+                            <span className="text-[12px] text-white/80 leading-snug">
+                              {msg.text}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                      {isPartnerTyping && (
+                        <div className="bg-black/20 backdrop-blur-sm px-3 py-1 rounded-full w-fit flex items-center gap-2">
+                          <span className="text-[10px] text-white/50 italic font-bold">Partner is typing...</span>
+                        </div>
+                      )}
                     </div>
-                    <span className="text-white/90 text-[13px] font-bold tracking-tight">strangy.app</span>
                   </div>
                 </div>
 
@@ -1230,55 +1255,51 @@ const VideoChat = ({ onEndChat }) => {
                       <RiVideoOffLine className="text-white/40" size={40} />
                     </div>
                   )}
-                  {/* Chat & Gift buttons bottom bar */}
-                  <div className="absolute bottom-6 left-0 right-0 flex items-center justify-center gap-4 z-10 px-4">
-                    {/* Chat Button */}
-                    <button
-                      onClick={() => {
-                        setShowChat(!showChat);
-                        if (!showChat) setUnreadCount(0);
-                      }}
-                      className="w-12 h-12 rounded-full bg-black/40 backdrop-blur-md border border-white/10 flex items-center justify-center relative shadow-xl active:scale-90 transition-transform"
+                  {/* INSTAGRAM LIVE STYLE BOTTOM INPUT & CONTROLS */}
+                  <div className="absolute bottom-5 left-0 right-0 flex items-center gap-3 z-40 px-4 md:hidden">
+                    {/* Input Bar */}
+                    <form 
+                      onSubmit={handleSendMessage}
+                      className="flex-1 bg-black/40 backdrop-blur-xl rounded-full border border-white/10 flex items-center px-4 py-2.5 shadow-2xl"
                     >
-                      <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                      </svg>
-                      {unreadCount > 0 && (
-                        <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center border-2 border-black">
-                          {unreadCount > 9 ? '9+' : unreadCount}
-                        </span>
-                      )}
-                    </button>
+                      <input
+                        type="text"
+                        value={newMessage}
+                        onChange={handleTyping}
+                        placeholder="Add a comment..."
+                        className="bg-transparent border-none outline-none text-white text-[14px] flex-1 placeholder:text-white/40"
+                      />
+                      <button type="submit" className={`ml-2 text-white font-bold text-sm ${!newMessage.trim() ? 'hidden' : 'text-accent-pink'}`}>
+                        Post
+                      </button>
+                    </form>
 
-                    {/* Stickers Button */}
+                    {/* Stickers/Reactions Button */}
                     <button
                       onClick={() => setShowStickerPicker(!showStickerPicker)}
-                      className="w-12 h-12 rounded-full bg-yellow-400 flex items-center justify-center shadow-lg active:scale-95 transition-transform"
+                      className="w-11 h-11 rounded-full bg-white/10 backdrop-blur-md border border-white/10 flex items-center justify-center text-white active:scale-90 transition-transform"
                     >
-                      <RiMagicLine className="text-black" size={22} />
+                      <RiMagicLine size={20} />
                     </button>
 
-                    {/* End Call Button (Call Cut) */}
+                    {/* End Call Button */}
                     <button
                       onClick={endCall}
-                      className="w-14 h-14 rounded-full bg-red-500 flex items-center justify-center shadow-lg shadow-red-500/40 active:scale-95 transition-transform"
+                      className="w-11 h-11 rounded-full bg-red-500/90 flex items-center justify-center text-white shadow-lg active:scale-90 transition-transform"
                     >
-                      <svg className="w-8 h-8 text-white transform rotate-[135deg]" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2c-11.045 0-20-8.955-20-20V3z" />
-                      </svg>
+                      <RiCloseLine size={24} />
                     </button>
 
-                    {/* Gift Button */}
-                    <button className="w-12 h-12 rounded-full bg-white/10 backdrop-blur-md border border-white/10 flex items-center justify-center shadow-lg active:scale-95 transition-transform">
-                      <svg className="w-7 h-7 text-pink-500" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M20 6h-2.18c.11-.31.18-.65.18-1a2.5 2.5 0 00-5-0c0 .35.07.69.18 1H11c.11-.31.18-.65.18-1a2.5 2.5 0 00-5-0c0 .35.07.69.18 1H4a2 2 0 00-2 2v2c0 .55.45 1 1 1h1v10a2 2 0 002 2h12a2 2 0 002-2V10h1c.55 0 1-.45 1-1V8a2 2 0 00-2-2M15.5 5c0-.83.67-1.5 1.5-1.5s1.5.67 1.5 1.5-0.67 1.5-1.5 1.5h-1.5V5M7 5c0-.83.67-1.5 1.5-1.5S10 4.17 10 5v1.5H8.5C7.67 6.5 7 5.83 7 5m11 15H6V10h12v10m1-11H5V8h14v1" />
-                      </svg>
+                    {/* Next Button (Skip) */}
+                    <button
+                      onClick={handleNext}
+                      className="w-11 h-11 rounded-full bg-accent-purple/90 flex items-center justify-center text-white shadow-lg active:scale-90 transition-transform"
+                    >
+                      <RiArrowRightDoubleLine size={24} />
                     </button>
                   </div>
-
                 </div>
               </>
-
             ) : (
               /* === SEARCHING: Centered loader === */
               <div className="flex-1 flex items-center justify-center">
@@ -1337,9 +1358,7 @@ const VideoChat = ({ onEndChat }) => {
             <div className="hidden md:flex flex-row items-center gap-4">
               {/* Strangy Chat badge */}
               <div className="flex items-center gap-2 bg-[#302b3e]/80 backdrop-blur-md rounded-full px-4 py-2 shadow-lg">
-                <div className="w-6 h-6 rounded-full bg-[#8234f9] flex items-center justify-center">
-                  <span className="text-[12px] relative top-[1px]">🐵</span>
-                </div>
+                <StrangyIcon className="w-6 h-6 rounded-full" size="text-[12px]" />
                 <span className="text-white font-bold text-[15px] tracking-wide">Strangy Chat</span>
               </div>
               {/* Timer */}
@@ -1514,9 +1533,9 @@ const VideoChat = ({ onEndChat }) => {
         )}
       </div>
 
-      {/* Right Panel - Chat Interface */}
+      {/* Right Panel - Chat Interface (Desktop Only) */}
       {status === 'Connected' && (
-        <div className={`w-full md:w-[350px] h-full md:h-auto md:max-h-[70vh] md:min-h-[480px] bg-[#665e64]/95 md:bg-[#5c545e]/80 backdrop-blur-2xl md:rounded-[24px] border-l md:border border-white/10 flex flex-col z-[200] absolute inset-0 md:inset-auto md:right-8 md:top-1/2 md:-translate-y-1/2 md:translate-x-0 ${showChat ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0 pointer-events-none'} transition-all duration-300 transform shadow-[0_15px_40px_rgba(0,0,0,0.5)] overflow-hidden`}>
+        <div className={`hidden md:flex w-full md:w-[350px] h-full md:h-auto md:max-h-[70vh] md:min-h-[480px] bg-[#5c545e]/80 backdrop-blur-2xl md:rounded-[24px] border border-white/10 flex-col z-[200] absolute inset-0 md:inset-auto md:right-8 md:top-1/2 md:-translate-y-1/2 md:translate-x-0 ${showChat ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0 pointer-events-none'} transition-all duration-300 transform shadow-[0_15px_40px_rgba(0,0,0,0.5)] overflow-hidden`}>
           {/* Chat Header */}
           <div className="px-6 py-5 border-b border-white/10 flex items-center justify-between bg-black/10">
             <div className="flex items-center gap-2">

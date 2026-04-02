@@ -8,7 +8,7 @@ import toast from 'react-hot-toast';
 
 const SystemSettings = () => {
     const [settings, setSettings] = useState({
-        site_name: 'Monkey Clone',
+        site_name: 'Strangy',
         maintenance_mode: false,
         allow_guests: true,
         matching_algorithm: 'interest_priority',

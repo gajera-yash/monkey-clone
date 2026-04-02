@@ -36,7 +36,7 @@ const Support = () => {
             // Fallback to mock data for presentation purposes if table is missing
             setTickets([
                 { id: 1, user: { username: 'AlexD', email: 'alex@example.com' }, subject: 'Account Access Issue', message: 'I cannot log in with my Google account anymore.', status: 'open', created_at: new Date().toISOString() },
-                { id: 2, user: { username: 'SarahConnor', email: 'sarah@example.com' }, subject: 'Billing Question', message: 'I was double charged for my Monkey Plus subscription.', status: 'open', created_at: new Date(Date.now() - 86400000).toISOString() },
+                { id: 2, user: { username: 'SarahConnor', email: 'sarah@example.com' }, subject: 'Billing Question', message: 'I was double charged for my Strangy Premium subscription.', status: 'open', created_at: new Date(Date.now() - 86400000).toISOString() },
             ]);
         } else {
             setTickets(data || []);

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import StrangyIcon from '../common/StrangyIcon';
 
 const PrivateRoute = ({ children }) => {
     const { currentUser, loading } = useAuth();
@@ -10,7 +11,9 @@ const PrivateRoute = ({ children }) => {
             <div className="flex flex-col items-center justify-center h-screen bg-dark-900 text-white">
                 <div className="relative mb-8">
                     <div className="absolute inset-0 bg-accent-purple/20 blur-3xl rounded-full scale-150 animate-pulse"></div>
-                    <span className="text-8xl relative z-10 animate-bounce">🐵</span>
+                    <div className="relative z-10 animate-bounce">
+                        <StrangyIcon className="w-24 h-24" size="text-5xl" />
+                    </div>
                 </div>
                 <div className="flex flex-col items-center gap-2">
                     <h2 className="text-xl font-bold tracking-widest text-white/90">LOADING</h2>
