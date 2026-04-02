@@ -1205,10 +1205,10 @@ const VideoChat = ({ onEndChat }) => {
               /* === CONNECTED: 50/50 Split screen on mobile === */
               <>
                 {/* Remote Video - Top 50% on mobile, full on desktop */}
-                <div className="h-[50dvh] md:h-auto md:flex-none md:absolute md:inset-0 overflow-hidden relative bg-black flex-shrink-0">
+                <div className="flex-1 md:h-auto md:flex-none md:absolute md:inset-0 overflow-hidden relative bg-black flex-shrink-0">
                   <video ref={remoteVideoRef} autoPlay playsInline className="w-full h-full object-cover" />
                   {/* strangy.app watermark */}
-                  <div className="absolute bottom-3 left-3 flex items-center gap-2 md:hidden">
+                  <div className="absolute bottom-3 left-3 flex items-center gap-2 md:hidden z-20">
                     <div className="w-7 h-7 rounded-lg bg-indigo-600 flex items-center justify-center shadow-lg">
                       <span className="text-[14px]">🐵</span>
                     </div>
@@ -1217,7 +1217,7 @@ const VideoChat = ({ onEndChat }) => {
                 </div>
 
                 {/* Local Video - Bottom 50% on mobile */}
-                <div className="h-[50dvh] overflow-hidden md:hidden relative bg-black border-t-2 border-white/5 flex-shrink-0">
+                <div className="flex-1 overflow-hidden md:hidden relative bg-black border-t-2 border-white/5 flex-shrink-0">
                   <video
                     ref={localVideoMobileRef}
                     autoPlay
@@ -1425,9 +1425,9 @@ const VideoChat = ({ onEndChat }) => {
         )}
 
         {/* ===== MOBILE CONNECTED TOP BAR ===== */}
-        {status === 'Connected' && remoteStream && partnerName && (
-          <div className="absolute top-0 left-0 right-0 z-50 md:hidden">
-            <div className="flex items-center justify-between px-4 py-3 bg-black/40 backdrop-blur-sm">
+        {status === 'Connected' && remoteStream && (
+          <div className="absolute top-0 left-0 right-0 z-[100] md:hidden">
+            <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-b from-black/80 to-transparent">
               <div className="flex items-center gap-3 min-w-0">
                 {/* Partner Avatar Circle with Initial */}
                 <div className="w-10 h-10 rounded-full bg-orange-600 border border-white/20 flex items-center justify-center text-white font-bold text-lg flex-shrink-0 shadow-lg">
@@ -1516,7 +1516,7 @@ const VideoChat = ({ onEndChat }) => {
 
       {/* Right Panel - Chat Interface */}
       {status === 'Connected' && (
-        <div className={`w-full md:w-[350px] h-full md:h-auto md:max-h-[70vh] md:min-h-[480px] bg-[#665e64]/80 md:bg-[#5c545e]/80 backdrop-blur-2xl md:rounded-[24px] border-l md:border border-white/10 flex flex-col z-[60] absolute inset-0 md:inset-auto md:right-8 md:top-1/2 md:-translate-y-1/2 md:translate-x-0 ${showChat ? 'translate-x-0' : 'translate-x-full'} transition-transform duration-300 transform shadow-[0_15px_40px_rgba(0,0,0,0.5)] overflow-hidden`}>
+        <div className={`w-full md:w-[350px] h-full md:h-auto md:max-h-[70vh] md:min-h-[480px] bg-[#665e64]/95 md:bg-[#5c545e]/80 backdrop-blur-2xl md:rounded-[24px] border-l md:border border-white/10 flex flex-col z-[200] absolute inset-0 md:inset-auto md:right-8 md:top-1/2 md:-translate-y-1/2 md:translate-x-0 ${showChat ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0 pointer-events-none'} transition-all duration-300 transform shadow-[0_15px_40px_rgba(0,0,0,0.5)] overflow-hidden`}>
           {/* Chat Header */}
           <div className="px-6 py-5 border-b border-white/10 flex items-center justify-between bg-black/10">
             <div className="flex items-center gap-2">
