@@ -23,12 +23,34 @@ import CoinStoreModal from './coins/CoinStoreModal';
 import SafetyInfoModal from './safety/SafetyInfoModal';
 import { loadNsfwModel, checkVideoForNsfw } from '../utils/nsfwDetector';
 
-const RTC_CONFIG = {
-  iceServers: [
+const buildRtcConfig = () => {
+  const iceServers = [
     { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' },
-  ]
+    { urls: 'stun:stun1.l.google.com:19302' }
+  ];
+
+  // Optional TURN fallback for strict NAT/firewall networks.
+  // Configure these in frontend env (Vercel) to improve connection reliability:
+  // REACT_APP_TURN_URL, REACT_APP_TURN_USERNAME, REACT_APP_TURN_CREDENTIAL
+  const turnUrl = process.env.REACT_APP_TURN_URL;
+  const turnUsername = process.env.REACT_APP_TURN_USERNAME;
+  const turnCredential = process.env.REACT_APP_TURN_CREDENTIAL;
+
+  if (turnUrl && turnUsername && turnCredential) {
+    iceServers.push({
+      urls: turnUrl,
+      username: turnUsername,
+      credential: turnCredential
+    });
+  }
+
+  return {
+    iceServers,
+    iceCandidatePoolSize: 10
+  };
 };
+
+const RTC_CONFIG = buildRtcConfig();
 
 const VideoChat = ({ onEndChat }) => {
   const location = useLocation();
@@ -60,6 +82,7 @@ const VideoChat = ({ onEndChat }) => {
   const randomRewardAdded = useRef(false);
   const lastMinuteHandled = useRef(-1); // To handle per-minute billing once per minute
   const streamRef = useRef(null);
+  const pendingIceCandidates = useRef([]);
 
   const [stream, setStream] = useState(null);
   const [remoteStream, setRemoteStream] = useState(null);
@@ -423,6 +446,7 @@ const VideoChat = ({ onEndChat }) => {
     setChatTimer(0);
     setIsPartnerTyping(false);
     partnerIdRef.current = null;
+    pendingIceCandidates.current = [];
     pendingFilterCharge.current = null;
     if (roomIdRef.current) {
       socket.emit('leave-room', { roomId: roomIdRef.current });
@@ -650,8 +674,15 @@ const VideoChat = ({ onEndChat }) => {
       if (peerConnection.current) {
         peerConnection.current.close();
       }
+      pendingIceCandidates.current = [];
       const pc = new RTCPeerConnection(RTC_CONFIG);
       peerConnection.current = pc;
+
+      pc.onconnectionstatechange = () => {
+        if (pc.connectionState === 'failed') {
+          console.warn('[WebRTC] Connection failed - likely NAT/firewall issue. TURN fallback may be required.');
+        }
+      };
 
       // Use stable streamRef instead of stream state
       const currentStream = streamRef.current;
@@ -690,10 +721,27 @@ const VideoChat = ({ onEndChat }) => {
       }
     };
 
+    const flushPendingIceCandidates = async (pc) => {
+      if (!pc || !pc.remoteDescription || !pc.remoteDescription.type) return;
+      if (!pendingIceCandidates.current.length) return;
+
+      const queued = [...pendingIceCandidates.current];
+      pendingIceCandidates.current = [];
+
+      for (const ice of queued) {
+        try {
+          await pc.addIceCandidate(ice);
+        } catch (e) {
+          console.warn('[WebRTC] Failed to add queued ICE candidate:', e?.message || e);
+        }
+      }
+    };
+
     const handleOffer = async (offer) => {
       const pc = peerConnection.current;
       if (pc && pc.signalingState !== 'closed') {
         await pc.setRemoteDescription(new RTCSessionDescription(offer));
+        await flushPendingIceCandidates(pc);
         if (pc.signalingState === 'closed') return;
         
         const answer = await pc.createAnswer();
@@ -708,12 +756,23 @@ const VideoChat = ({ onEndChat }) => {
       const pc = peerConnection.current;
       if (pc && pc.signalingState !== 'closed') {
           await pc.setRemoteDescription(new RTCSessionDescription(answer));
+          await flushPendingIceCandidates(pc);
       }
     };
 
     const handleIce = (candidate) => {
       const pc = peerConnection.current;
-      if (pc) pc.addIceCandidate(new RTCIceCandidate(candidate)).catch(e => { });
+      if (!pc || pc.signalingState === 'closed') return;
+
+      const ice = new RTCIceCandidate(candidate);
+
+      if (pc.remoteDescription && pc.remoteDescription.type) {
+        pc.addIceCandidate(ice).catch(e => {
+          console.warn('[WebRTC] Failed to add ICE candidate:', e?.message || e);
+        });
+      } else {
+        pendingIceCandidates.current.push(ice);
+      }
     };
 
     const handleDisconnect = () => {
@@ -732,6 +791,7 @@ const VideoChat = ({ onEndChat }) => {
       setMessages([]);
       setChatTimer(0);
       setIsPartnerTyping(false);
+      pendingIceCandidates.current = [];
       
       if (activeLogId.current) {
         const durationSec = startTime ? Math.floor((Date.now() - startTime) / 1000) : 0;
@@ -821,6 +881,7 @@ const VideoChat = ({ onEndChat }) => {
       peerConnection.current.close();
       peerConnection.current = null;
     }
+    pendingIceCandidates.current = [];
     if (stream) stream.getTracks().forEach(t => t.stop());
     if (roomIdRef.current) socket.emit('leave-room', { roomId: roomIdRef.current });
 
