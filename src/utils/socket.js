@@ -6,11 +6,12 @@ let SOCKET_URL;
 
 const hostname = window.location.hostname;
 
-if (hostname === 'localhost' || hostname.startsWith('192.168.')) {
-    // Development mode (Split frontend/backend) - Localhost or Local IP
-    SOCKET_URL = `http://${hostname}:3000`;
-} else if (process.env.REACT_APP_SOCKET_URL) {
+if (process.env.REACT_APP_SOCKET_URL) {
     SOCKET_URL = process.env.REACT_APP_SOCKET_URL;
+} else if (hostname === 'localhost' || hostname.startsWith('192.168.')) {
+    // Development mode (Split frontend/backend) - Localhost or Local IP
+    // Backend signaling server runs on 3001 by default
+    SOCKET_URL = `http://${hostname}:3001`;
 } else if (hostname.includes('vercel.app')) {
     // Railway Production URL for Vercel
     SOCKET_URL = 'https://strangy-production-9664.up.railway.app';
@@ -31,17 +32,16 @@ if (SOCKET_URL !== '/') {
 
 console.log("[SocketDebug] Connecting to:", SOCKET_URL);
 
-// Forcing polling first is the "Perfect Solution" for Railway/Vercel handshake issues
+// Prefer websocket first in cross-origin deploys (Vercel -> Railway)
+// Polling can fail with CORS/proxy layers and cause repeated "xhr poll error"
 const socket = io(SOCKET_URL, {
     autoConnect: false,
     reconnection: true,
-    reconnectionAttempts: 10,
+    reconnectionAttempts: Infinity,
     reconnectionDelay: 1000,
-    transports: ['polling', 'websocket'], // Polling first is most stable for handshake
-    withCredentials: true,
-    extraHeaders: {
-        "ngrok-skip-browser-warning": "true"
-    }
+    timeout: 20000,
+    transports: ['websocket', 'polling'],
+    withCredentials: false
 });
 
 // Global debug listeners

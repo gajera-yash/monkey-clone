@@ -37,7 +37,7 @@ export const AdminProvider = ({ children }) => {
                     .from('admin_team_members')
                     .select('role, permissions, is_active')
                     .eq('user_id', currentUser.id)
-                    .single();
+                    .maybeSingle();
 
                 if (error || !data) {
                     // Fallback to profiles
@@ -46,7 +46,7 @@ export const AdminProvider = ({ children }) => {
                         .from('profiles')
                         .select('role, permissions')
                         .eq('id', currentUser.id)
-                        .single();
+                        .maybeSingle();
                     data = pData;
                 }
 

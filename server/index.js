@@ -13,10 +13,22 @@ const app = express();
 
 // CORS: Allow Vercel frontend in production
 const FRONTEND_URL = process.env.FRONTEND_URL || '*';
+const allowedOrigins = FRONTEND_URL.split(',').map(o => o.trim()).filter(Boolean);
+
+const isAllowedOrigin = (origin) => {
+    // Allow non-browser clients / server-to-server calls
+    if (!origin) return true;
+    if (allowedOrigins.includes('*')) return true;
+    return allowedOrigins.includes(origin);
+};
+
 app.use(cors({
-    origin: true, // This allows any origin that sends credentials
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],
-    credentials: true
+    origin: (origin, callback) => {
+        if (isAllowedOrigin(origin)) return callback(null, true);
+        return callback(new Error(`CORS blocked for origin: ${origin}`));
+    },
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    credentials: false
 }));
 app.use(express.json());
 
@@ -39,10 +51,14 @@ if (fs.existsSync(buildPath)) {
 const server = http.createServer(app);
 const io = new Server(server, {
     cors: {
-        origin: true, // Allow all origins for the socket connection
-        methods: ["GET", "POST"],
-        credentials: true
-    }
+        origin: (origin, callback) => {
+            if (isAllowedOrigin(origin)) return callback(null, true);
+            return callback(new Error(`Socket CORS blocked for origin: ${origin}`));
+        },
+        methods: ["GET", "POST", "OPTIONS"],
+        credentials: false
+    },
+    transports: ['websocket', 'polling']
 });
 
 // Queue for users waiting to be matched [{id, name}]
