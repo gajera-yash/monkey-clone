@@ -14,10 +14,10 @@ if (process.env.REACT_APP_SOCKET_URL) {
     SOCKET_URL = `http://${hostname}:3001`;
 } else if (hostname.includes('vercel.app')) {
     // Railway Production URL for Vercel
-    SOCKET_URL = 'https://strangy-production-9664.up.railway.app';
+    SOCKET_URL = 'https://strangy-production-56d4.up.railway.app';
 } else {
     // Railway Production URL
-    SOCKET_URL = 'https://strangy-production-9664.up.railway.app';
+    SOCKET_URL = 'https://strangy-production-56d4.up.railway.app';
 }
 
 // Ensure URL has protocol and NO trailing slash
