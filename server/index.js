@@ -1,4 +1,8 @@
-require('dotenv').config({ path: require('path').join(__dirname, '.env') });
+const fs = require('fs');
+const path = require('path');
+if (fs.existsSync(path.join(__dirname, '.env'))) {
+    require('dotenv').config({ path: path.join(__dirname, '.env') });
+}
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -31,6 +35,11 @@ app.use(cors({
     credentials: false
 }));
 app.use(express.json());
+
+// Health Check Endpoint
+app.get('/health', (req, res) => {
+    res.status(200).json({ status: 'ok', time: new Date().toISOString(), port: process.env.PORT || 3001 });
+});
 
 // Supabase admin client for server-side checks
 const supabaseUrl = process.env.SUPABASE_URL || process.env.REACT_APP_SUPABASE_URL;
@@ -844,6 +853,9 @@ if (fs.existsSync(buildPath)) {
 
 const PORT = process.env.PORT || 3001;
 server.listen(PORT, '0.0.0.0', () => {
-    console.log(`Signaling server running on http://0.0.0.0:${PORT}`);
-    console.log(`--- SERVER RESTARTED WITH 0.0.0.0 BINDING ---`);
+    console.log(`========================================`);
+    console.log(`Signaling server running on PORT: ${PORT}`);
+    console.log(`Interface: 0.0.0.0 (Publicly Reachable)`);
+    console.log(`Frontend URL: ${FRONTEND_URL}`);
+    console.log(`========================================`);
 });
