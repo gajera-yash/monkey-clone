@@ -635,7 +635,7 @@ const VideoChat = ({ onEndChat }) => {
       setPartnerAge(calculateAge(partnerBirthdate));
       
       console.log(`[SocketDebug] Matching with ${partnerName || 'Stranger'}. Initiator: ${initiator}`);
-      setStatus(`Connected to ${partnerName || 'Stranger'}`);
+      setStatus('Connected');
       setStartTime(Date.now());
       setMessages([]);
       setChatTimer(0);
@@ -1205,44 +1205,18 @@ const VideoChat = ({ onEndChat }) => {
             {remoteStream ? (
               /* === CONNECTED: 50/50 Split screen on mobile === */
               <>
-                {/* Remote Video - Top 50% on mobile, full on desktop */}
-                <div className="flex-1 md:h-auto md:flex-none md:absolute md:inset-0 overflow-hidden relative bg-black flex-shrink-0">
+                {/* Remote Video - Top 50% on mobile */}
+                <div className="flex-1 md:h-auto md:flex-none md:absolute md:inset-0 overflow-hidden relative bg-black transition-all duration-500">
                   <video ref={remoteVideoRef} autoPlay playsInline className="w-full h-full object-cover" />
                   {/* strangy.app watermark */}
                   <div className="absolute bottom-3 left-3 flex items-center gap-2 md:hidden z-20">
-                    <StrangyIcon className="w-7 h-7 rounded-lg" size="text-[14px]" />
-                    <span className="text-white/90 text-[13px] font-bold tracking-tight opacity-50">strangy.app</span>
-                  </div>
-
-                  {/* INSTAGRAM LIVE STYLE FLOATING CHAT (Mobile Only) */}
-                  <div className="absolute bottom-[20px] left-4 right-16 z-30 flex flex-col md:hidden pointer-events-none">
-                    <div 
-                      className="flex flex-col gap-2 overflow-y-auto max-h-[160px] scrollbar-hide"
-                      style={{ maskImage: 'linear-gradient(to top, black 80%, transparent 100%)', WebkitMaskImage: 'linear-gradient(to top, black 80%, transparent 100%)' }}
-                    >
-                      {messages.slice(-8).map((msg) => (
-                        <div key={msg.id} className="flex items-start gap-2 animate-fade-in-up">
-                          <div className="bg-black/30 backdrop-blur-md px-3 py-1.5 rounded-[18px] flex items-center gap-2 max-w-[90%] border border-white/5">
-                            <span className="text-[12px] font-black text-white/90 whitespace-nowrap">
-                              {msg.senderId === currentUser.uid ? 'You' : (partnerName || 'Stranger')}
-                            </span>
-                            <span className="text-[12px] text-white/80 leading-snug">
-                              {msg.text}
-                            </span>
-                          </div>
-                        </div>
-                      ))}
-                      {isPartnerTyping && (
-                        <div className="bg-black/20 backdrop-blur-sm px-3 py-1 rounded-full w-fit flex items-center gap-2">
-                          <span className="text-[10px] text-white/50 italic font-bold">Partner is typing...</span>
-                        </div>
-                      )}
-                    </div>
+                    <StrangyIcon className="w-6 h-6 rounded-lg opacity-60" size="text-[12px]" />
+                    <span className="text-white/40 text-[11px] font-bold tracking-tight">strangy.app</span>
                   </div>
                 </div>
 
                 {/* Local Video - Bottom 50% on mobile */}
-                <div className="flex-1 overflow-hidden md:hidden relative bg-black border-t-2 border-white/5 flex-shrink-0">
+                <div className="flex-1 overflow-hidden md:hidden relative bg-black border-t-2 border-white/5 transition-all duration-500">
                   <video
                     ref={localVideoMobileRef}
                     autoPlay
@@ -1251,23 +1225,58 @@ const VideoChat = ({ onEndChat }) => {
                     className={`w-full h-full object-cover -scale-x-100 ${!isCamOn ? 'hidden' : ''} ${isLocalNsfw ? 'nsfw-blur' : ''}`}
                   />
                   {!isCamOn && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-gray-900">
-                      <RiVideoOffLine className="text-white/40" size={40} />
+                    <div className="absolute inset-0 flex items-center justify-center bg-gray-900/80 backdrop-blur-sm">
+                      <RiVideoOffLine className="text-white/20" size={48} />
                     </div>
                   )}
+
+                  {/* INSTAGRAM LIVE STYLE FLOATING CHAT (Overlaying bottom half) */}
+                  <div className="absolute bottom-[80px] left-4 right-16 z-30 flex flex-col md:hidden pointer-events-none">
+                    <div 
+                      className="flex flex-col gap-2 overflow-y-auto max-h-[200px] scrollbar-hide"
+                      style={{ 
+                        maskImage: 'linear-gradient(to top, black 85%, transparent 100%)', 
+                        WebkitMaskImage: 'linear-gradient(to top, black 85%, transparent 100%)' 
+                      }}
+                    >
+                      {messages.slice(-6).map((msg) => (
+                        <div key={msg.id} className="flex items-start gap-2 animate-fade-in-up">
+                          <div className="bg-black/40 backdrop-blur-xl px-3 py-1.5 rounded-[18px] flex items-center gap-2 max-w-[90%] border border-white/10">
+                            <span className={`text-[12px] font-black whitespace-nowrap ${msg.senderId === currentUser.uid ? 'text-accent-pink' : 'text-accent-purple'}`}>
+                              {msg.senderId === currentUser.uid ? 'You' : (partnerName || 'Stranger')}
+                            </span>
+                            <span className="text-[13px] text-white/95 leading-tight">
+                              {msg.text}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                      {isPartnerTyping && (
+                        <div className="bg-black/30 backdrop-blur-md px-3 py-1 rounded-full w-fit flex items-center gap-2 border border-white/5">
+                          <div className="flex gap-1">
+                            <span className="w-1 h-1 bg-white/50 rounded-full animate-bounce"></span>
+                            <span className="w-1 h-1 bg-white/50 rounded-full animate-bounce [animation-delay:0.2s]"></span>
+                            <span className="w-1 h-1 bg-white/50 rounded-full animate-bounce [animation-delay:0.4s]"></span>
+                          </div>
+                          <span className="text-[11px] text-white/60 font-bold">Partner is typing...</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
                   {/* INSTAGRAM LIVE STYLE BOTTOM INPUT & CONTROLS */}
-                  <div className="absolute bottom-5 left-0 right-0 flex items-center gap-3 z-40 px-4 md:hidden">
+                  <div className="absolute bottom-5 left-0 right-0 flex items-center gap-2 z-40 px-4 md:hidden">
                     {/* Input Bar */}
                     <form 
                       onSubmit={handleSendMessage}
-                      className="flex-1 bg-black/40 backdrop-blur-xl rounded-full border border-white/10 flex items-center px-4 py-2.5 shadow-2xl"
+                      className="flex-1 bg-white/10 backdrop-blur-2xl rounded-full border border-white/20 flex items-center px-4 py-2.5 shadow-2xl focus-within:bg-white/20 transition-all"
                     >
                       <input
                         type="text"
                         value={newMessage}
                         onChange={handleTyping}
                         placeholder="Add a comment..."
-                        className="bg-transparent border-none outline-none text-white text-[14px] flex-1 placeholder:text-white/40"
+                        className="bg-transparent border-none outline-none text-white text-[15px] flex-1 placeholder:text-white/50"
                       />
                       <button type="submit" className={`ml-2 text-white font-bold text-sm ${!newMessage.trim() ? 'hidden' : 'text-accent-pink'}`}>
                         Post
@@ -1277,23 +1286,15 @@ const VideoChat = ({ onEndChat }) => {
                     {/* Stickers/Reactions Button */}
                     <button
                       onClick={() => setShowStickerPicker(!showStickerPicker)}
-                      className="w-11 h-11 rounded-full bg-white/10 backdrop-blur-md border border-white/10 flex items-center justify-center text-white active:scale-90 transition-transform"
+                      className="w-11 h-11 rounded-full bg-white/10 backdrop-blur-2xl border border-white/20 flex items-center justify-center text-white active:scale-90 transition-all"
                     >
                       <RiMagicLine size={20} />
-                    </button>
-
-                    {/* End Call Button */}
-                    <button
-                      onClick={endCall}
-                      className="w-11 h-11 rounded-full bg-red-500/90 flex items-center justify-center text-white shadow-lg active:scale-90 transition-transform"
-                    >
-                      <RiCloseLine size={24} />
                     </button>
 
                     {/* Next Button (Skip) */}
                     <button
                       onClick={handleNext}
-                      className="w-11 h-11 rounded-full bg-accent-purple/90 flex items-center justify-center text-white shadow-lg active:scale-90 transition-transform"
+                      className="w-11 h-11 rounded-full bg-gradient-to-br from-accent-purple to-indigo-600 flex items-center justify-center text-white shadow-lg active:scale-90 transition-all border border-white/20"
                     >
                       <RiArrowRightDoubleLine size={24} />
                     </button>
@@ -1446,46 +1447,41 @@ const VideoChat = ({ onEndChat }) => {
         {/* ===== MOBILE CONNECTED TOP BAR ===== */}
         {status === 'Connected' && remoteStream && (
           <div className="absolute top-0 left-0 right-0 z-[100] md:hidden">
-            <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-b from-black/80 to-transparent">
+            <div className="flex items-center justify-between px-4 py-4 bg-gradient-to-b from-black/90 via-black/40 to-transparent">
               <div className="flex items-center gap-3 min-w-0">
                 {/* Partner Avatar Circle with Initial */}
-                <div className="w-10 h-10 rounded-full bg-orange-600 border border-white/20 flex items-center justify-center text-white font-bold text-lg flex-shrink-0 shadow-lg">
+                <div className="w-11 h-11 rounded-full bg-gradient-to-tr from-orange-600 to-pink-600 border-2 border-white/20 flex items-center justify-center text-white font-bold text-xl flex-shrink-0 shadow-lg">
                   {partnerName?.charAt(0)?.toUpperCase() || 'P'}
                 </div>
                 <div className="min-w-0 flex flex-col">
-                  <span className="text-white font-bold text-[15px] truncate leading-tight">{partnerName}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-white font-bold text-[16px] truncate leading-tight">{partnerName}</span>
+                    {partnerIsPremium && <PremiumBadge size="sm" />}
+                  </div>
                    <div className="flex items-center gap-1.5 overflow-hidden">
-                    <p className="text-[12px] text-white/70 truncate flex-shrink">
+                    <p className="text-[12px] text-white/80 truncate flex-shrink">
                       {partnerGender && (
-                        <span className="mr-1 opacity-80">{partnerGender === 'Male' ? '♂' : '♀'}</span>
+                        <span className="mr-1 opacity-90">{partnerGender === 'Male' ? '♂' : '♀'}</span>
                       )}
                       {partnerAge && `${partnerAge} • `}
-                      {getLocationDisplay(partnerLocation, showCityName) || 'Somewhere'}
+                      {getLocationDisplay(partnerLocation, showCityName) || 'Online'}
                     </p>
-                    <RiHeartLine className="text-purple-400 flex-shrink-0" size={14} />
-                    <button
-                      onClick={() => setShowReportModal(true)}
-                      className="flex-shrink-0 hover:scale-110 active:scale-90 transition-transform text-white/50 hover:text-red-400"
-                    ><RiFlagLine size={16} /></button>
+                    <RiHeartLine className="text-accent-pink flex-shrink-0" size={14} />
                   </div>
                 </div>
               </div>
               {/* Right Side Buttons */}
-              <div className="flex items-center gap-2">
-                {/* Connected Users Button */}
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setShowReportModal(true)}
+                  className="w-10 h-10 bg-white/10 backdrop-blur-md rounded-full flex items-center justify-center text-white/70 hover:text-red-400 transition-colors border border-white/10"
+                ><RiFlagLine size={20} /></button>
+                
                 <button
                   onClick={() => setShowConnectedUsers(true)}
-                  className="w-10 h-10 bg-[#3a4959]/90 backdrop-blur-md rounded-lg flex items-center justify-center text-white shadow-lg active:scale-95 transition-all"
+                  className="w-10 h-10 bg-white/10 backdrop-blur-md rounded-full flex items-center justify-center text-white transition-all border border-white/10 active:scale-95"
                 >
-                  <RiMenuLine size={24} />
-                </button>
-
-                {/* Next Button */}
-                <button
-                  onClick={handleNext}
-                  className="w-10 h-10 bg-[#3a4959]/90 backdrop-blur-md rounded-lg flex items-center justify-center text-white shadow-lg active:scale-95 transition-all"
-                >
-                  <RiArrowRightDoubleLine size={28} />
+                  <RiMenuLine size={22} />
                 </button>
               </div>
             </div>
