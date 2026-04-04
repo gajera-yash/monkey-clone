@@ -1206,7 +1206,7 @@ const VideoChat = ({ onEndChat }) => {
               /* === CONNECTED: 50/50 Split screen on mobile === */
               <>
                 {/* Remote Video - Top 50% on mobile */}
-                <div className="flex-1 md:h-auto md:flex-none md:absolute md:inset-0 overflow-hidden relative bg-black transition-all duration-500">
+                <div className="h-1/2 md:h-auto md:flex-none md:absolute md:inset-0 overflow-hidden relative bg-black">
                   <video ref={remoteVideoRef} autoPlay playsInline className="w-full h-full object-cover" />
                   {/* strangy.app watermark */}
                   <div className="absolute bottom-3 left-3 flex items-center gap-2 md:hidden z-20">
@@ -1216,7 +1216,7 @@ const VideoChat = ({ onEndChat }) => {
                 </div>
 
                 {/* Local Video - Bottom 50% on mobile */}
-                <div className="flex-1 overflow-hidden md:hidden relative bg-black border-t-2 border-white/5 transition-all duration-500">
+                <div className="h-1/2 overflow-hidden md:hidden relative bg-black border-t-2 border-white/10">
                   <video
                     ref={localVideoMobileRef}
                     autoPlay
