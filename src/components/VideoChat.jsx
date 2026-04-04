@@ -435,7 +435,11 @@ const VideoChat = ({ onEndChat }) => {
   }, [currentUser, sessionEarnings, addCoins]);
 
   const handleNext = () => {
+    console.log("[VideoChat] User requested next partner. Cleaning up...");
     if (peerConnection.current) {
+      peerConnection.current.ontrack = null;
+      peerConnection.current.onicecandidate = null;
+      peerConnection.current.onnegotiationneeded = null;
       peerConnection.current.close();
       peerConnection.current = null;
     }
@@ -457,7 +461,12 @@ const VideoChat = ({ onEndChat }) => {
       roomIdRef.current = null;
     }
     hasEmittedJoin.current = false;
-    performJoin();
+    
+    // Safety delay to allow socket/server to process the 'leave' 
+    // before attempting to 'join' again. This prevents the "refresh" bug.
+    setTimeout(() => {
+        performJoin();
+    }, 500);
   };
 
   const sendMessage = (text, type = 'text', giftValue = 0) => {

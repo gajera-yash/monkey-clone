@@ -26,19 +26,25 @@ const Dashboard = () => {
 
     useEffect(() => {
         const initDashboard = async () => {
-            setLoading(true);
-            await Promise.all([
-                fetchDashboardStats(),
-                fetchChartData(),
-                fetchRecentActivities()
-            ]);
-            setLoading(false);
+            // Only show loader if we have no data yet (prevents "0 0" flicker on tab focus)
+            const isInitial = stats.totalUsers === 0;
+            if (isInitial) setLoading(true);
+            
+            try {
+                await Promise.all([
+                    fetchDashboardStats(),
+                    fetchChartData(),
+                    fetchRecentActivities()
+                ]);
+            } finally {
+                if (isInitial) setLoading(false);
+            }
         };
         initDashboard();
 
         window.addEventListener('focus', initDashboard);
         return () => window.removeEventListener('focus', initDashboard);
-    }, []);
+    }, [stats.totalUsers]);
 
     const fetchDashboardStats = async () => {
         try {

@@ -47,8 +47,12 @@ const AdminLayout = () => {
     const [showNotifications, setShowNotifications] = useState(false);
     const [notifications, setNotifications] = useState([]);
     const [unreadCount, setUnreadCount] = useState(0);
+    const [audio] = useState(new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3'));
 
     const handleNewNotification = (notif) => {
+        // Play notification sound
+        audio.play().catch(e => console.log("Audio play blocked by browser."));
+        
         setNotifications(prev => {
             const match = prev.find(n => n.id === notif.id);
             if(match) return prev;

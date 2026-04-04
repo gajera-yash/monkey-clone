@@ -3,6 +3,7 @@ import { useCoins } from '../../context/CoinsContext';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../supabase';
 import toast from 'react-hot-toast';
+import { load } from '@cashfreepayments/cashfree-js';
 
 
 
@@ -76,22 +77,65 @@ const CoinStoreModal = ({ isOpen, onClose }) => {
     };
 
     const handlePay = async () => {
-        const err = validateForm();
-        if (err) { setFormError(err); return; }
-
-        setFormError('');
         setProcessing(true);
+        
+        try {
+            // 1. Create order on backend
+            const orderRes = await fetch('/api/coins/purchase/create-order', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    userId: currentUser?.uid || currentUser?.id,
+                    packageId: selectedPkg.id
+                })
+            });
+            
+            const orderData = await orderRes.json();
+            
+            if (!orderData.paymentSessionId) {
+                throw new Error(orderData.error || "Failed to create payment session");
+            }
 
-        // Simulate payment gateway delay
-        await new Promise(r => setTimeout(r, 2200));
+            // 2. Load Cashfree Checkout
+            const cashfree = await load({
+                mode: "sandbox" // Change to "production" when going live
+            });
 
-        const success = await addCoins(selectedPkg.coins, `Purchased ${selectedPkg.coins} Coins`);
-        setProcessing(false);
+            const result = await cashfree.checkout({
+                paymentSessionId: orderData.paymentSessionId,
+                redirectTarget: "_modal"
+            });
 
-        if (success) {
-            setStep('success');
-        } else {
-            toast.error('Payment failed. Please try again.');
+            if (result?.error) {
+                toast.error(result.error.message || "Payment cancelled");
+                setProcessing(false);
+                return;
+            }
+
+            // 3. Verify on backend
+            const verifyRes = await fetch('/api/coins/purchase/verify', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    orderId: orderData.orderId,
+                    userId: currentUser?.uid || currentUser?.id,
+                    packageId: selectedPkg.id
+                })
+            });
+            
+            const verifyData = await verifyRes.json();
+            
+            if (verifyData.success) {
+                await addCoins(selectedPkg.coins, `Purchased ${selectedPkg.coins} Coins`);
+                setStep('success');
+            } else {
+                toast.error("Payment verification failed");
+            }
+        } catch (error) {
+            console.error("Payment Error:", error);
+            toast.error(error.message || "Payment failed");
+        } finally {
+            setProcessing(false);
         }
     };
 
@@ -207,8 +251,8 @@ const CoinStoreModal = ({ isOpen, onClose }) => {
                             </button>
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <h2 className="text-xl font-black text-white">Payment</h2>
-                                    <p className="text-white/40 text-sm">Secure checkout</p>
+                                    <h2 className="text-xl font-black text-white">Secure Checkout</h2>
+                                    <p className="text-white/40 text-sm">Powered by Cashfree</p>
                                 </div>
                                 <div className="text-right">
                                     <div className="text-yellow-400 font-black text-lg">{selectedPkg?.coins.toLocaleString()} 🪙</div>
@@ -217,82 +261,13 @@ const CoinStoreModal = ({ isOpen, onClose }) => {
                             </div>
                         </div>
 
-                        {/* Card Visual */}
-                        <div className="mx-5 mb-5 rounded-2xl p-5 relative overflow-hidden"
-                            style={{ background: 'linear-gradient(135deg, #6d28d9 0%, #4c1d95 50%, #1e40af 100%)', boxShadow: '0 12px 32px rgba(109,40,217,0.4)' }}>
-                            <div className="absolute top-0 right-0 w-32 h-32 rounded-full opacity-20"
-                                style={{ background: 'radial-gradient(circle, white, transparent)', transform: 'translate(30%, -30%)' }} />
-                            <div className="text-white/60 text-xs font-bold uppercase tracking-widest mb-6">Credit / Debit Card</div>
-                            <div className="text-white font-mono text-lg font-bold tracking-widest mb-4">
-                                {cardNumber || '•••• •••• •••• ••••'}
+                        {/* Redirect Info */}
+                        <div className="px-10 py-16 text-center">
+                            <div className="w-20 h-20 bg-indigo-500/10 rounded-full flex items-center justify-center mx-auto mb-6 border border-indigo-500/20">
+                                <div className="w-10 h-10 border-4 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin" />
                             </div>
-                            <div className="flex items-end justify-between">
-                                <div>
-                                    <div className="text-white/50 text-[10px] uppercase tracking-widest">Card Holder</div>
-                                    <div className="text-white font-semibold text-sm">{cardName || 'YOUR NAME'}</div>
-                                </div>
-                                <div>
-                                    <div className="text-white/50 text-[10px] uppercase tracking-widest">Expires</div>
-                                    <div className="text-white font-semibold text-sm">{expiry || 'MM/YY'}</div>
-                                </div>
-                                <div className="text-2xl">💳</div>
-                            </div>
-                        </div>
-
-                        {/* Form */}
-                        <div className="px-5 pb-5 space-y-3">
-                            <div>
-                                <label className="text-white/50 text-xs font-bold uppercase tracking-widest block mb-1.5">Name on Card</label>
-                                <input
-                                    type="text"
-                                    value={cardName}
-                                    onChange={e => setCardName(e.target.value)}
-                                    placeholder="John Doe"
-                                    className="w-full rounded-xl px-4 py-3 text-sm font-semibold text-white outline-none transition-all"
-                                    style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)' }}
-                                />
-                            </div>
-                            <div>
-                                <label className="text-white/50 text-xs font-bold uppercase tracking-widest block mb-1.5">Card Number</label>
-                                <input
-                                    type="text"
-                                    value={cardNumber}
-                                    onChange={e => setCardNumber(formatCard(e.target.value))}
-                                    placeholder="1234 5678 9012 3456"
-                                    className="w-full rounded-xl px-4 py-3 text-sm font-mono font-semibold text-white outline-none transition-all"
-                                    style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)' }}
-                                />
-                            </div>
-                            <div className="flex gap-3">
-                                <div className="flex-1">
-                                    <label className="text-white/50 text-xs font-bold uppercase tracking-widest block mb-1.5">Expiry</label>
-                                    <input
-                                        type="text"
-                                        value={expiry}
-                                        onChange={e => setExpiry(formatExpiry(e.target.value))}
-                                        placeholder="MM/YY"
-                                        className="w-full rounded-xl px-4 py-3 text-sm font-mono font-semibold text-white outline-none"
-                                        style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)' }}
-                                    />
-                                </div>
-                                <div className="flex-1">
-                                    <label className="text-white/50 text-xs font-bold uppercase tracking-widest block mb-1.5">CVV</label>
-                                    <input
-                                        type="password"
-                                        value={cvv}
-                                        onChange={e => setCvv(e.target.value.replace(/\D/g, '').slice(0, 4))}
-                                        placeholder="•••"
-                                        className="w-full rounded-xl px-4 py-3 text-sm font-mono font-semibold text-white outline-none"
-                                        style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)' }}
-                                    />
-                                </div>
-                            </div>
-
-                            {formError && (
-                                <div className="text-red-400 text-xs font-semibold bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-2.5">
-                                    ⚠️ {formError}
-                                </div>
-                            )}
+                            <h3 className="text-white font-black text-lg mb-2">Ready for payment?</h3>
+                            <p className="text-white/40 text-sm leading-relaxed mb-8">Click below to open the secure payment gateway and complete your purchase.</p>
 
                             <button
                                 onClick={handlePay}
@@ -304,20 +279,9 @@ const CoinStoreModal = ({ isOpen, onClose }) => {
                                     color: 'white'
                                 }}
                             >
-                                {processing ? (
-                                    <>
-                                        <svg className="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24">
-                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
-                                        </svg>
-                                        Processing Payment...
-                                    </>
-                                ) : (
-                                    <>🔒 Pay ₹{selectedPkg?.price}</>
-                                )}
+                                {processing ? 'Opening Gateway...' : <>💳 Open Gateway (Pay ₹{selectedPkg?.price})</>}
                             </button>
-
-                            <p className="text-center text-white/25 text-xs">🛡️ Demo mode — no real charges</p>
+                            <p className="text-center text-white/25 text-xs mt-6 uppercase tracking-widest font-bold">Safe • Encrypted • SSL</p>
                         </div>
                     </div>
                 )}
