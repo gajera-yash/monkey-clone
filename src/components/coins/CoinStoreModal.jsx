@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../supabase';
 import toast from 'react-hot-toast';
 import { load } from '@cashfreepayments/cashfree-js';
+import { API_BASE_URL } from '../../utils/socket';
 
 
 
@@ -81,7 +82,8 @@ const CoinStoreModal = ({ isOpen, onClose }) => {
         
         try {
             // 1. Create order on backend
-            const orderRes = await fetch('/api/coins/purchase/create-order', {
+            // Construct absolute URL to avoid hitting port 3000
+            const orderRes = await fetch(`${API_BASE_URL}/api/coins/purchase/create-order`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -90,6 +92,13 @@ const CoinStoreModal = ({ isOpen, onClose }) => {
                 })
             });
             
+            // Check for non-OK response before parsing JSON
+            if (!orderRes.ok) {
+                const text = await orderRes.text();
+                console.error("Server Error:", text);
+                throw new Error(`Server Error (${orderRes.status}): Please check backend logs.`);
+            }
+
             const orderData = await orderRes.json();
             
             if (!orderData.paymentSessionId) {
@@ -113,7 +122,7 @@ const CoinStoreModal = ({ isOpen, onClose }) => {
             }
 
             // 3. Verify on backend
-            const verifyRes = await fetch('/api/coins/purchase/verify', {
+            const verifyRes = await fetch(`${API_BASE_URL}/api/coins/purchase/verify`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -123,6 +132,10 @@ const CoinStoreModal = ({ isOpen, onClose }) => {
                 })
             });
             
+            if (!verifyRes.ok) {
+                throw new Error("Verification failed to complete on server!");
+            }
+
             const verifyData = await verifyRes.json();
             
             if (verifyData.success) {

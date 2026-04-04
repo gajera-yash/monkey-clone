@@ -436,13 +436,34 @@ const VideoChat = ({ onEndChat }) => {
 
   const handleNext = () => {
     console.log("[VideoChat] User requested next partner. Cleaning up...");
+    
+    // 1. Thorough PeerConnection Cleanup
     if (peerConnection.current) {
+      // Stop all remote tracks to free up hardware/network resources
+      const remoteStreamLocal = remoteStream;
+      if (remoteStreamLocal) {
+          remoteStreamLocal.getTracks().forEach(track => {
+              track.stop();
+              console.log(`[WebRTC] Stopped remote track: ${track.kind}`);
+          });
+      }
+
       peerConnection.current.ontrack = null;
       peerConnection.current.onicecandidate = null;
       peerConnection.current.onnegotiationneeded = null;
-      peerConnection.current.close();
+      peerConnection.current.oniceconnectionstatechange = null;
+      peerConnection.current.onconnectionstatechange = null;
+      peerConnection.current.onsignalingstatechange = null;
+      
+      try {
+          peerConnection.current.close();
+      } catch (e) {
+          console.error("[WebRTC] Error closing PeerConnection:", e);
+      }
       peerConnection.current = null;
     }
+
+    // 2. Clear Session Data
     payoutSessionEarnings();
     
     setRemoteStream(null);
@@ -452,21 +473,31 @@ const VideoChat = ({ onEndChat }) => {
     setMessages([]);
     setChatTimer(0);
     setIsPartnerTyping(false);
+    setPartnerAge(null);
+    setPartnerGender(null);
+
+    // 3. Reset Internal Tracking
     skippedPartnerIdRef.current = partnerIdRef.current;
     partnerIdRef.current = null;
     pendingIceCandidates.current = [];
     pendingFilterCharge.current = null;
+    
+    // 4. Leave Socket Room
     if (roomIdRef.current) {
       socket.emit('leave-room', { roomId: roomIdRef.current });
       roomIdRef.current = null;
     }
-    hasEmittedJoin.current = false;
     
-    // Safety delay to allow socket/server to process the 'leave' 
-    // before attempting to 'join' again. This prevents the "refresh" bug.
+    // 5. Reset Matchmaking Flag
+    hasEmittedJoin.current = false;
+    setStatus('Cleaning up session...');
+    
+    // 6. Safety delay to allow socket/server to process the 'leave' 
+    // before attempting to 'join' again. Increased to 800ms for stability.
     setTimeout(() => {
+        console.log("[VideoChat] Safety delay finished, searching for next...");
         performJoin();
-    }, 500);
+    }, 800);
   };
 
   const sendMessage = (text, type = 'text', giftValue = 0) => {

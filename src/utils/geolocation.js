@@ -93,9 +93,36 @@ export const getUserLocation = async () => {
         return locationData;
 
     } catch (error) {
-        console.error('Error fetching location from IPInfo:', error);
+        console.error('Error fetching location from IPInfo, trying fallback...', error);
+        
+        try {
+            // Fallback to freeipapi.com (No token required, very reliable)
+            const fallbackRes = await axios.get('https://freeipapi.com/api/json', { timeout: 3000 });
+            const fb = fallbackRes.data;
+            
+            if (fb && fb.countryCode) {
+                const fbLocation = {
+                    country: fb.countryName || 'Unknown',
+                    countryCode: fb.countryCode || 'XX',
+                    city: fb.cityName || 'Unknown',
+                    region: fb.regionName || 'Unknown',
+                    latitude: fb.latitude || 0,
+                    longitude: fb.longitude || 0,
+                    flag: countryCodeToFlag(fb.countryCode)
+                };
+                
+                // Cache the fallback location too
+                localStorage.setItem('userLocation', JSON.stringify(fbLocation));
+                localStorage.setItem('userLocationTimestamp', Date.now().toString());
+                
+                console.log('Location fetched from Fallback (FreeIPAPI):', fbLocation);
+                return fbLocation;
+            }
+        } catch (fallbackError) {
+            console.error('All geolocation services failed:', fallbackError);
+        }
 
-        // Return fallback location
+        // Return fallback location if everything fails
         return {
             country: 'Unknown',
             countryCode: 'XX',

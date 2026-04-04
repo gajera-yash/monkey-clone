@@ -49,4 +49,6 @@ socket.on('connect', () => console.log("[SocketDebug] Connected to server!", soc
 socket.on('connect_error', (err) => console.error("[SocketDebug] Connection Error:", err.message));
 socket.on('disconnect', (reason) => console.warn("[SocketDebug] Disconnected:", reason));
 
+export { SOCKET_URL };
+export const API_BASE_URL = SOCKET_URL;
 export default socket;

@@ -26,7 +26,7 @@ const Dashboard = () => {
 
     useEffect(() => {
         const initDashboard = async () => {
-            // Only show loader if we have no data yet (prevents "0 0" flicker on tab focus)
+            // Only show loader if we have no data yet (prevents "0 0" flicker)
             const isInitial = stats.totalUsers === 0;
             if (isInitial) setLoading(true);
             
@@ -36,45 +36,48 @@ const Dashboard = () => {
                     fetchChartData(),
                     fetchRecentActivities()
                 ]);
+            } catch (err) {
+                console.error("Dashboard Global Fetch Error:", err);
             } finally {
                 if (isInitial) setLoading(false);
             }
         };
         initDashboard();
 
+        // Auto-refresh every 60 seconds
+        const refreshInterval = setInterval(initDashboard, 60000);
+
         window.addEventListener('focus', initDashboard);
-        return () => window.removeEventListener('focus', initDashboard);
+        return () => {
+            window.removeEventListener('focus', initDashboard);
+            clearInterval(refreshInterval);
+        };
     }, [stats.totalUsers]);
 
     const fetchDashboardStats = async () => {
         try {
-            // 1. Total Users
-            const { count: usersCount } = await supabase.from('profiles').select('*', { count: 'exact', head: true });
+            const [usersRes, activeRes, reportsRes, chatsRes, revRes] = await Promise.all([
+                supabase.from('profiles').select('*', { count: 'exact', head: true }),
+                supabase.from('profiles').select('*', { count: 'exact', head: true }).gt('last_seen', new Date(Date.now() - 5 * 60000).toISOString()),
+                supabase.from('reports').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+                supabase.from('chat_logs').select('*', { count: 'exact', head: true }).gt('start_time', new Date(new Date().setHours(0,0,0,0)).toISOString()),
+                supabase.from('transactions').select('amount').eq('status', 'success')
+            ]);
 
-            // 2. Active Now (seen in last 5 minutes)
-            const fiveMinsAgo = new Date(Date.now() - 5 * 60000).toISOString();
-            const { count: activeCount } = await supabase.from('profiles').select('*', { count: 'exact', head: true }).gt('last_seen', fiveMinsAgo);
+            // If any critical request failed, we log it but keep the old stats to prevent "0 0" reset
+            if (usersRes.error) console.warn("Failed to fetch user count", usersRes.error);
+            if (revRes.error) console.warn("Failed to fetch revenue", revRes.error);
 
-            // 3. Reports Pending
-            const { count: reportsCount } = await supabase.from('reports').select('*', { count: 'exact', head: true }).eq('status', 'pending');
+            const totalRev = revRes.data?.reduce((sum, tx) => sum + (tx.amount || 0), 0) || 0;
 
-            // 4. Chats Today
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            const { count: chatsToday } = await supabase.from('chat_logs').select('*', { count: 'exact', head: true }).gt('start_time', today.toISOString());
-
-            // 5. Total Revenue (Success only)
-            const { data: revData } = await supabase.from('transactions').select('amount').eq('status', 'success');
-            const totalRev = revData?.reduce((sum, tx) => sum + (tx.amount || 0), 0) || 0;
-
-            setStats({
-                totalUsers: usersCount || 0,
-                activeNow: activeCount || 0,
-                totalChats: chatsToday || 0,
-                revenue: totalRev,
-                growth: 12.5, // Trend could be calculated by comparing with yesterday
-                reportsPending: reportsCount || 0
-            });
+            setStats(prev => ({
+                totalUsers: usersRes.count !== null ? usersRes.count : prev.totalUsers,
+                activeNow: activeRes.count !== null ? activeRes.count : prev.activeNow,
+                totalChats: chatsRes.count !== null ? chatsRes.count : prev.totalChats,
+                revenue: revRes.data ? totalRev : prev.revenue,
+                growth: prev.growth, // keep old growth
+                reportsPending: reportsRes.count !== null ? reportsRes.count : prev.reportsPending
+            }));
         } catch (err) {
             console.error("Dashboard Stats Error:", err);
         }

@@ -48,10 +48,15 @@ const AdminLayout = () => {
     const [notifications, setNotifications] = useState([]);
     const [unreadCount, setUnreadCount] = useState(0);
     const [audio] = useState(new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3'));
+    const [isSoundEnabled, setIsSoundEnabled] = useState(() => {
+        return localStorage.getItem('admin_sound_enabled') === 'true';
+    });
 
     const handleNewNotification = (notif) => {
-        // Play notification sound
-        audio.play().catch(e => console.log("Audio play blocked by browser."));
+        // Play notification sound if enabled
+        if (isSoundEnabled) {
+            audio.play().catch(e => console.log("Audio play blocked. Click anywhere to enable."));
+        }
         
         setNotifications(prev => {
             const match = prev.find(n => n.id === notif.id);
@@ -352,7 +357,27 @@ const AdminLayout = () => {
                                 <div className="absolute right-0 top-12 w-80 bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 overflow-hidden">
                                     <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
                                         <h4 className="font-black text-slate-800 text-sm uppercase tracking-widest">Notifications</h4>
-                                        <span className="text-[10px] font-black text-indigo-500 bg-indigo-50 px-2 py-1 rounded-full">{unreadCount} NEW</span>
+                                        <div className="flex items-center gap-2">
+                                            <button 
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    const newState = !isSoundEnabled;
+                                                    setIsSoundEnabled(newState);
+                                                    localStorage.setItem('admin_sound_enabled', newState);
+                                                    if (newState) {
+                                                        audio.play().catch(e => console.log("Sound enabled via click"));
+                                                        toast.success("Notification sound enabled!");
+                                                    } else {
+                                                        toast("Sound disabled", { icon: '🔇' });
+                                                    }
+                                                }}
+                                                className={`p-1.5 rounded-lg border transition-all ${isSoundEnabled ? 'bg-indigo-50 border-indigo-200 text-indigo-600' : 'bg-slate-50 border-slate-200 text-slate-400'}`}
+                                                title={isSoundEnabled ? "Disable Sound" : "Enable Sound"}
+                                            >
+                                                {isSoundEnabled ? <Bell size={14} /> : <X size={14} />}
+                                            </button>
+                                            <span className="text-[10px] font-black text-indigo-500 bg-indigo-50 px-2 py-1 rounded-full">{unreadCount} NEW</span>
+                                        </div>
                                     </div>
                                     <div className="divide-y divide-slate-50 max-h-64 overflow-y-auto">
                                         {notifications.length === 0 ? (
