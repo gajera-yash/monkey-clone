@@ -6,13 +6,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta http-equiv="Content-Security-Policy" content="
       default-src 'self';
-      script-src 'self' 'unsafe-inline' https://checkout.razorpay.com https://cdn.jsdelivr.net https://cdn.onesignal.com;
-      connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.razorpay.com https://onesignal.com https://*.onesignal.com https://strangy-production-56d4.up.railway.app wss://strangy-production-56d4.up.railway.app;
+      script-src 'self' 'unsafe-inline' https://sdk.cashfree.com https://cdn.jsdelivr.net https://cdn.onesignal.com;
+      connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.cashfree.com https://sandbox.cashfree.com https://onesignal.com https://*.onesignal.com https://strangy-production-56d4.up.railway.app wss://strangy-production-56d4.up.railway.app;
       img-src 'self' data: blob: https://*.supabase.co https://images.unsplash.com https://img.onesignal.com;
       media-src 'self' blob:;
       style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
       font-src 'self' https://fonts.gstatic.com;
-      frame-src https://api.razorpay.com;
+      frame-src https://sdk.cashfree.com https://sandbox.cashfree.com;
       worker-src 'self' blob:;
     ">
     <meta name="theme-color" content="#000000" />
@@ -36,8 +36,7 @@
       Learn how to configure a non-root public URL by running `npm run build`.
     -->
     <title>Strangy - Connect, Chat & Meet New People</title>
-    <!-- Razorpay Checkout Script -->
-    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+    <!-- Cashfree Script is loaded dynamically by the SDK in components -->
     
     <!-- AI NSFW Detection Scripts (Global via CDN to bypass Webpack bundling issues) -->
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.4.0/dist/tf.min.js"></script>
