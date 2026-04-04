@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Coins, X } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { load } from '@cashfreepayments/cashfree-js';
 
 export default function CoinStore({ userId, onClose }) {
   const [packages, setPackages] = useState([]);
@@ -38,7 +39,6 @@ export default function CoinStore({ userId, onClose }) {
     setLoading(true);
     
     try {
-      // Create order
       const orderRes = await fetch('/api/coins/purchase/create-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -50,56 +50,49 @@ export default function CoinStore({ userId, onClose }) {
       
       const orderData = await orderRes.json();
       
-      if (!orderData.orderId) throw new Error("Failed to create order");
+      if (!orderData.paymentSessionId) {
+          throw new Error(orderData.error || "Failed to create order");
+      }
 
-      // Initialize Razorpay
-      const options = {
-        key: process.env.REACT_APP_RAZORPAY_KEY_ID || 'rzp_test_placeholder', // Should be in env
-        amount: orderData.amount,
-        currency: orderData.currency,
-        name: 'Strangy',
-        description: `${packageItem.coins} Coins`,
-        order_id: orderData.orderId,
-        handler: async function(response) {
-          // Verify payment
-          const verifyRes = await fetch('/api/coins/purchase/verify', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
+      const cashfree = await load({
+          mode: "sandbox" // Change to "production" when going live
+      });
+
+      let checkoutOptions = {
+          paymentSessionId: orderData.paymentSessionId,
+          redirectTarget: "_modal"
+      };
+
+      const result = await cashfree.checkout(checkoutOptions);
+      
+      if (result?.error) {
+          console.error("Cashfree Checkout Error:", result.error);
+          toast.error(result.error.message || "Payment cancelled or failed");
+          setLoading(false);
+          return;
+      }
+
+      // Verify payment with our server
+      const verifyRes = await fetch('/api/coins/purchase/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
               orderId: orderData.orderId,
-              paymentId: response.razorpay_payment_id,
-              signature: response.razorpay_signature,
               userId: userId,
               packageId: packageItem.id
-            })
-          });
-          
-          const verifyData = await verifyRes.json();
-          
-          if (verifyData.success) {
-            toast.success(`Successfully added ${verifyData.coinsAdded} coins!`);
-            fetchUserCoins();
-            if (onClose) onClose();
-          } else {
-            toast.error("Payment verification failed");
-          }
-        },
-        prefill: {
-            name: "User",
-            email: "user@example.com"
-        },
-        theme: {
-          color: '#6366f1'
-        },
-        modal: {
-            ondismiss: function() {
-                setLoading(false);
-            }
-        }
-      };
+          })
+      });
       
-      const razorpay = new window.Razorpay(options);
-      razorpay.open();
+      const verifyData = await verifyRes.json();
+      
+      if (verifyData.success) {
+          toast.success(`Successfully added ${verifyData.coinsAdded} coins!`);
+          fetchUserCoins();
+          if (onClose) onClose();
+      } else {
+          toast.error("Payment verification failed");
+          setLoading(false);
+      }
       
     } catch (error) {
       console.error('Error purchasing coins:', error);
@@ -207,7 +200,7 @@ export default function CoinStore({ userId, onClose }) {
               </div>
             </div>
             <div className="flex gap-4 opacity-50 grayscale hover:grayscale-0 transition-all">
-                <span className="font-black text-xs uppercase tracking-widest text-slate-400">Razorpay</span>
+                <span className="font-black text-xs uppercase tracking-widest text-slate-400">CASHFREE PAYMENTS</span>
                 <span className="font-black text-xs uppercase tracking-widest text-slate-400">SSL</span>
                 <span className="font-black text-xs uppercase tracking-widest text-slate-400">256-BIT</span>
             </div>

@@ -425,9 +425,9 @@ io.on('connection', (socket) => {
         let location = null;
         let isPremium = false;
 
-        let gender = null;
         let birthdate = null;
         let filters = {};
+        let skippedPartner = null;
 
         if (typeof userData === 'string') {
             name = userData;
@@ -440,6 +440,7 @@ io.on('connection', (socket) => {
             gender = userData.ownGender || null;
             birthdate = userData.ownBirthdate || null;
             filters = userData.filters || {};
+            skippedPartner = userData.skippedPartner || null;
         }
 
         const user = {
@@ -451,7 +452,8 @@ io.on('connection', (socket) => {
             isPremium,
             gender,
             birthdate,
-            filters
+            filters,
+            skippedPartner
         };
 
         // --- GEO-BLOCK CHECK ---
@@ -565,6 +567,11 @@ io.on('connection', (socket) => {
 
                     if (u1BlocksU2 || u2BlocksU1) continue;
 
+                    // Check skipped partner (prevent instant re-match with someone just skipped)
+                    if ((u1.skippedPartner && u1.skippedPartner === u2.uid) || (u2.skippedPartner && u2.skippedPartner === u1.uid)) {
+                        continue;
+                    }
+
                     // CHECK FREE MALE FEMALE RATIO LIMIT (3 out of 10 matches)
                     const checkRatioLimit = (userA, userB) => {
                         const aGender = userA.gender || 'Male'; // default unknown to Male
@@ -606,8 +613,8 @@ io.on('connection', (socket) => {
                 waitingUsers.splice(user2Index, 1);
                 waitingUsers.splice(user1Index, 1);
 
-                // Create a unique room ID
-                const roomId = `room_${u1.id}_${u2.id}`;
+                // Create a globally UNIQUE room ID to prevent race conditions on Next/Skip
+                const roomId = `room_${u1.id}_${u2.id}_${Date.now()}`;
                 console.log(`[Match] Pair Found: ${u1.name} & ${u2.name} -> ${roomId}`);
 
                 // Record the match in history for both users

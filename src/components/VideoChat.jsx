@@ -75,6 +75,7 @@ const VideoChat = ({ onEndChat }) => {
   const hasEmittedJoin = useRef(false);
   const userInitiatedJoin = useRef(false);
   const partnerIdRef = useRef(null);
+  const skippedPartnerIdRef = useRef(null);
   const scrollRef = useRef(null);
   const typingTimeoutRef = useRef(null);
   const notificationSound = useRef(new Audio('https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3'));
@@ -373,7 +374,8 @@ const VideoChat = ({ onEndChat }) => {
           isPremium,
           filters: chatFilters,
           ownGender: currentUser?.gender || localStorage.getItem('userGender'),
-          ownBirthdate: currentUser?.birthdate || null
+          ownBirthdate: currentUser?.birthdate || null,
+          skippedPartner: skippedPartnerIdRef.current
         });
       }
     } else {
@@ -446,6 +448,7 @@ const VideoChat = ({ onEndChat }) => {
     setMessages([]);
     setChatTimer(0);
     setIsPartnerTyping(false);
+    skippedPartnerIdRef.current = partnerIdRef.current;
     partnerIdRef.current = null;
     pendingIceCandidates.current = [];
     pendingFilterCharge.current = null;
@@ -1305,30 +1308,35 @@ const VideoChat = ({ onEndChat }) => {
               /* === SEARCHING: Centered loader === */
               <div className="flex-1 flex items-center justify-center">
                 <div className="text-center">
-                  {/* Spinning loader */}
-                  <div className="relative w-20 h-20 mx-auto mb-6">
-                    <div className="absolute inset-0 rounded-full border-4 border-white/10"></div>
-                    <div className="absolute inset-0 rounded-full border-4 border-t-yellow-400 border-r-transparent border-b-transparent border-l-transparent animate-spin"></div>
-                    <div className="absolute inset-3 rounded-full border-4 border-white/5"></div>
-                    <div className="absolute inset-3 rounded-full border-4 border-t-accent-purple border-r-transparent border-b-transparent border-l-transparent animate-spin" style={{ animationDirection: 'reverse', animationDuration: '1.5s' }}></div>
-                  </div>
-                  <p className="text-white font-bold text-lg mb-1">Finding a partner...</p>
-                  <p className="text-gray-500 text-sm mb-2">Please wait while we connect you</p>
-                  <div className="flex items-center justify-center gap-2 mb-6">
-                    <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-                    <p className="text-accent-purple font-bold text-xs uppercase tracking-widest">{waitingCount} users online</p>
+                  {/* Premium Spinning loader */}
+                  <div className="relative w-24 h-24 mx-auto mb-8 flex items-center justify-center">
+                    <div className="absolute inset-0 rounded-full border-[3px] border-white/5"></div>
+                    <div className="absolute inset-0 rounded-full border-[3px] border-transparent border-t-accent-pink animate-spin"></div>
+                    <div className="absolute inset-3 rounded-full border-[3px] border-white/5"></div>
+                    <div className="absolute inset-3 rounded-full border-[3px] border-transparent border-b-accent-purple animate-spin" style={{ animationDirection: 'reverse', animationDuration: '1.2s' }}></div>
+                    <StrangyIcon className="w-8 h-8 rounded-lg opacity-40 animate-pulse" size="text-[16px]" />
                   </div>
                   
-                  {/* Connection Debug Indicator */}
-                  <div className="flex items-center justify-center gap-2 mb-6">
-                    <div className={`w-3 h-3 rounded-full ${
-                      socketStatus === 'Connected' ? 'bg-green-500' : 
-                      socketStatus === 'Connecting' ? 'bg-yellow-500 animate-pulse' : 'bg-red-500'
-                    }`}></div>
-                    <span className="text-[10px] text-gray-400 font-mono uppercase tracking-tighter">
-                      {socketStatus === 'Connected' ? 'Server Online' : 
-                       socketStatus === 'Error' ? 'Connection Failed' : 'Connecting To Signaling...'}
-                    </span>
+                  <h3 className="text-white font-black text-xl mb-2 tracking-tight">Finding a partner...</h3>
+                  <p className="text-white/50 text-sm mb-8 font-medium">Please wait while we connect you</p>
+                  
+                  {/* Status Indicators */}
+                  <div className="flex flex-col items-center gap-3 mb-10">
+                    <div className="flex items-center gap-2 bg-white/5 backdrop-blur-md px-4 py-2 rounded-full border border-white/10 shadow-lg">
+                      <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.6)]"></span>
+                      <span className="text-accent-purple font-black text-[11px] uppercase tracking-[0.2em]">{waitingCount} users online</span>
+                    </div>
+                    
+                    <div className="flex items-center gap-2 bg-white/5 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 shadow-md">
+                      <div className={`w-1.5 h-1.5 rounded-full ${
+                        socketStatus === 'Connected' ? 'bg-green-500' : 
+                        socketStatus === 'Connecting' ? 'bg-yellow-500 animate-pulse' : 'bg-red-500'
+                      }`}></div>
+                      <span className="text-[9px] text-white/60 font-mono uppercase tracking-widest">
+                        {socketStatus === 'Connected' ? 'Server Connected' : 
+                         socketStatus === 'Error' ? 'Connection Failed' : 'Connecting...'}
+                      </span>
+                    </div>
                   </div>
 
                   <button

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Check, Crown, X } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { load } from '@cashfreepayments/cashfree-js';
 
 export default function SubscriptionPlans({ userId, onClose }) {
   const [plans, setPlans] = useState([]);
@@ -38,54 +39,46 @@ export default function SubscriptionPlans({ userId, onClose }) {
       
       const orderData = await orderRes.json();
       
-      if (!orderData.orderId) throw new Error("Failed to create order");
+      if (!orderData.paymentSessionId) throw new Error("Failed to create order");
       
-      const options = {
-        key: process.env.REACT_APP_RAZORPAY_KEY_ID || 'rzp_test_placeholder',
-        amount: orderData.amount,
-        currency: orderData.currency,
-        name: 'Strangy',
-        description: `${plan.name} Subscription`,
-        order_id: orderData.orderId,
-        handler: async function(response) {
-          const verifyRes = await fetch('/api/subscriptions/subscribe/verify', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
+      const cashfree = await load({
+          mode: "sandbox" // Change to "production" when going live
+      });
+
+      let checkoutOptions = {
+          paymentSessionId: orderData.paymentSessionId,
+          redirectTarget: "_modal"
+      };
+
+      const result = await cashfree.checkout(checkoutOptions);
+
+      if (result?.error) {
+          console.error("Cashfree Checkout Error:", result.error);
+          toast.error(result.error.message || "Subscription cancelled or failed");
+          setLoading(false);
+          return;
+      }
+
+      const verifyRes = await fetch('/api/subscriptions/subscribe/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
               orderId: orderData.orderId,
-              paymentId: response.razorpay_payment_id,
-              signature: response.razorpay_signature,
               userId: userId,
               planId: plan.id,
               billingPeriod: billingPeriod
-            })
-          });
-          
-          const verifyData = await verifyRes.json();
-          
-          if (verifyData.success) {
-            toast.success(`Welcome to ${plan.name}!`);
-            if (onClose) onClose();
-          } else {
-            toast.error("Subscription verification failed");
-          }
-        },
-        prefill: {
-            name: "Premium User",
-            email: "premium@example.com"
-        },
-        theme: {
-          color: '#8b5cf6'
-        },
-        modal: {
-            ondismiss: function() {
-                setLoading(false);
-            }
-        }
-      };
+          })
+      });
       
-      const razorpay = new window.Razorpay(options);
-      razorpay.open();
+      const verifyData = await verifyRes.json();
+      
+      if (verifyData.success) {
+          toast.success(`Welcome to ${plan.name}!`);
+          if (onClose) onClose();
+      } else {
+          toast.error("Subscription verification failed");
+          setLoading(false);
+      }
       
     } catch (error) {
       console.error('Error subscribing:', error);
@@ -209,7 +202,7 @@ export default function SubscriptionPlans({ userId, onClose }) {
           <div className="mt-16 text-center">
             <p className="text-xs font-black text-slate-400 uppercase tracking-[4px]">Verified Security</p>
             <div className="flex items-center justify-center gap-8 mt-6 opacity-30 grayscale hover:opacity-100 hover:grayscale-0 transition-all cursor-default">
-              <span className="font-black text-sm tracking-tighter">RAZORPAY</span>
+              <span className="font-black text-sm tracking-tighter">CASHFREE</span>
               <span className="font-black text-sm tracking-tighter">MASTERCARD</span>
               <span className="font-black text-sm tracking-tighter">VISA</span>
               <span className="font-black text-sm tracking-tighter">UPI</span>

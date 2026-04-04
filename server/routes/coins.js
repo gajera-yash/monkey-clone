@@ -8,8 +8,22 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_KEY
 );
 
-// Razorpay integration removed (no active account)
-const razorpay = null;
+// ============ CASHFREE CONFIG ============
+const getCashfreeHeaders = () => {
+    return {
+        'x-client-id': process.env.CASHFREE_APP_ID,
+        'x-client-secret': process.env.CASHFREE_SECRET_KEY,
+        'x-api-version': '2023-08-01',
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+    };
+};
+
+const getCashfreeUrl = () => {
+    return process.env.CASHFREE_ENV === 'PRODUCTION' ? 
+        'https://api.cashfree.com/pg/orders' : 
+        'https://sandbox.cashfree.com/pg/orders';
+};
 
 // ============ COIN PACKAGES ============
 
@@ -33,14 +47,159 @@ router.get('/packages', async (req, res) => {
 
 // ============ PURCHASE COINS ============
 
-// Create Razorpay order for coin purchase (DISABLED)
+// Create Cashfree order for coin purchase
 router.post('/purchase/create-order', async (req, res) => {
-  return res.status(403).json({ error: 'Payments are currently disabled. Please contact support.' });
+  try {
+    const { userId, packageId } = req.body;
+    
+    const { data: pkg } = await supabase
+      .from('coin_packages')
+      .select('*')
+      .eq('id', packageId)
+      .single();
+      
+    if (!pkg) return res.status(404).json({ error: 'Package not found' });
+    
+    const { data: user } = await supabase
+      .from('profiles')
+      .select('email, phone, username')
+      .eq('id', userId)
+      .single();
+
+    const orderId = `order_${Date.now()}_${userId.substring(0, 6)}`;
+    
+    const requestBody = {
+        order_amount: pkg.price_inr,
+        order_currency: "INR",
+        order_id: orderId,
+        customer_details: {
+            customer_id: userId,
+            customer_phone: user?.phone || "9999999999",
+            customer_email: user?.email || "customer@strangy.in",
+            customer_name: user?.username || "Strangy User"
+        },
+        order_meta: {
+            return_url: "https://strangy.in/chat?order_id={order_id}"
+        }
+    };
+
+    const response = await fetch(getCashfreeUrl(), {
+        method: 'POST',
+        headers: getCashfreeHeaders(),
+        body: JSON.stringify(requestBody)
+    });
+
+    const data = await response.json();
+    
+    if (!response.ok) {
+        console.error("Cashfree Order Error:", data);
+        return res.status(500).json({ error: 'Payment gateway error', details: data });
+    }
+
+    res.json({
+        orderId: data.order_id,
+        paymentSessionId: data.payment_session_id,
+        amount: pkg.price_inr,
+        currency: "INR"
+    });
+
+  } catch (error) {
+    console.error('Error creating order:', error);
+    res.status(500).json({ error: 'Failed to create order' });
+  }
 });
 
-// Verify payment and add coins (DISABLED)
+// Verify payment and add coins
 router.post('/purchase/verify', async (req, res) => {
-  return res.status(403).json({ error: 'Payments are currently disabled.' });
+  try {
+    const { orderId, userId, packageId } = req.body;
+    
+    const response = await fetch(`${getCashfreeUrl()}/${orderId}`, {
+        method: 'GET',
+        headers: getCashfreeHeaders()
+    });
+    
+    const orderStat = await response.json();
+    
+    if (orderStat.order_status !== 'PAID') {
+        return res.status(400).json({ success: false, error: 'Payment not successful' });
+    }
+    
+    // Prevent double crediting
+    const { data: existingTx } = await supabase
+        .from('coin_transactions')
+        .select('*')
+        .eq('metadata->>orderId', orderId)
+        .single();
+        
+    if (existingTx) {
+        return res.json({ success: true, message: 'Already verified' });
+    }
+
+    const { data: pkg } = await supabase
+      .from('coin_packages')
+      .select('coins, price_inr, name')
+      .eq('id', packageId)
+      .single();
+
+    const { data: user } = await supabase
+      .from('profiles')
+      .select('coins, total_coins_purchased')
+      .eq('id', userId)
+      .single();
+
+    const newCoins = (user.coins || 0) + pkg.coins;
+    const newTotalPurchased = (user.total_coins_purchased || 0) + pkg.coins;
+
+    await supabase
+      .from('profiles')
+      .update({
+        coins: newCoins,
+        total_coins_purchased: newTotalPurchased,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', userId);
+
+    await supabase
+      .from('coin_transactions')
+      .insert({
+        user_id: userId,
+        transaction_type: 'purchased',
+        coins_amount: pkg.coins,
+        coins_balance_after: newCoins,
+        description: `Purchased ${pkg.name}`,
+        payment_status: 'completed',
+        metadata: {
+            orderId: orderId,
+            gateway: 'cashfree',
+            amount_paid: pkg.price_inr
+        }
+      });
+      
+    await supabase
+        .from('transactions')
+        .insert({
+            user_id: userId,
+            type: 'coins',
+            amount: pkg.price_inr,
+            status: 'success',
+            metadata: {
+                payment_gateway: 'cashfree',
+                order_id: orderId,
+                package: pkg.name
+            }
+        });
+
+    res.json({
+        success: true,
+        coinsAdded: pkg.coins,
+        newBalance: newCoins
+    });
+
+  } catch (error) {
+    console.error('Error verifying payment:', error);
+    res.status(500).json({ error: 'Failed to verify payment' });
+  }
 });
 
 // ============ SPEND COINS ============
