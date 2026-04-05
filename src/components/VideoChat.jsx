@@ -90,7 +90,7 @@ const VideoChat = ({ onEndChat }) => {
   const [remoteStream, setRemoteStream] = useState(null);
   const [partnerName, setPartnerName] = useState(null);
   const [error, setError] = useState(null);
-  const [showPermissionModal, setShowPermissionModal] = useState(false);
+  const [showPermissionModal, setShowPermissionModal] = useState(true);
   const [showReportModal, setShowReportModal] = useState(false);
   const [isMicOn, setIsMicOn] = useState(true);
   const [isCamOn, setIsCamOn] = useState(true);
@@ -379,16 +379,24 @@ const VideoChat = ({ onEndChat }) => {
         });
       }
     } else {
-      if (!stream) setStatus('Waiting for camera...');
-      else if (!socket.connected) setStatus('Connecting to server...');
+      if (!stream) {
+        setStatus('Waiting for camera...');
+        setShowPermissionModal(true); // Ensure modal is visible if stream is missing
+      } else if (!socket.connected) {
+        setStatus('Connecting to server...');
+      }
     }
   }, [stream, currentUser, blockedUsers, userLocation, chatFilters, directCallTarget, incomingDirectCall, directCallName, navigate, location.pathname, isPremium]);
 
-
   const handleStartChat = useCallback(() => {
+    if (!stream) {
+      setShowPermissionModal(true);
+      toast.error("Please grant camera/mic access first!");
+      return;
+    }
     userInitiatedJoin.current = true;
     performJoin();
-  }, [performJoin]);
+  }, [performJoin, stream]);
 
   // Auto-Start Stream for Direct Calls
   useEffect(() => {
@@ -492,12 +500,13 @@ const VideoChat = ({ onEndChat }) => {
     hasEmittedJoin.current = false;
     setStatus('Cleaning up session...');
     
-    // 6. Safety delay to allow socket/server to process the 'leave' 
-    // before attempting to 'join' again. Increased to 800ms for stability.
+    // 6. Snappy transition to next partner
+    const tid = toast.loading("Searching for next partner...");
     setTimeout(() => {
-        console.log("[VideoChat] Safety delay finished, searching for next...");
+        toast.dismiss(tid);
+        console.log("[VideoChat] Transition delay finished, searching for next...");
         performJoin();
-    }, 800);
+    }, 500);
   };
 
   const sendMessage = (text, type = 'text', giftValue = 0) => {

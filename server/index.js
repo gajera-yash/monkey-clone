@@ -567,11 +567,6 @@ io.on('connection', (socket) => {
 
                     if (u1BlocksU2 || u2BlocksU1) continue;
 
-                    // Check skipped partner (prevent instant re-match with someone just skipped)
-                    if ((u1.skippedPartner && u1.skippedPartner === u2.uid) || (u2.skippedPartner && u2.skippedPartner === u1.uid)) {
-                        continue;
-                    }
-
                     // CHECK FREE MALE FEMALE RATIO LIMIT (3 out of 10 matches)
                     const checkRatioLimit = (userA, userB) => {
                         const aGender = userA.gender || 'Male'; // default unknown to Male

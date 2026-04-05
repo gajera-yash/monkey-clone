@@ -33,15 +33,16 @@ const CoinStoreModal = ({ isOpen, onClose }) => {
         
         const fetchPackages = async () => {
             const { data, error } = await supabase
-                .from('subscription_plans')
+                .from('coin_packages')
                 .select('*')
-                .order('sort_order', { ascending: true });
+                .eq('is_active', true)
+                .order('display_order', { ascending: true });
             
             if (!error && data) {
                 setPackages(data.map(p => ({
                     id: p.id,
                     coins: p.coins,
-                    price: p.price_monthly_inr,
+                    price: p.price_inr, // Changed from price_monthly_inr
                     label: p.name,
                     discount: p.discount_label,
                     icon: p.icon || '🪙',

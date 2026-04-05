@@ -36,6 +36,11 @@ const CreatorDashboard = () => {
     const [referralList, setReferralList] = useState([]);
     const [isFetchingReferrals, setIsFetchingReferrals] = useState(false);
 
+    // Gifts Data State
+    const [showGifts, setShowGifts] = useState(false);
+    const [giftsList, setGiftsList] = useState([]);
+    const [isFetchingGifts, setIsFetchingGifts] = useState(false);
+
     const fetchTransactionLists = async () => {
         if (!currentUser?.id) return;
         setIsFetchingLists(true);
@@ -93,6 +98,28 @@ const CreatorDashboard = () => {
             console.error("Error fetching referral data:", err);
         } finally {
             setIsFetchingReferrals(false);
+        }
+    };
+
+    const fetchGiftsData = async () => {
+        if (!currentUser?.id) return;
+        setIsFetchingGifts(true);
+        try {
+            const { data, error } = await supabase
+                .from('coin_transactions')
+                .select('*, sender:profiles!coin_transactions_sender_id_fkey(username, avatar_url)')
+                .eq('user_id', currentUser.id)
+                .eq('transaction_type', 'earned')
+                .ilike('description', '%gift%')
+                .order('created_at', { ascending: false });
+            
+            if (error) throw error;
+            setGiftsList(data || []);
+        } catch (err) {
+            console.error("Error fetching gifts data:", err);
+            toast.error("Failed to load gifts.");
+        } finally {
+            setIsFetchingGifts(false);
         }
     };
 
@@ -472,7 +499,13 @@ const CreatorDashboard = () => {
                         <div className="w-12 h-12 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center text-xl group-hover:scale-110 transition-transform">🏦</div>
                         <span className="font-semibold text-sm">Withdraw Funds</span>
                     </button>
-                    <button className="bg-dark-800 hover:bg-white/5 transition-colors p-6 rounded-3xl border border-white/5 flex flex-col items-center justify-center gap-3 text-center group">
+                    <button 
+                        onClick={() => {
+                            setShowGifts(true);
+                            fetchGiftsData();
+                        }}
+                        className="bg-dark-800 hover:bg-white/5 transition-colors p-6 rounded-3xl border border-white/5 flex flex-col items-center justify-center gap-3 text-center group"
+                    >
                         <div className="w-12 h-12 rounded-full bg-pink-500/20 text-pink-400 flex items-center justify-center text-xl group-hover:scale-110 transition-transform">🎁</div>
                         <span className="font-semibold text-sm">My Gifts</span>
                     </button>
@@ -544,11 +577,12 @@ const CreatorDashboard = () => {
                                     </p>
                                     <div className="flex flex-col sm:flex-row items-center gap-3">
                                         <div className="flex-1 w-full bg-black/40 border border-white/10 rounded-2xl px-5 py-4 font-mono text-sm text-gray-300 truncate">
-                                            {`https://strangy.app/ref/${currentUser?.referral_code || currentUser?.uid?.substring(0, 8)}`}
+                                            {`${window.location.origin}/ref/${currentUser?.referral_code || currentUser?.uid?.substring(0, 8)}`}
                                         </div>
                                         <button 
                                             onClick={() => {
-                                                navigator.clipboard.writeText(`https://strangy.app/ref/${currentUser?.referral_code || currentUser?.uid?.substring(0, 8)}`);
+                                                const link = `${window.location.origin}/ref/${currentUser?.referral_code || currentUser?.uid?.substring(0, 8)}`;
+                                                navigator.clipboard.writeText(link);
                                                 toast.success("Referral link copied!");
                                             }}
                                             className="w-full sm:w-auto px-8 py-4 bg-white text-dark-900 rounded-2xl font-black hover:bg-gray-200 transition-all active:scale-95 shadow-xl shadow-white/5"
@@ -708,6 +742,78 @@ const CreatorDashboard = () => {
                     </div>
                 )}
 
+                {/* 7. MY GIFTS MODAL */}
+                {showGifts && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 backdrop-blur-xl p-4 animate-fade-in">
+                        <div className="bg-dark-800 border border-white/10 rounded-[32px] w-full max-w-2xl h-[80vh] flex flex-col shadow-2xl overflow-hidden animate-slide-up">
+                            {/* Modal Header */}
+                            <div className="p-8 border-b border-white/5 flex items-center justify-between bg-dark-800/50">
+                                <h2 className="text-2xl font-black flex items-center gap-4">
+                                    <span className="w-12 h-12 rounded-2xl bg-pink-500/20 flex items-center justify-center text-2xl text-pink-400 shadow-lg shadow-pink-500/10">🎁</span>
+                                    My Gifts
+                                </h2>
+                                <button 
+                                    onClick={() => setShowGifts(false)}
+                                    className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center hover:bg-white/10 transition-all hover:rotate-90"
+                                >
+                                    <span className="text-xl">✕</span>
+                                </button>
+                            </div>
+
+                            <div className="flex-1 overflow-y-auto p-8 scrollbar-thin scrollbar-thumb-white/10">
+                                {isFetchingGifts ? (
+                                    <div className="h-full flex flex-col items-center justify-center text-gray-500 gap-4">
+                                        <div className="w-12 h-12 border-4 border-pink-500 border-t-white rounded-full animate-spin"></div>
+                                        <p className="text-xs font-bold uppercase tracking-widest">Unwrapping your gifts...</p>
+                                    </div>
+                                ) : giftsList.length === 0 ? (
+                                    <div className="h-full flex flex-col items-center justify-center text-center gap-6 py-20">
+                                        <div className="w-24 h-24 rounded-full bg-white/5 flex items-center justify-center text-5xl">💝</div>
+                                        <div className="space-y-2">
+                                            <h3 className="text-xl font-bold text-white">No gifts yet!</h3>
+                                            <p className="text-gray-500 max-w-xs mx-auto">Gifts from users during your video chats will appear here. Go live to start receiving!</p>
+                                        </div>
+                                        <button 
+                                            onClick={() => { setShowGifts(false); setIsOnline(true); navigate('/chat'); }}
+                                            className="px-8 py-3 bg-accent-pink rounded-xl font-bold shadow-lg shadow-pink-500/20 hover:scale-105 transition-transform"
+                                        >
+                                            Go Live Now
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-1 gap-4">
+                                        {giftsList.map((gift, idx) => (
+                                            <div key={idx} className="bg-dark-900 border border-white/5 p-5 rounded-3xl flex items-center justify-between group hover:border-white/10 transition-all hover:bg-dark-800">
+                                                <div className="flex items-center gap-4">
+                                                    <div className="w-12 h-12 rounded-2xl bg-pink-500/10 flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">
+                                                        {gift.description?.includes('Rose') ? '🌹' : 
+                                                         gift.description?.includes('Heart') ? '❤️' :
+                                                         gift.description?.includes('Diamond') ? '💎' :
+                                                         gift.description?.includes('Crown') ? '👑' : '🎁'}
+                                                    </div>
+                                                    <div>
+                                                        <h4 className="font-bold text-white mb-0.5">{gift.description?.replace('Received gift: ', '') || 'Special Gift'}</h4>
+                                                        <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest flex items-center gap-2">
+                                                            From {gift.sender?.username || 'Stranger'} • {new Date(gift.created_at).toLocaleDateString()}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <div className="text-right">
+                                                    <p className="text-xl font-black text-pink-400">🪙 {gift.coins_amount?.toLocaleString()}</p>
+                                                    <p className="text-[10px] text-green-500 font-bold uppercase">Added to Balance</p>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="p-8 bg-dark-900/50 border-t border-white/5 text-center">
+                                <p className="text-gray-500 text-xs">Total Gifts Received: <span className="text-white font-bold">{giftsList.length}</span></p>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );

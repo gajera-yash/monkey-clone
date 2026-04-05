@@ -500,8 +500,18 @@ export const AuthProvider = ({ children }) => {
     useEffect(() => {
         let mounted = true;
 
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-            console.log("[AuthContext] onAuthStateChange event:", event);
+        // --- LOADING SAFETY TIMEOUT ---
+        // If Supabase takes > 5 seconds to respond, force resolve loading
+        // so the user isn't stuck on a spinner forever.
+        const loadingSafetyTimeout = setTimeout(() => {
+            if (mounted) {
+                console.warn("[AuthContext] Auth state check timed out. Forcing resolve.");
+                setLoading(false);
+            }
+        }, 5000);
+
+        const handleAuthState = async (event, session) => {
+            console.log("[AuthContext] Auth state change event:", event);
 
             if (!mounted) return;
             try {
@@ -700,15 +710,33 @@ export const AuthProvider = ({ children }) => {
             } catch (err) {
                 console.error("Unexpected error in auth state change:", err);
             } finally {
-                if (mounted) setLoading(false);
+                if (mounted) {
+                    setLoading(false);
+                    clearTimeout(loadingSafetyTimeout);
+                }
+            }
+        };
+
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(handleAuthState);
+
+        // Explicitly check for session on mount to ensure we don't wait for onAuthStateChange
+        // which can sometimes be delayed or miss initial state on some browsers/caches
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            if (session) {
+                handleAuthState('INITIAL_SESSION', session);
+            } else {
+                setLoading(false);
+                clearTimeout(loadingSafetyTimeout);
             }
         });
 
         return () => {
             mounted = false;
+            clearTimeout(loadingSafetyTimeout);
             if (subscription) subscription.unsubscribe();
         };
     }, [isGuest]);
+
 
     // Fetch user location on mount
     useEffect(() => {

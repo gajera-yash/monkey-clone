@@ -15,7 +15,7 @@ const CreatorSettings = () => {
         showLocation: true,
     });
 
-    const referralLink = `https://strangy.app/ref/${currentUser?.uid?.substring(0, 8)}`;
+    const referralLink = `${window.location.origin}/ref/${currentUser?.referral_code || currentUser?.uid?.substring(0, 8)}`;
 
     const handleCopy = () => {
         navigator.clipboard.writeText(referralLink);
@@ -80,6 +80,71 @@ const CreatorSettings = () => {
                         <div className="flex items-center gap-3 mb-2">
                             <span className="text-2xl">👤</span>
                             <h2 className="text-xl font-bold">Public Profile</h2>
+                        </div>
+
+                        {/* Image Update Section */}
+                        <div className="flex flex-col items-center sm:flex-row gap-6 pb-6 border-b border-white/5">
+                            <div className="relative group">
+                                <img
+                                    src={currentUser?.photoURL || `https://ui-avatars.com/api/?name=${currentUser?.displayName}&background=random`}
+                                    alt="Profile"
+                                    className="w-24 h-24 rounded-full object-cover border-4 border-dark-900 shadow-[0_0_0_2px_#8b5cf6]"
+                                />
+                                {isSaving && (
+                                    <div className="absolute inset-0 bg-black/60 rounded-full flex items-center justify-center">
+                                        <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                    </div>
+                                )}
+                            </div>
+                            <div className="flex-1 text-center sm:text-left space-y-2">
+                                <h3 className="font-bold text-lg">Profile Picture</h3>
+                                <p className="text-gray-500 text-xs">PNG, JPG or JPEG. Max size 2MB.</p>
+                                <div className="flex items-center justify-center sm:justify-start gap-3">
+                                    <label className="cursor-pointer px-4 py-2 bg-white/5 hover:bg-white/10 rounded-lg text-sm font-bold transition-all border border-white/10">
+                                        <span>Change Image</span>
+                                        <input 
+                                            type="file" 
+                                            className="hidden" 
+                                            accept="image/*"
+                                            onChange={async (e) => {
+                                                const file = e.target.files?.[0];
+                                                if (!file) return;
+                                                
+                                                if (file.size > 2 * 1024 * 1024) {
+                                                    toast.error("Image size must be less than 2MB");
+                                                    return;
+                                                }
+
+                                                setIsSaving(true);
+                                                const tid = toast.loading("Uploading image...");
+                                                try {
+                                                    const fileExt = file.name.split('.').pop();
+                                                    const fileName = `${currentUser.id}-${Math.random()}.${fileExt}`;
+                                                    const filePath = `avatars/${fileName}`;
+
+                                                    const { error: uploadError } = await supabase.storage
+                                                        .from('avatars')
+                                                        .upload(filePath, file);
+
+                                                    if (uploadError) throw uploadError;
+
+                                                    const { data: { publicUrl } } = supabase.storage
+                                                        .from('avatars')
+                                                        .getPublicUrl(filePath);
+
+                                                    await updateProfileInfo({ avatar_url: publicUrl });
+                                                    toast.success("Profile image updated!", { id: tid });
+                                                } catch (err) {
+                                                    console.error("Upload error:", err);
+                                                    toast.error("Failed to upload image.", { id: tid });
+                                                } finally {
+                                                    setIsSaving(false);
+                                                }
+                                            }}
+                                        />
+                                    </label>
+                                </div>
+                            </div>
                         </div>
 
                         <div>
