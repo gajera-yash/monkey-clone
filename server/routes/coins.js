@@ -56,18 +56,36 @@ router.get('/packages', async (req, res) => {
 // Create Cashfree order for coin purchase
 router.post('/purchase/create-order', async (req, res) => {
   try {
+    // Validate Cashfree keys are configured
+    if (!process.env.CASHFREE_APP_ID || !process.env.CASHFREE_SECRET_KEY) {
+        console.error('[Coins] CASHFREE_APP_ID or CASHFREE_SECRET_KEY not configured!');
+        return res.status(500).json({ error: 'Payment gateway not configured. Please contact support.' });
+    }
+
     const { userId, packageId } = req.body;
     
-    const { data: pkg } = await supabase
+    if (!userId || !packageId) {
+        return res.status(400).json({ error: 'userId and packageId are required' });
+    }
+
+    const { data: pkg, error: pkgError } = await supabase
       .from('subscription_plans')
       .select('*')
       .eq('id', packageId)
       .single();
       
-    if (!pkg) return res.status(404).json({ error: 'Package not found' });
+    if (pkgError || !pkg) {
+        console.error('[Coins] Package fetch error:', pkgError);
+        return res.status(404).json({ error: 'Package not found' });
+    }
     
-    const orderAmount = pkg.price_monthly_inr || pkg.price;
+    const orderAmount = pkg.price_monthly_inr || pkg.price || pkg.price_inr;
     
+    if (!orderAmount || orderAmount <= 0) {
+        console.error('[Coins] Invalid order amount:', orderAmount, 'Package:', pkg);
+        return res.status(400).json({ error: 'Invalid package price configuration' });
+    }
+
     const { data: user } = await supabase
       .from('profiles')
       .select('email, phone, username')
@@ -77,7 +95,7 @@ router.post('/purchase/create-order', async (req, res) => {
     const orderId = `order_${Date.now()}_${userId.substring(0, 6)}`;
     
     const requestBody = {
-        order_amount: orderAmount,
+        order_amount: Number(orderAmount),
         order_currency: "INR",
         order_id: orderId,
         customer_details: {
@@ -91,6 +109,8 @@ router.post('/purchase/create-order', async (req, res) => {
         }
     };
 
+    console.log('[Coins] Creating Cashfree order:', { orderId, amount: orderAmount, env: process.env.CASHFREE_ENV });
+
     const response = await fetch(getCashfreeUrl(), {
         method: 'POST',
         headers: getCashfreeHeaders(),
@@ -100,20 +120,28 @@ router.post('/purchase/create-order', async (req, res) => {
     const data = await response.json();
     
     if (!response.ok) {
-        console.error("Cashfree Order Error:", data);
-        return res.status(500).json({ error: 'Payment gateway error', details: data });
+        console.error("Cashfree Order Error:", JSON.stringify(data));
+        return res.status(500).json({ 
+            error: 'Payment gateway error', 
+            details: data,
+            message: data?.message || 'Cashfree rejected the order. Check API keys and environment.'
+        });
     }
+
+    // Return cashfreeEnv so frontend can dynamically set mode
+    const cashfreeEnv = (process.env.CASHFREE_ENV || 'SANDBOX').toUpperCase();
 
     res.json({
         orderId: data.order_id,
         paymentSessionId: data.payment_session_id,
-        amount: pkg.price_inr,
-        currency: "INR"
+        amount: orderAmount,
+        currency: "INR",
+        cashfreeMode: cashfreeEnv === 'PRODUCTION' ? 'production' : 'sandbox'
     });
 
   } catch (error) {
     console.error('Error creating order:', error);
-    res.status(500).json({ error: 'Failed to create order' });
+    res.status(500).json({ error: 'Failed to create order', message: error.message });
   }
 });
 
@@ -145,8 +173,8 @@ router.post('/purchase/verify', async (req, res) => {
     }
 
     const { data: pkg } = await supabase
-      .from('coin_packages')
-      .select('coins, price_inr, name')
+      .from('subscription_plans')
+      .select('coins, price_monthly_inr, price, name')
       .eq('id', packageId)
       .single();
 
@@ -156,8 +184,10 @@ router.post('/purchase/verify', async (req, res) => {
       .eq('id', userId)
       .single();
 
-    const newCoins = (user.coins || 0) + pkg.coins;
-    const newTotalPurchased = (user.total_coins_purchased || 0) + pkg.coins;
+    const pkgCoins = pkg.coins || 0;
+    const pkgPrice = pkg.price_monthly_inr || pkg.price || 0;
+    const newCoins = (user.coins || 0) + pkgCoins;
+    const newTotalPurchased = (user.total_coins_purchased || 0) + pkgCoins;
 
     await supabase
       .from('profiles')
@@ -173,14 +203,14 @@ router.post('/purchase/verify', async (req, res) => {
       .insert({
         user_id: userId,
         transaction_type: 'purchased',
-        coins_amount: pkg.coins,
+        coins_amount: pkgCoins,
         coins_balance_after: newCoins,
         description: `Purchased ${pkg.name}`,
         payment_status: 'completed',
         metadata: {
             orderId: orderId,
             gateway: 'cashfree',
-            amount_paid: pkg.price_inr
+            amount_paid: pkgPrice
         }
       });
       
@@ -189,7 +219,7 @@ router.post('/purchase/verify', async (req, res) => {
         .insert({
             user_id: userId,
             type: 'coins',
-            amount: pkg.price_inr,
+            amount: pkgPrice,
             status: 'success',
             metadata: {
                 payment_gateway: 'cashfree',
@@ -200,7 +230,7 @@ router.post('/purchase/verify', async (req, res) => {
 
     res.json({
         success: true,
-        coinsAdded: pkg.coins,
+        coinsAdded: pkgCoins,
         newBalance: newCoins
     });
 

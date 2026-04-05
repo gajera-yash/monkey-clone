@@ -94,11 +94,15 @@ router.post('/subscribe/create-order', async (req, res) => {
         return res.status(500).json({ error: 'Payment gateway error', details: data });
     }
 
+    // Return cashfreeEnv so frontend can dynamically set mode
+    const cashfreeEnv = (process.env.CASHFREE_ENV || 'SANDBOX').toUpperCase();
+
     res.json({
         orderId: data.order_id,
         paymentSessionId: data.payment_session_id,
         amount: amount,
-        currency: "INR"
+        currency: "INR",
+        cashfreeMode: cashfreeEnv === 'PRODUCTION' ? 'production' : 'sandbox'
     });
 
   } catch (error) {

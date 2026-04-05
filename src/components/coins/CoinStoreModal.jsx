@@ -88,7 +88,6 @@ const CoinStoreModal = ({ isOpen, onClose }) => {
         
         try {
             // 1. Create order on backend
-            // Construct absolute URL to avoid hitting port 3000
             const orderRes = await fetch(`${API_BASE_URL}/api/coins/purchase/create-order`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -100,9 +99,16 @@ const CoinStoreModal = ({ isOpen, onClose }) => {
             
             // Check for non-OK response before parsing JSON
             if (!orderRes.ok) {
-                const text = await orderRes.text();
-                console.error("Server Error:", text);
-                throw new Error(`Server Error (${orderRes.status}): Please check backend logs.`);
+                let errorMsg = `Server Error (${orderRes.status})`;
+                try {
+                    const errorData = await orderRes.json();
+                    errorMsg = errorData.message || errorData.error || errorMsg;
+                    console.error("Server Error Details:", errorData);
+                } catch (e) {
+                    const text = await orderRes.text();
+                    console.error("Server Error:", text);
+                }
+                throw new Error(errorMsg);
             }
 
             const orderData = await orderRes.json();
@@ -111,9 +117,12 @@ const CoinStoreModal = ({ isOpen, onClose }) => {
                 throw new Error(orderData.error || "Failed to create payment session");
             }
 
-            // 2. Load Cashfree Checkout
+            // 2. Load Cashfree Checkout - use dynamic mode from server
+            const cashfreeMode = orderData.cashfreeMode || "sandbox";
+            console.log("[CoinStore] Loading Cashfree in mode:", cashfreeMode);
+            
             const cashfree = await load({
-                mode: "sandbox" // Change to "production" when going live
+                mode: cashfreeMode
             });
 
             const result = await cashfree.checkout({
@@ -139,7 +148,12 @@ const CoinStoreModal = ({ isOpen, onClose }) => {
             });
             
             if (!verifyRes.ok) {
-                throw new Error("Verification failed to complete on server!");
+                let verifyErrorMsg = "Verification failed";
+                try {
+                    const verifyErrorData = await verifyRes.json();
+                    verifyErrorMsg = verifyErrorData.message || verifyErrorData.error || verifyErrorMsg;
+                } catch (e) {}
+                throw new Error(verifyErrorMsg);
             }
 
             const verifyData = await verifyRes.json();

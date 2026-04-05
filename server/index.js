@@ -424,6 +424,7 @@ io.on('connection', (socket) => {
         let blockedUsers = [];
         let location = null;
         let isPremium = false;
+        let gender = null;
 
         let birthdate = null;
         let filters = {};
@@ -488,6 +489,8 @@ io.on('connection', (socket) => {
         console.log(`[Queue] User ${user.uid || user.id} (${user.name}) joined. Pool: ${waitingUsers.length}`);
         io.emit('waiting-count', io.engine.clientsCount);
         
+        // Matching function (extracted so it can be called later for retries)
+        const attemptMatching = () => {
         // Check if we can match
         if (waitingUsers.length >= 2) {
             console.log(`[MatchEngine] Attempting to match from pool of ${waitingUsers.length}...`);
@@ -566,6 +569,16 @@ io.on('connection', (socket) => {
                     const u2BlocksU1 = (u2.blockedUsers || []).includes(u1.uid) || (u2.uid && (u1.blockedUsers || []).includes(u2.uid));
 
                     if (u1BlocksU2 || u2BlocksU1) continue;
+
+                    // SKIP CHECK: Don't re-match users who just skipped each other
+                    if (u1.skippedPartner && u1.skippedPartner === u2.uid) {
+                        console.log(`[MatchEngine] Skipping pair: ${u1.name} recently skipped ${u2.name}`);
+                        continue;
+                    }
+                    if (u2.skippedPartner && u2.skippedPartner === u1.uid) {
+                        console.log(`[MatchEngine] Skipping pair: ${u2.name} recently skipped ${u1.name}`);
+                        continue;
+                    }
 
                     // CHECK FREE MALE FEMALE RATIO LIMIT (3 out of 10 matches)
                     const checkRatioLimit = (userA, userB) => {
@@ -655,8 +668,30 @@ io.on('connection', (socket) => {
                 });
             } else {
                 console.log(`[MatchEngine] No suitable pairs found in current pool. Queue status: ${waitingUsers.length} waiting.`);
+                
+                // If only skipped-partner pairs remain, clear skippedPartner after 5 seconds so they can rematch
+                if (waitingUsers.length >= 2) {
+                    setTimeout(() => {
+                        let cleared = false;
+                        waitingUsers.forEach(u => {
+                            if (u.skippedPartner) {
+                                console.log(`[MatchEngine] Clearing stale skippedPartner for ${u.name}`);
+                                u.skippedPartner = null;
+                                cleared = true;
+                            }
+                        });
+                        // Re-attempt matching after clearing
+                        if (cleared && waitingUsers.length >= 2) {
+                            console.log(`[MatchEngine] Retrying matching after clearing skipped partners...`);
+                            attemptMatching();
+                        }
+                    }, 5000);
+                }
             }
-        }
+        } // end if waitingUsers.length >= 2
+        }; // end attemptMatching()
+
+        attemptMatching();
     });
 
     // WebRTC Signaling Events
