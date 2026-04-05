@@ -28,14 +28,17 @@ export const AuthProvider = ({ children }) => {
 
             if (error) throw error;
             // Mapping to support existing components (uid, isCreator, etc)
+            const username = data.username || data.email?.split('@')[0] || 'User';
+            const defaultAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}&background=8234f9&color=fff`;
+
             return {
                 ...data,
                 uid: data.id,
                 email: data.email,
                 isCreator: data.is_creator,
                 accountStatus: data.account_status,
-                displayName: data.username,
-                photoURL: data.avatar_url,
+                displayName: username,
+                photoURL: data.avatar_url || defaultAvatar,
                 role: data.role || 'user'
             };
         } catch (error) {
@@ -528,14 +531,20 @@ export const AuthProvider = ({ children }) => {
 
                         // If profile doesn't exist, create it (important for new Google users)
                         if (!profile) {
+                            // NEW: Smart Image Fetch from Google/OAuth or Default Fallback
+                            const meta = session.user.user_metadata;
+                            const username = meta?.full_name || session.user.email?.split('@')[0] || 'User';
+                            const oauthAvatar = meta?.avatar_url || meta?.picture; // Google uses picture
+                            const defaultAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}&background=8234f9&color=fff`;
+
                             console.log("Creating missing profile for user:", session.user.id);
                             const { data: newProfile, error: createError } = await supabase
                                 .from('profiles')
                                 .insert({
                                     id: session.user.id,
                                     email: session.user.email,
-                                    username: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'User',
-                                    avatar_url: session.user.user_metadata?.avatar_url,
+                                    username: username,
+                                    avatar_url: oauthAvatar || defaultAvatar,
                                     coins: 50,
                                     is_creator: false,
                                     account_status: 'active',
@@ -738,9 +747,22 @@ export const AuthProvider = ({ children }) => {
     }, [isGuest]);
 
 
-    // Fetch user location on mount
+    // Fetch user location on mount (clears old cache to ensure new IPInfo Lite API is used)
     useEffect(() => {
         const fetchLocation = async () => {
+            // Clear old cache if it was from the old API (no state/region data)
+            try {
+                const cached = localStorage.getItem('userLocation');
+                if (cached) {
+                    const parsed = JSON.parse(cached);
+                    if (!parsed.region || parsed.region === 'Unknown') {
+                        console.log('[Geo] Old cache detected, clearing for fresh fetch with IPInfo Lite...');
+                        localStorage.removeItem('userLocation');
+                        localStorage.removeItem('userLocationTimestamp');
+                    }
+                }
+            } catch (e) { /* ignore */ }
+
             const location = await getUserLocation();
             setUserLocation(location);
         };

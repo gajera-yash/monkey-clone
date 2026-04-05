@@ -31,14 +31,20 @@ const getCashfreeUrl = () => {
 router.get('/packages', async (req, res) => {
   try {
     const { data, error } = await supabase
-      .from('coin_packages')
+      .from('subscription_plans')
       .select('*')
       .eq('is_active', true)
-      .order('display_order');
+      .order('sort_order');
     
     if (error) throw error;
     
-    res.json({ packages: data });
+    // Auto-map for frontend consistency
+    const packages = data.map(p => ({
+        ...p,
+        price_inr: p.price_monthly_inr || p.price
+    }));
+    
+    res.json({ packages });
   } catch (error) {
     console.error('Error fetching packages:', error);
     res.status(500).json({ error: 'Failed to fetch packages' });
@@ -53,12 +59,14 @@ router.post('/purchase/create-order', async (req, res) => {
     const { userId, packageId } = req.body;
     
     const { data: pkg } = await supabase
-      .from('coin_packages')
+      .from('subscription_plans')
       .select('*')
       .eq('id', packageId)
       .single();
       
     if (!pkg) return res.status(404).json({ error: 'Package not found' });
+    
+    const orderAmount = pkg.price_monthly_inr || pkg.price;
     
     const { data: user } = await supabase
       .from('profiles')
@@ -69,7 +77,7 @@ router.post('/purchase/create-order', async (req, res) => {
     const orderId = `order_${Date.now()}_${userId.substring(0, 6)}`;
     
     const requestBody = {
-        order_amount: pkg.price_inr,
+        order_amount: orderAmount,
         order_currency: "INR",
         order_id: orderId,
         customer_details: {

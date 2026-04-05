@@ -33,22 +33,27 @@ const CoinStoreModal = ({ isOpen, onClose }) => {
         
         const fetchPackages = async () => {
             const { data, error } = await supabase
-                .from('coin_packages')
+                .from('subscription_plans')
                 .select('*')
                 .eq('is_active', true)
-                .order('display_order', { ascending: true });
-            
-            if (!error && data) {
-                setPackages(data.map(p => ({
-                    id: p.id,
-                    coins: p.coins,
-                    price: p.price_inr, // Changed from price_monthly_inr
-                    label: p.name,
-                    discount: p.discount_label,
-                    icon: p.icon || '🪙',
-                    popular: p.is_popular
-                })));
-            }
+                .order('sort_order', { ascending: true });
+
+            if (error) throw error;
+
+            console.log("[CoinStore] Fetched plans:", data);
+
+            // Mapping for UI consistency
+            const formattedPackages = data.map(pkg => ({
+                id: pkg.id,
+                coins: pkg.coins,
+                price: pkg.price_monthly_inr || pkg.price || 0,
+                label: pkg.name || pkg.label || `${pkg.coins} Coins`,
+                discount: pkg.discount_label,
+                icon: pkg.icon || '🪙',
+                popular: pkg.is_popular
+            }));
+
+            setPackages(formattedPackages);
             setLoading(false);
         };
         fetchPackages();

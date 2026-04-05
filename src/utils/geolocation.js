@@ -36,7 +36,7 @@ const formatDistance = (distanceKm) => {
     return `${distanceKm.toLocaleString()} km away`;
 };
 
-// Fetch user location from IP geolocation API (using IPInfo as requested)
+// Fetch user location from IPInfo Lite API (country, state, city)
 export const getUserLocation = async () => {
     try {
         // Check if location is cached in localStorage
@@ -47,59 +47,70 @@ export const getUserLocation = async () => {
         if (cachedLocation && cacheTimestamp) {
             const cacheAge = Date.now() - parseInt(cacheTimestamp);
             const twentyFourHours = 24 * 60 * 60 * 1000;
-
             if (cacheAge < twentyFourHours) {
-                console.log('Using cached location data');
+                console.log('[Geo] Using cached location data');
                 return JSON.parse(cachedLocation);
             }
         }
 
-        // Fetch fresh location data from IPInfo
-        const API_TOKEN = "c3aceba5644587";
-        console.log('Fetching location from ipinfo.io...');
-        
-        // Use ipinfo.io with the provided token
-        const response = await axios.get(`https://ipinfo.io/json?token=${API_TOKEN}`, {
-            timeout: 5000
+        // --- PRIMARY: IPInfo Lite API (New Token) ---
+        const IPINFO_TOKEN = "0e6362ad9ac7bd";
+        console.log('[Geo] Fetching from IPInfo Lite...');
+
+        const response = await axios.get(`https://api.ipinfo.io/lite/json?token=${IPINFO_TOKEN}`, {
+            timeout: 6000
         });
 
         const data = response.data;
-        const [lat, lon] = (data.loc || "0,0").split(',');
+        console.log('[Geo] IPInfo Lite raw response:', data);
 
-        // Convert country code to full name (e.g. IN -> India)
-        let countryFullName = data.country || 'Unknown';
-        try {
-            const regions = new Intl.DisplayNames(['en'], { type: 'region' });
-            countryFullName = regions.of(data.country) || data.country;
-        } catch (e) {
-            console.warn('Could not localize country name', e);
+        // IPInfo Lite returns: country_code, country_name, city, state_code, state_name, lat, lng
+        // Regular IPInfo returns: country, city, region, loc (lat,long)
+        // Handle both formats:
+        const countryCode = data.country_code || data.country || 'XX';
+        const countryName = data.country_name || (() => {
+            try {
+                const regions = new Intl.DisplayNames(['en'], { type: 'region' });
+                return regions.of(countryCode) || countryCode;
+            } catch (e) { return countryCode; }
+        })();
+
+        const city = data.city || 'Unknown';
+        const region = data.state_name || data.region || 'Unknown';
+
+        let lat = data.lat || data.latitude || 0;
+        let lon = data.lng || data.longitude || 0;
+        if (!lat && data.loc) {
+            const parts = data.loc.split(',');
+            lat = parseFloat(parts[0]) || 0;
+            lon = parseFloat(parts[1]) || 0;
         }
 
         const locationData = {
-            country: countryFullName,
-            countryCode: data.country || 'XX',
-            city: data.city || 'Unknown',
-            region: data.region || 'Unknown',
+            country: countryName,
+            countryCode: countryCode,
+            city: city,
+            region: region,
             latitude: parseFloat(lat),
             longitude: parseFloat(lon),
-            flag: countryCodeToFlag(data.country)
+            flag: countryCodeToFlag(countryCode)
         };
 
         // Cache the location data
         localStorage.setItem('userLocation', JSON.stringify(locationData));
         localStorage.setItem('userLocationTimestamp', Date.now().toString());
 
-        console.log('Location fetched from IPInfo:', locationData);
+        console.log('[Geo] Location fetched from IPInfo Lite:', locationData);
         return locationData;
 
     } catch (error) {
-        console.error('Error fetching location from IPInfo, trying fallback...', error);
-        
+        console.warn('[Geo] IPInfo Lite failed, trying fallback...', error?.message);
+
         try {
-            // Fallback to freeipapi.com (No token required, very reliable)
-            const fallbackRes = await axios.get('https://freeipapi.com/api/json', { timeout: 3000 });
+            // --- FALLBACK: freeipapi.com ---
+            const fallbackRes = await axios.get('https://freeipapi.com/api/json', { timeout: 4000 });
             const fb = fallbackRes.data;
-            
+
             if (fb && fb.countryCode) {
                 const fbLocation = {
                     country: fb.countryName || 'Unknown',
@@ -110,19 +121,18 @@ export const getUserLocation = async () => {
                     longitude: fb.longitude || 0,
                     flag: countryCodeToFlag(fb.countryCode)
                 };
-                
-                // Cache the fallback location too
+
                 localStorage.setItem('userLocation', JSON.stringify(fbLocation));
                 localStorage.setItem('userLocationTimestamp', Date.now().toString());
-                
-                console.log('Location fetched from Fallback (FreeIPAPI):', fbLocation);
+
+                console.log('[Geo] Location fetched from Fallback (freeipapi):', fbLocation);
                 return fbLocation;
             }
         } catch (fallbackError) {
-            console.error('All geolocation services failed:', fallbackError);
+            console.error('[Geo] All geolocation services failed:', fallbackError?.message);
         }
 
-        // Return fallback location if everything fails
+        // Final hardcoded fallback
         return {
             country: 'Unknown',
             countryCode: 'XX',
@@ -135,13 +145,18 @@ export const getUserLocation = async () => {
     }
 };
 
-// Get location display string
+
+// Get location display string - shows City, State, Country with flag
 export const getLocationDisplay = (locationData, showCity = true) => {
     if (!locationData) return '🌍 Unknown Location';
 
-    const { flag, city, country } = locationData;
+    const { flag, city, region, country } = locationData;
 
     if (showCity && city && city !== 'Unknown') {
+        // Show City, State if state is available, else City, Country
+        if (region && region !== 'Unknown') {
+            return `${flag} ${city}, ${region}`;
+        }
         return `${flag} ${city}, ${country}`;
     }
 
