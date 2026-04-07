@@ -1136,8 +1136,8 @@ const VideoChat = ({ onEndChat }) => {
                     ))}
                   </div>
 
-                  {/* Location */}
-                  <div className="relative">
+                  {/* Location (Hidden) */}
+                  <div className="hidden relative">
                     <select
                       value={chatFilters.location}
                       onChange={(e) => {

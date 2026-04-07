@@ -146,11 +146,19 @@ const MatchHistoryMobile = ({ onClose }) => {
                                 <div className="flex items-center gap-3">
                                     {/* Avatar */}
                                     <div className="relative">
-                                        {match.avatar ? (
-                                            <img src={match.avatar} alt={match.name} className="w-12 h-12 rounded-full object-cover shadow-lg shrink-0" />
+                                        {match.avatar && match.avatar !== 'null' && match.avatar !== 'undefined' ? (
+                                            <img 
+                                                src={match.avatar} 
+                                                alt={match.name} 
+                                                className="w-12 h-12 rounded-full object-cover shadow-lg shrink-0" 
+                                                onError={(e) => {
+                                                    e.target.onerror = null;
+                                                    e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(match.name || 'User')}&background=random`;
+                                                }}
+                                            />
                                         ) : (
                                             <div className={`w-12 h-12 rounded-full ${getColor(match.name)} flex items-center justify-center text-lg font-bold text-white shadow-lg shrink-0`}>
-                                                {match.name?.charAt(0)?.toUpperCase()}
+                                                {match.name?.charAt(0)?.toUpperCase() || 'U'}
                                             </div>
                                         )}
                                         {/* Online dot */}

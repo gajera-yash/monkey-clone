@@ -157,8 +157,16 @@ const DesktopHistoryModal = ({ onClose }) => {
                             <div className="flex items-center justify-between px-1">
                                 <div className="flex items-center gap-4">
                                     <div className={`w-14 h-14 rounded-full flex items-center justify-center text-xl font-bold text-white shadow-lg overflow-hidden ${item.avatarColor || avatarColors[index % avatarColors.length]}`}>
-                                        {item.avatar ? (
-                                            <img src={item.avatar} alt={item.name} className="w-full h-full object-cover" />
+                                        {item.avatar && item.avatar !== 'null' && item.avatar !== 'undefined' ? (
+                                            <img 
+                                                src={item.avatar} 
+                                                alt={item.name} 
+                                                className="w-full h-full object-cover" 
+                                                onError={(e) => {
+                                                    e.target.onerror = null;
+                                                    e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(item.name || 'User')}&background=random`;
+                                                }}
+                                            />
                                         ) : (
                                             item.name?.charAt(0) || '?'
                                         )}

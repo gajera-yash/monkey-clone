@@ -20,6 +20,10 @@ const getCashfreeHeaders = () => {
 };
 
 const getCashfreeUrl = () => {
+    const appId = process.env.CASHFREE_APP_ID || "TEST110318160b1c0d9b14535af06f5e61813011";
+    if (appId.startsWith("TEST")) {
+        return 'https://sandbox.cashfree.com/pg/orders';
+    }
     return process.env.CASHFREE_ENV === 'PRODUCTION' ? 
         'https://api.cashfree.com/pg/orders' : 
         'https://sandbox.cashfree.com/pg/orders';
@@ -96,13 +100,14 @@ router.post('/subscribe/create-order', async (req, res) => {
 
     // Return cashfreeEnv so frontend can dynamically set mode
     const cashfreeEnv = (process.env.CASHFREE_ENV || 'SANDBOX').toUpperCase();
+    const activeAppId = process.env.CASHFREE_APP_ID || "TEST110318160b1c0d9b14535af06f5e61813011";
 
     res.json({
         orderId: data.order_id,
         paymentSessionId: data.payment_session_id,
         amount: amount,
         currency: "INR",
-        cashfreeMode: cashfreeEnv === 'PRODUCTION' ? 'production' : 'sandbox'
+        cashfreeMode: (cashfreeEnv === 'PRODUCTION' && !activeAppId.startsWith("TEST")) ? 'production' : 'sandbox'
     });
 
   } catch (error) {
