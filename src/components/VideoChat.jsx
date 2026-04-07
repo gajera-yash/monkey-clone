@@ -96,9 +96,11 @@ const VideoChat = ({ onEndChat }) => {
   const [isCamOn, setIsCamOn] = useState(true);
   const [status, setStatus] = useState('Idle');
   const [startTime, setStartTime] = useState(null);
+  const startTimeRef = useRef(null); // Add ref for startTime to access inside stable closures
 
   // Chat & Timer States
   const [messages, setMessages] = useState([]);
+  const messagesRef = useRef([]); // Add ref for messages to access inside stable closures
   const [newMessage, setNewMessage] = useState('');
   const [isPartnerTyping, setIsPartnerTyping] = useState(false);
   const [chatTimer, setChatTimer] = useState(0);
@@ -529,7 +531,11 @@ const VideoChat = ({ onEndChat }) => {
     };
 
     socket.emit('send-message', { roomId: roomIdRef.current, message: messageData });
-    setMessages(prev => [...prev, messageData]);
+    setMessages(prev => {
+        const updated = [...prev, messageData];
+        messagesRef.current = updated;
+        return updated;
+    });
   };
 
   const handleSendMessage = (e) => {
@@ -694,8 +700,13 @@ const VideoChat = ({ onEndChat }) => {
       
       console.log(`[SocketDebug] Matching with ${partnerName || 'Stranger'}. Initiator: ${initiator}`);
       setStatus('Connected');
-      setStartTime(Date.now());
+      
+      const now = Date.now();
+      setStartTime(now);
+      startTimeRef.current = now;
+      
       setMessages([]);
+      messagesRef.current = [];
       setChatTimer(0);
 
       // --- Deduct filter coins on each match (Unless Direct Call) ---
@@ -848,13 +859,15 @@ const VideoChat = ({ onEndChat }) => {
       setPartnerLocation(null);
       setPartnerIsPremium(false);
       setMessages([]);
+      messagesRef.current = [];
       setChatTimer(0);
       setIsPartnerTyping(false);
       pendingIceCandidates.current = [];
       
       if (activeLogId.current) {
-        const durationSec = startTime ? Math.floor((Date.now() - startTime) / 1000) : 0;
-        updateChatLog(activeLogId.current, durationSec, messages.length);
+        const start = startTimeRef.current;
+        const durationSec = start ? Math.floor((Date.now() - start) / 1000) : 0;
+        updateChatLog(activeLogId.current, durationSec, messagesRef.current.length);
         activeLogId.current = null;
       }
       payoutSessionEarnings();
@@ -870,7 +883,11 @@ const VideoChat = ({ onEndChat }) => {
     };
 
     const handleReceiveMessage = (message) => {
-      setMessages(prev => [...prev, message]);
+      setMessages(prev => {
+          const updated = [...prev, message];
+          messagesRef.current = updated;
+          return updated;
+      });
       setUnreadCount(prevCount => showChat ? 0 : prevCount + 1);
       notificationSound.current.play().catch(e => console.log("Sound play failed", e));
       if (message.type === 'gift' && currentUser?.isCreator && message.giftValue) {
@@ -926,14 +943,15 @@ const VideoChat = ({ onEndChat }) => {
 
   const endCall = () => {
     if (status === 'Connected' && partnerName) {
-      const durationSec = startTime ? Math.floor((Date.now() - startTime) / 1000) : 0;
+      const start = startTimeRef.current;
+      const durationSec = start ? Math.floor((Date.now() - start) / 1000) : 0;
       const minutes = Math.floor(durationSec / 60);
       const seconds = durationSec % 60;
       const durationStr = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
 
       // Update Unified Chat Monitoring Log
       if (activeLogId.current) {
-        updateChatLog(activeLogId.current, durationSec, messages.length);
+        updateChatLog(activeLogId.current, durationSec, messagesRef.current.length);
         activeLogId.current = null;
       }
 
@@ -949,6 +967,7 @@ const VideoChat = ({ onEndChat }) => {
     if (roomIdRef.current) socket.emit('leave-room', { roomId: roomIdRef.current });
 
     setStartTime(null);
+    startTimeRef.current = null;
     setSessionEarnings(0);
     pendingFilterCharge.current = null;
     onEndChat();
