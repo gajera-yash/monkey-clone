@@ -177,6 +177,14 @@ export const AuthProvider = ({ children }) => {
             });
             if (error) throw error;
             setIsGuest(false);
+            
+            // Check if the user is actually an admin
+            let profile = await fetchProfile(data.user.id);
+            if (!profile || !['admin', 'moderator', 'support'].includes(profile.role)) {
+                await supabase.auth.signOut();
+                throw new Error("Access Denied: You do not have administrative privileges.");
+            }
+            
             toast.success("Admin logged in successfully!");
             return data.user;
         } catch (error) {

@@ -13,10 +13,9 @@ const AdminLoginModal = () => {
         setLoading(true);
         try {
             await loginWithEmail(email, password);
-            // Refresh to trigger AdminContext check
-            window.location.reload();
+            // We no longer reload the window; we let AuthContext & AdminContext dynamically update the route.
         } catch (error) {
-            console.error(error);
+            console.error("Admin Login Error:", error);
         } finally {
             setLoading(false);
         }
