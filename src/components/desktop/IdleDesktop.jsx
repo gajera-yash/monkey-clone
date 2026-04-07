@@ -220,8 +220,8 @@ const IdleDesktop = ({ localVideoRef, isCamOn, isMicOn, onStartChat, onToggleCam
                             </div>
                         </div>
 
-                        {/* Location Filter */}
-                        <div className="mb-4 relative">
+                        {/* Location Filter (Hidden per request) */}
+                        <div className="hidden mb-4 relative">
                             <p className="text-white/50 text-xs font-bold tracking-widest uppercase mb-2">
                                 Location Filter
                             </p>

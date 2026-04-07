@@ -18,7 +18,7 @@ import DesktopSubscriptionModal from './desktop/modals/DesktopSubscriptionModal'
 import DesktopSearchModal from './desktop/modals/DesktopSearchModal';
 import DesktopSafetyModal from './desktop/modals/DesktopSafetyModal';
 import DesktopMatchPreferenceModal from './desktop/modals/DesktopMatchPreferenceModal';
-import { RiMagicLine, RiChat3Line, RiFlagLine, RiHeartLine, RiEmotionHappyLine, RiGiftLine, RiArrowRightDoubleLine, RiMicFill, RiMicOffLine, RiVidiconFill, RiVideoOffLine, RiCloseLine, RiMenuLine, RiUserLine, RiSendPlaneLine } from 'react-icons/ri';
+import { RiMagicLine, RiChat3Line, RiFlagLine, RiHeartLine, RiEmotionHappyLine, RiGiftLine, RiArrowRightDoubleLine, RiMicFill, RiMicOffLine, RiVidiconFill, RiVideoOffLine, RiCloseLine, RiMenuLine, RiUserLine, RiSendPlaneLine, RiSearchFill, RiHistoryFill, RiShieldCheckFill, RiGiftFill, RiWallet3Fill } from 'react-icons/ri';
 import CoinStoreModal from './coins/CoinStoreModal';
 import SafetyInfoModal from './safety/SafetyInfoModal';
 import { loadNsfwModel, checkVideoForNsfw } from '../utils/nsfwDetector';
@@ -1037,43 +1037,43 @@ const VideoChat = ({ onEndChat }) => {
                 {/* Search */}
                 <button
                   onClick={() => setShowSearchModal(true)}
-                  className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-md border border-white/10 flex items-center justify-center hover:bg-white/10 transition-colors"
+                  className="w-10 h-10 rounded-full bg-black/60 backdrop-blur-md border border-white/10 flex items-center justify-center hover:bg-white/20 transition-all text-white shadow-lg"
                 >
-                  <span className="text-lg">🔍</span>
+                  <RiSearchFill size={20} className="text-white/90" />
                 </button>
 
                 {/* Match History */}
                 <button
                   onClick={() => setShowMatchHistory(true)}
-                  className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-md border border-white/10 flex items-center justify-center hover:bg-white/10 transition-colors"
+                  className="w-10 h-10 rounded-full bg-black/60 backdrop-blur-md border border-white/10 flex items-center justify-center hover:bg-white/20 transition-all text-white shadow-lg"
                 >
-                  <span className="text-lg">🕐</span>
+                  <RiHistoryFill size={20} className="text-white/90" />
                 </button>
 
                 {/* Safety Center */}
                 <button
                   onClick={() => setShowSafetyModal(true)}
-                  className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-md border border-white/10 flex items-center justify-center hover:bg-white/10 transition-colors"
+                  className="w-10 h-10 rounded-full bg-black/60 backdrop-blur-md border border-white/10 flex items-center justify-center hover:bg-white/20 transition-all text-white shadow-lg"
                 >
-                  <span className="text-lg">🛡️</span>
+                  <RiShieldCheckFill size={20} className="text-white/90" />
                 </button>
 
                 {/* Free Coins (Trigger Bonus) */}
                 <button
                   onClick={() => openDailyBonus()}
-                  className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-md border border-yellow-400/30 flex items-center justify-center hover:bg-yellow-400/10 transition-colors relative shadow-[0_0_15px_rgba(250,204,21,0.2)]"
+                  className="w-10 h-10 rounded-full bg-black/60 backdrop-blur-md border border-white/10 flex items-center justify-center hover:bg-white/20 transition-all text-yellow-400 shadow-[0_0_15px_rgba(250,204,21,0.2)] relative"
                 >
-                  <span className="text-lg">💰</span>
+                  <RiGiftFill size={20} />
                   <span className="absolute -bottom-1 text-[8px] bg-green-500 text-white px-1.5 py-0.5 rounded-full font-black uppercase tracking-wider shadow-sm border border-green-400">FREE</span>
                 </button>
 
                 {/* Coin Store (Purchase Coins) */}
                 <button
                   onClick={() => setShowCoinStore(true)}
-                  className="w-10 h-10 rounded-full bg-gradient-to-br from-yellow-300 to-yellow-500 backdrop-blur-md border px-0 border-yellow-200 flex flex-col items-center justify-center hover:scale-105 transition-transform relative shadow-[0_0_20px_rgba(250,204,21,0.4)] mt-2"
+                  className="w-10 h-10 rounded-full bg-black/60 backdrop-blur-md border border-white/10 flex flex-col items-center justify-center hover:scale-105 transition-transform text-yellow-500 shadow-[0_0_20px_rgba(250,204,21,0.3)] mt-2"
                 >
-                  <span className="text-base font-black text-yellow-900 leading-none">C</span>
-                  <span className="text-[7px] font-black uppercase tracking-widest text-yellow-900 leading-none mt-0.5">Topup</span>
+                  <RiWallet3Fill size={20} />
+                  <span className="text-[7px] font-black uppercase tracking-widest leading-none mt-0.5">Topup</span>
                 </button>
               </div>
 

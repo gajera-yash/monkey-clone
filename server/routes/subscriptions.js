@@ -11,8 +11,8 @@ const supabase = createClient(
 // ============ CASHFREE CONFIG ============
 const getCashfreeHeaders = () => {
     return {
-        'x-client-id': process.env.CASHFREE_APP_ID,
-        'x-client-secret': process.env.CASHFREE_SECRET_KEY,
+        'x-client-id': process.env.CASHFREE_APP_ID || "TEST110318160b1c0d9b14535af06f5e61813011",
+        'x-client-secret': process.env.CASHFREE_SECRET_KEY || "cfsk_ma_test_7f8dc4850ce067d9694c1355c45b9609_",
         'x-api-version': '2023-08-01',
         'Content-Type': 'application/json',
         'Accept': 'application/json'

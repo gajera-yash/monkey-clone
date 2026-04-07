@@ -83,8 +83,8 @@ const DesktopMatchPreferenceModal = ({ onClose }) => {
                     </div>
                 </div>
 
-                {/* Region */}
-                <div className="space-y-3">
+                {/* Region (Hidden) */}
+                <div className="hidden space-y-3">
                     <div className="flex items-center gap-2 text-gray-900 font-bold">
                         <span>🌍</span>
                         <span>Region</span>
