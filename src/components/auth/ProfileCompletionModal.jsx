@@ -6,7 +6,7 @@ import toast from 'react-hot-toast';
 const ProfileCompletionModal = ({ isOpen, user }) => {
     const { completeProfile } = useAuth();
     const [birthdate, setBirthdate] = useState('');
-    const [gender, setGender] = useState('');
+    const [gender, setGender] = useState(localStorage.getItem('userGender') || '');
     const [loading, setLoading] = useState(false);
 
     if (!isOpen) return null;
@@ -64,10 +64,18 @@ const ProfileCompletionModal = ({ isOpen, user }) => {
                 <div className="relative h-32 bg-gradient-to-br from-indigo-600 to-purple-700 p-8 flex justify-center">
                     <div className="absolute -bottom-10 w-24 h-24 rounded-3xl bg-[#1a172e] p-1 shadow-2xl">
                         <div className="w-full h-full rounded-[22px] bg-indigo-500/20 flex items-center justify-center text-3xl font-black text-white overflow-hidden border border-white/10">
-                            {user?.photoURL ? (
-                                <img src={user.photoURL} alt="" className="w-full h-full object-cover" />
+                            {user?.photoURL && user.photoURL !== 'null' && user.photoURL !== 'undefined' ? (
+                                <img 
+                                    src={user.photoURL} 
+                                    alt="" 
+                                    className="w-full h-full object-cover" 
+                                    onError={(e) => {
+                                        e.target.onerror = null;
+                                        e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.displayName || 'User')}&background=random`;
+                                    }}
+                                />
                             ) : (
-                                user?.displayName?.charAt(0).toUpperCase()
+                                user?.displayName?.charAt(0)?.toUpperCase() || 'U'
                             )}
                         </div>
                         <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-green-500 rounded-lg flex items-center justify-center border-4 border-[#1a172e] shadow-lg">
@@ -96,10 +104,13 @@ const ProfileCompletionModal = ({ isOpen, user }) => {
                             <div className="relative group">
                                 <Calendar className="absolute left-5 top-1/2 -translate-y-1/2 text-white/30 group-focus-within:text-indigo-400 transition-colors" size={16} />
                                 <input
-                                    type="date"
+                                    type={birthdate ? "date" : "text"}
+                                    onFocus={(e) => e.target.type = 'date'}
+                                    onBlur={(e) => { if (!e.target.value) e.target.type = 'text' }}
+                                    placeholder="Select Birthdate (DD/MM/YYYY)"
                                     value={birthdate}
                                     onChange={(e) => setBirthdate(e.target.value)}
-                                    className="w-full bg-white/5 border border-white/10 rounded-2xl pl-12 pr-5 py-3.5 text-sm font-bold text-white outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all appearance-none"
+                                    className="w-full bg-white/5 border border-white/10 rounded-2xl pl-12 pr-5 py-3.5 text-sm font-bold text-white outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all appearance-none placeholder:text-white/30"
                                 />
                             </div>
                         </div>

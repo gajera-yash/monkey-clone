@@ -426,10 +426,14 @@ const VideoChat = ({ onEndChat }) => {
       if (localVideoRef.current) localVideoRef.current.srcObject = mediaStream;
       setShowPermissionModal(false);
     } catch (err) {
+      // Only show permission modal on error, and let the stream state remain null
       setError("Please allow camera and microphone access.");
       setShowPermissionModal(true);
     }
   }, []);
+
+  const performJoinRef = useRef(performJoin);
+  useEffect(() => { performJoinRef.current = performJoin; }, [performJoin]);
 
   const payoutSessionEarnings = useCallback(async () => {
     if (currentUser?.isCreator && sessionEarnings > 0) {
@@ -505,7 +509,9 @@ const VideoChat = ({ onEndChat }) => {
     setTimeout(() => {
         toast.dismiss(tid);
         console.log("[VideoChat] Transition delay finished, searching for next...");
-        performJoin();
+        if (performJoinRef.current) {
+            performJoinRef.current();
+        }
     }, 500);
   };
 
@@ -856,7 +862,11 @@ const VideoChat = ({ onEndChat }) => {
       pendingFilterCharge.current = null;
       hasEmittedJoin.current = false;
       setStatus('Searching for partner...');
-      performJoin();
+      
+      // Use the ref to avoid stale closure where stream might be null
+      if (performJoinRef.current) {
+          performJoinRef.current();
+      }
     };
 
     const handleReceiveMessage = (message) => {
