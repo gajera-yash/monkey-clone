@@ -1,0 +1,35 @@
+{
+  "config": {
+    "target": "https://strangy-production-56d4.up.railway.app",
+    "phases": [
+      { "duration": 30, "arrivalRate": 5, "name": "Warm up" },
+      { "duration": 60, "arrivalRate": 20, "name": "Normal load" },
+      { "duration": 60, "arrivalRate": 50, "name": "Stress test" }
+    ],
+    "engines": {
+      "socketio": {
+        "transports": ["websocket"]
+      }
+    }
+  },
+  "scenarios": [
+    {
+      "name": "Join waiting queue",
+      "engine": "socketio",
+      "flow": [
+        {
+          "emit": {
+            "channel": "join-waiting",
+            "data": {
+              "userId": "loadtest_user",
+              "gender": "male",
+              "lookingFor": "any",
+              "isPremium": false
+            }
+          }
+        },
+        { "think": 30 }
+      ]
+    }
+  ]
+}
