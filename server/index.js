@@ -20,7 +20,6 @@ process.on('unhandledRejection', (reason, promise) => {
     console.error('Reason:', reason);
     console.error('========================================');
 });
-
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -32,38 +31,39 @@ const subscriptionsRoutes = require('./routes/subscriptions');
 
 const app = express();
 
-// ============================================================
-// FIX 1: CORS — Removed forced "return true" debug bypass
-// Production ma origin properly check thase
-// ============================================================
+// CORS: Allow Vercel frontend in production
 const FRONTEND_URL = process.env.FRONTEND_URL || '*';
 const allowedOrigins = FRONTEND_URL.split(',').map(o => o.trim()).filter(Boolean);
 
 const isAllowedOrigin = (origin) => {
+    // Standardize origin for comparison (remove trailing slashes)
     const cleanOrigin = origin ? origin.replace(/\/+$/, "") : null;
+
+    // Log incoming origin for debugging (VERY HELPFUL)
+    console.log(`[CORS DEBUG] Incoming Origin: ${origin || 'No Origin (Direct call)'}`);
+
     if (!cleanOrigin) return true;
     if (FRONTEND_URL === '*') return true;
+
     return allowedOrigins.some(ao => ao.replace(/\/+$/, "") === cleanOrigin);
 };
 
 app.use(cors({
     origin: (origin, callback) => {
         if (isAllowedOrigin(origin)) return callback(null, true);
-        console.warn(`[CORS] Blocked origin: ${origin}`);
-        return callback(new Error('Not allowed by CORS'));
+        return callback(null, true); // FINAL RASTO: Force allow during debug
     },
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     credentials: false
 }));
-
 app.use(express.json());
 
-// Health Check
+// Health Check Endpoint
 app.get('/health', (req, res) => {
     res.status(200).json({ status: 'ok', time: new Date().toISOString(), port: process.env.PORT || 3001 });
 });
 
-// Supabase admin client
+// Supabase admin client for server-side checks
 const supabaseUrl = process.env.SUPABASE_URL || process.env.REACT_APP_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY || process.env.REACT_APP_SUPABASE_ANON_KEY;
 const supabase = (supabaseUrl && supabaseServiceKey) ? createClient(supabaseUrl, supabaseServiceKey) : null;
@@ -72,7 +72,7 @@ const supabase = (supabaseUrl && supabaseServiceKey) ? createClient(supabaseUrl,
 app.use('/api/coins', coinsRoutes);
 app.use('/api/subscriptions', subscriptionsRoutes);
 
-// Static build (combined deploy only)
+// Serve static files from the React app (only if build folder exists - for combined deploy)
 const buildPath = path.join(__dirname, '../build');
 if (fs.existsSync(buildPath)) {
     app.use(express.static(buildPath));
@@ -81,30 +81,24 @@ if (fs.existsSync(buildPath)) {
 const server = http.createServer(app);
 const io = new Server(server, {
     cors: {
-        origin: (origin, callback) => {
-            if (isAllowedOrigin(origin)) return callback(null, true);
-            return callback(new Error('Not allowed by CORS'));
-        },
+        origin: true, // Echo origin (Safest for debug)
         methods: ["GET", "POST", "OPTIONS"],
         credentials: false
     },
     transports: ['websocket', 'polling'],
-    allowEIO3: true
+    allowEIO3: true // Support older clients if any
 });
 
-// ============================================================
-// STATE
-// ============================================================
+// Queue for users waiting to be matched [{id, name}]
 let waitingUsers = [];
-const socketRooms = new Map();   // socketId -> roomId
-const userSockets = new Map();   // uid -> socketId
-const userMatchHistory = new Map(); // uid -> array of recent matched genders
-const onlineCreators = new Map(); // uid -> userData
+const socketRooms = new Map(); // socketId -> roomId
+const userSockets = new Map(); // uid -> socketId
+const userMatchHistory = new Map(); // uid -> array of recent matched genders ['Male', 'Female', ...]
+const onlineCreators = new Map(); // uid -> userData (including socketId)
+
+// Simple Rate Limiting Map
 const socketRateLimits = new Map(); // socketId:event -> lastTimestamp
 
-// ============================================================
-// HELPERS
-// ============================================================
 const isRateLimited = (socketId, event, limitMs = 1000) => {
     const key = `${socketId}:${event}`;
     const now = Date.now();
@@ -114,6 +108,7 @@ const isRateLimited = (socketId, event, limitMs = 1000) => {
     return false;
 };
 
+// Flagged keywords list (auto-disconnect triggers)
 const FLAGGED_KEYWORDS = [
     'cp', 'child porn', 'underage', 'lolita', 'jailbait',
     'minor sex', 'kill yourself', 'kys', 'suicide method',
@@ -125,10 +120,10 @@ const containsFlaggedKeyword = (text) => {
     return FLAGGED_KEYWORDS.some(kw => lower.includes(kw));
 };
 
-// Geo-block cache
+// Fetch blocked countries from DB (cached)
 let geoBlockCache = [];
 let geoBlockLastFetch = 0;
-const GEO_CACHE_TTL = 60 * 1000;
+const GEO_CACHE_TTL = 60 * 1000; // 1 minute
 
 const getGeoBlocks = async () => {
     if (!supabase) return [];
@@ -139,10 +134,11 @@ const getGeoBlocks = async () => {
         geoBlockLastFetch = Date.now();
         return geoBlockCache;
     } catch (e) {
-        return geoBlockCache;
+        return geoBlockCache; // use cached on error
     }
 };
 
+// Check if a user has 3+ reports in the last hour
 const checkAutoDisconnect = async (uid) => {
     if (!supabase || !uid) return false;
     try {
@@ -156,177 +152,7 @@ const checkAutoDisconnect = async (uid) => {
     } catch (e) { return false; }
 };
 
-// ============================================================
-// MATCHING ENGINE HELPERS (extracted — no longer nested)
-// ============================================================
-const calculateAge = (birthdate) => {
-    if (!birthdate) return null;
-    const birth = new Date(birthdate);
-    const today = new Date();
-    let age = today.getFullYear() - birth.getFullYear();
-    const m = today.getMonth() - birth.getMonth();
-    if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
-    return age;
-};
-
-const matchesFilters = (user, filterer) => {
-    const filters = filterer.filters || {};
-
-    if (filters.gender && filters.gender !== 'Both') {
-        if (user.gender !== filters.gender) return false;
-    }
-
-    if (filters.ageRange && filters.ageRange !== 'Any') {
-        const age = calculateAge(user.birthdate);
-        if (age === null) return false;
-        if (filters.ageRange === '18-25' && (age < 18 || age > 25)) return false;
-        if (filters.ageRange === '26-35' && (age < 26 || age > 35)) return false;
-        if (filters.ageRange === '36+' && age < 36) return false;
-    }
-
-    if (filters.location && filters.location !== 'Global') {
-        const userCountry = typeof user.location === 'string'
-            ? user.location
-            : (user.location?.country || '');
-        if (!userCountry.toLowerCase().includes(filters.location.toLowerCase())) return false;
-    }
-
-    return true;
-};
-
-const checkRatioLimit = (userA, userB) => {
-    const aGender = userA.gender || 'Male';
-    const bGender = userB.gender || 'Male';
-    if (aGender !== 'Male' || bGender !== 'Female') return false;
-    if (userA.filters?.gender && userA.filters.gender !== 'Both') return false;
-    const history = userMatchHistory.get(userA.uid) || [];
-    const femaleCount = history.filter(g => g === 'Female').length;
-    return femaleCount >= 3;
-};
-
-const recordMatch = (uid, partnerGender) => {
-    if (!uid) return;
-    const gender = partnerGender || 'Male';
-    const history = userMatchHistory.get(uid) || [];
-    history.push(gender);
-    if (history.length > 10) history.shift();
-    userMatchHistory.set(uid, history);
-};
-
-// ============================================================
-// FIX 2: MATCHING ENGINE
-// - O(n²) loop capped at 20 — prevents freeze at scale
-// - Recursive setTimeout replaced with one-time guarded retry
-// ============================================================
-const attemptMatching = () => {
-    if (waitingUsers.length < 2) return;
-
-    // Sort: premium/filter users first
-    const isPriority = (u) => {
-        const f = u.filters || {};
-        return (f.gender && f.gender !== 'Both') ||
-            (f.ageRange && f.ageRange !== 'Any') ||
-            (f.location && f.location !== 'Global');
-    };
-    waitingUsers.sort((a, b) => (isPriority(b) ? 1 : 0) - (isPriority(a) ? 1 : 0));
-
-    // FIX: Cap scan at 20 users — O(n²) becomes O(400) max, not O(n²) unbounded
-    const scanLimit = Math.min(waitingUsers.length, 20);
-
-    let matchFound = false;
-    let user1Index = -1;
-    let user2Index = -1;
-
-    for (let i = 0; i < scanLimit && !matchFound; i++) {
-        const u1 = waitingUsers[i];
-        for (let j = i + 1; j < scanLimit; j++) {
-            const u2 = waitingUsers[j];
-
-            const u1BlocksU2 = (u1.blockedUsers || []).includes(u2.uid) ||
-                (u1.uid && (u2.blockedUsers || []).includes(u1.uid));
-            const u2BlocksU1 = (u2.blockedUsers || []).includes(u1.uid) ||
-                (u2.uid && (u1.blockedUsers || []).includes(u2.uid));
-
-            if (u1BlocksU2 || u2BlocksU1) continue;
-
-            if (u1.skippedPartner && u1.skippedPartner === u2.uid) continue;
-            if (u2.skippedPartner && u2.skippedPartner === u1.uid) continue;
-
-            if (checkRatioLimit(u1, u2) || checkRatioLimit(u2, u1)) continue;
-
-            const u1FiltersMatchU2 = matchesFilters(u2, u1);
-            const u2FiltersMatchU1 = matchesFilters(u1, u2);
-
-            if (u1FiltersMatchU2 && u2FiltersMatchU1) {
-                user1Index = i;
-                user2Index = j;
-                matchFound = true;
-                break;
-            }
-        }
-    }
-
-    if (matchFound) {
-        const u1 = waitingUsers[user1Index];
-        const u2 = waitingUsers[user2Index];
-
-        waitingUsers.splice(user2Index, 1);
-        waitingUsers.splice(user1Index, 1);
-
-        const roomId = `room_${u1.id}_${u2.id}_${Date.now()}`;
-        console.log(`[Match] Pair Found: ${u1.name} & ${u2.name} -> ${roomId}`);
-
-        recordMatch(u1.uid, u2.gender);
-        recordMatch(u2.uid, u1.gender);
-
-        io.to(u1.id).socketsJoin(roomId);
-        io.to(u2.id).socketsJoin(roomId);
-
-        socketRooms.set(u1.id, roomId);
-        socketRooms.set(u2.id, roomId);
-
-        io.to(u1.id).emit('matched', {
-            roomId, initiator: true,
-            partnerId: u2.uid, partnerName: u2.name,
-            partnerLocation: u2.location, partnerIsPremium: u2.isPremium,
-            partnerGender: u2.gender, partnerBirthdate: u2.birthdate
-        });
-        io.to(u2.id).emit('matched', {
-            roomId, initiator: false,
-            partnerId: u1.uid, partnerName: u1.name,
-            partnerLocation: u1.location, partnerIsPremium: u1.isPremium,
-            partnerGender: u1.gender, partnerBirthdate: u1.birthdate
-        });
-
-    } else {
-        console.log(`[MatchEngine] No suitable pairs. Queue: ${waitingUsers.length}`);
-
-        // FIX: One-time retry with guard — no unbounded recursion
-        if (waitingUsers.length >= 2) {
-            let retryFired = false;
-            setTimeout(() => {
-                if (retryFired) return;
-                retryFired = true;
-
-                let cleared = false;
-                waitingUsers.forEach(u => {
-                    if (u.skippedPartner) {
-                        u.skippedPartner = null;
-                        cleared = true;
-                    }
-                });
-                if (cleared && waitingUsers.length >= 2) {
-                    console.log(`[MatchEngine] One-time retry after clearing skipped partners`);
-                    attemptMatching();
-                }
-            }, 5000);
-        }
-    }
-};
-
-// ============================================================
-// REST ENDPOINTS
-// ============================================================
+// Status endpoint for debugging
 app.get('/api/status', (req, res) => {
     res.json({
         totalConnections: io.engine.clientsCount,
@@ -336,45 +162,74 @@ app.get('/api/status', (req, res) => {
     });
 });
 
+// Geo-blocks endpoint (for frontend to read)
 app.get('/api/geo-blocks', async (req, res) => {
     const blocks = await getGeoBlocks();
     res.json({ blocked_countries: blocks });
 });
 
+// Helper for admin verification
 const verifyAdmin = async (req) => {
     const authHeader = req.headers.authorization;
     if (!authHeader) return { error: 'No authorization header' };
+
     const token = authHeader.split(' ')[1];
     if (!token) return { error: 'Invalid token format' };
+
     try {
         const { data: { user }, error: authError } = await supabase.auth.getUser(token);
         if (authError || !user) return { error: 'Invalid session' };
+
         const { data: admin, error: dbError } = await supabase
-            .from('admin_team_members').select('role')
-            .eq('user_id', user.id).eq('is_active', true).single();
+            .from('admin_team_members')
+            .select('role')
+            .eq('user_id', user.id)
+            .eq('is_active', true)
+            .single();
+
         if (dbError || !admin || admin.role !== 'admin') {
+            // Second fallback: check profiles if they are super user
             const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
             if (profile?.role === 'admin') return { user };
             return { error: 'Access denied' };
         }
+
         return { user };
     } catch (e) {
         return { error: 'Verification failed' };
     }
 };
 
+// Create Admin User endpoint (bypass confirmation)
 app.post('/api/admin/create-user', async (req, res) => {
     const { user: requester, error: verifyError } = await verifyAdmin(req);
     if (verifyError) return res.status(403).json({ error: verifyError });
+
     const { email, password, metadata } = req.body;
     if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
-    console.log(`[Admin] Creating team member: ${email}`);
+
+    console.log(`[Admin] Admin ${requester.id} is creating new team member: ${email}`);
+
     try {
+        // 1. Create User with email_confirm: true
         const { data, error } = await supabase.auth.admin.createUser({
-            email, password, email_confirm: true, user_metadata: metadata || {}
+            email,
+            password,
+            email_confirm: true,
+            user_metadata: metadata || {}
         });
+
         if (error) throw error;
-        await supabase.auth.admin.updateUserById(data.user.id, { email_confirm: true });
+        const newUserId = data.user.id;
+
+        // 2. EXTRA SAFETY: Explicitly update the user to be confirmed (fallback for some Supabase configs)
+        const { error: confirmError } = await supabase.auth.admin.updateUserById(newUserId, {
+            email_confirm: true
+        });
+
+        if (confirmError) console.warn('[Admin] Manual confirmation fallback failed:', confirmError.message);
+
+        console.log(`[Admin] Successfully created confirmed user: ${email} (ID: ${newUserId})`);
         res.json({ user: data.user });
     } catch (err) {
         console.error('[Admin] Failed to create user:', err);
@@ -382,41 +237,39 @@ app.post('/api/admin/create-user', async (req, res) => {
     }
 });
 
+// Flag report endpoint — called by frontend after report is filed
+// Checks report count and emits auto-disconnect if threshold exceeded
 app.post('/api/flag-report', async (req, res) => {
     const { reportedUid } = req.body;
     if (!reportedUid) return res.json({ disconnect: false });
     const shouldDisconnect = await checkAutoDisconnect(reportedUid);
     if (shouldDisconnect) {
+        // Find socket for this uid and forcefully disconnect
         const targetSocketId = userSockets.get(reportedUid);
         if (targetSocketId) {
             const roomId = socketRooms.get(targetSocketId);
             if (roomId) {
-                io.to(roomId).emit('system-disconnect', {
-                    reason: 'Multiple reports received. Auto-disconnected by safety system.'
-                });
+                io.to(roomId).emit('system-disconnect', { reason: 'Multiple reports received. Auto-disconnected by safety system.' });
                 socketRooms.delete(targetSocketId);
             }
             waitingUsers = waitingUsers.filter(u => u.uid !== reportedUid);
-            console.log(`[SafetySystem] Auto-disconnected ${reportedUid}`);
+            console.log(`[SafetySystem] Auto-disconnected user ${reportedUid} due to 3+ reports in 1 hour`);
         }
     }
     res.json({ disconnect: shouldDisconnect });
 });
 
-// ============================================================
-// SOCKET.IO
-// ============================================================
 io.on('connection', (socket) => {
     console.log(`[Socket] Connected: ${socket.id} | Total: ${io.engine.clientsCount}`);
 
-    // FIX 3: Only notify the joining socket — not broadcast to ALL
-    socket.emit('waiting-count', waitingUsers.length);
+    // Immediately tell the new client and everyone else the updated total count
+    io.emit('waiting-count', io.engine.clientsCount);
 
-    // --- DIRECT CREATOR CALLS ---
+    // --- DIRECT 1-TO-1 CALLS LOGIC ---
     socket.on('creator-online', (userData) => {
         if (!userData || !userData.uid) return;
         onlineCreators.set(userData.uid, { ...userData, socketId: socket.id });
-        console.log(`[Creator Online] ${userData.name}`);
+        console.log(`[Creator Online] ${userData.name} is accepting direct calls`);
     });
 
     socket.on('creator-offline', (uid) => {
@@ -427,37 +280,73 @@ io.on('connection', (socket) => {
         if (isRateLimited(socket.id, 'direct-call', 5000)) {
             return socket.emit('error', { message: 'Please wait before making another call.' });
         }
-        let targetSocketId = onlineCreators.get(targetUid)?.socketId || userSockets.get(targetUid);
+        // First check if it's a creator on the dashboard
+        let targetSocketId = onlineCreators.get(targetUid)?.socketId;
+
+        // If not on dashboard, check global socket mapping
+        if (!targetSocketId) {
+            targetSocketId = userSockets.get(targetUid);
+            console.log(`[Direct Call] Target ${targetUid} not on dashboard, found global socket: ${!!targetSocketId}`);
+        }
+
         if (targetSocketId) {
+            const creator = onlineCreators.get(targetUid);
+            const targetName = creator ? creator.name : 'User';
+
+            console.log(`[Direct Call] ${callerData.name} calling ${targetName}`);
+
+            // Track pending call for cancellation
             socket.pendingCallTargetId = targetSocketId;
+
             io.to(targetSocketId).emit('incoming-call', {
-                callerSocketId: socket.id, callerData, isNewDirectCall: true
+                callerSocketId: socket.id,
+                callerData,
+                // Include target info for the App.js global listener to show better UI
+                isNewDirectCall: true
             });
         } else {
+            console.log(`[Direct Call Failed] Target ${targetUid} offline`);
             socket.emit('direct-call-declined', { reason: 'offline' });
         }
     });
 
     socket.on('accept-direct-call', ({ callerSocketId, callerData, creatorData }) => {
+        // Clear pending status for the caller since it's accepted
         const callerSocket = io.sockets.sockets.get(callerSocketId);
-        if (callerSocket) callerSocket.pendingCallTargetId = null;
+        if (callerSocket) {
+            callerSocket.pendingCallTargetId = null;
+        }
 
         const roomId = `direct_${callerSocketId}_${socket.id}`;
+
+        // Remove from waiting queue if they accidentally got in
         waitingUsers = waitingUsers.filter(u => u.id !== callerSocketId && u.id !== socket.id);
 
+        // Join both sockets to the new room
         io.to(callerSocketId).socketsJoin(roomId);
         socket.join(roomId);
+
         socketRooms.set(callerSocketId, roomId);
         socketRooms.set(socket.id, roomId);
 
+        console.log(`[Direct Call Accepted] Room: ${roomId} created for ${creatorData.name}`);
+
+        // Start call immediately (simulate normal matching format)
         io.to(callerSocketId).emit('matched', {
-            roomId, initiator: true,
-            partnerId: creatorData.uid, partnerName: creatorData.name,
-            partnerGender: creatorData.gender || 'Female', isDirectCall: true
+            roomId,
+            initiator: true,
+            partnerId: creatorData.uid,
+            partnerName: creatorData.name,
+            partnerGender: creatorData.gender || 'Female',
+            isDirectCall: true
         });
+
         socket.emit('matched', {
-            roomId, initiator: false,
-            partnerId: callerData?.uid, partnerName: callerData?.name || 'User', isDirectCall: true
+            roomId,
+            initiator: false,
+            partnerId: callerData?.uid,
+            partnerName: callerData?.name || 'User',
+            isDirectCall: true
         });
     });
 
@@ -470,55 +359,80 @@ io.on('connection', (socket) => {
     });
 
     socket.on('cancel-direct-call', ({ targetUid }) => {
-        const targetSocketId = onlineCreators.get(targetUid)?.socketId || userSockets.get(targetUid);
-        if (targetSocketId) io.to(targetSocketId).emit('call-cancelled', { callerSocketId: socket.id });
+        let targetSocketId = onlineCreators.get(targetUid)?.socketId || userSockets.get(targetUid);
+        if (targetSocketId) {
+            io.to(targetSocketId).emit('call-cancelled', { callerSocketId: socket.id });
+        }
         socket.pendingCallTargetId = null;
     });
+    // --- END DIRECT CALLS LOGIC ---
 
-    // --- SAFETY ---
+    // Safety Violation reported by the client (e.g. NSFW detected 3 times)
     socket.on('system-violation', async ({ reason, uid }) => {
         console.log(`[SafetyViolation] ${uid} flagged for: ${reason}`);
         if (!supabase || !uid) return;
+
         try {
-            const { data: profile } = await supabase.from('profiles')
-                .select('strike_count, is_blocked').eq('id', uid).single();
+            // 1. Get current strike count
+            const { data: profile } = await supabase.from('profiles').select('strike_count, is_blocked').eq('id', uid).single();
             const newStrikeCount = (profile?.strike_count || 0) + 1;
+
+            // Mirror StrikeSystem.jsx logic
             let ban_expiry = null;
             let is_blocked = profile?.is_blocked || false;
+
             if (newStrikeCount === 2) {
                 ban_expiry = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
                 is_blocked = true;
             } else if (newStrikeCount >= 3) {
                 is_blocked = true;
             }
+
+            // 2. Update Profile
             await supabase.from('profiles').update({
                 strike_count: newStrikeCount,
                 last_strike_at: new Date().toISOString(),
-                is_blocked, ban_expiry,
+                is_blocked,
+                ban_expiry,
                 ban_reason: `System: ${reason} (Strike ${newStrikeCount})`
             }).eq('id', uid);
+
+            // 3. Log Strike
             await supabase.from('user_strikes').insert({
-                user_id: uid, strike_number: newStrikeCount, reason,
-                admin_id: null,
+                user_id: uid,
+                strike_number: newStrikeCount,
+                reason: reason,
+                admin_id: null, // System-generated
                 action_taken: newStrikeCount === 1 ? 'warning' : newStrikeCount === 2 ? '24hr_ban' : 'permanent_ban',
                 expires_at: ban_expiry
             });
+
             console.log(`[SafetyViolation] Strike ${newStrikeCount} issued to ${uid}`);
         } catch (e) {
-            console.error('[SafetyViolation] Failed:', e);
+            console.error('[SafetyViolation] Failed to log strike:', e);
         }
     });
 
-    // --- MATCHMAKING ---
+    // User wants to find a random match
     socket.on('join-waiting', async (userData) => {
         if (isRateLimited(socket.id, 'join', 2000)) return;
+        console.log(`[Join] User ${socket.id} requested match:`, userData);
 
-        let name = 'Stranger', uid = null, blockedUsers = [], location = null;
-        let isPremium = false, gender = null, birthdate = null, filters = {}, skippedPartner = null;
+        // Handle both simple string (legacy) and object (new)
+        let name = 'Stranger';
+        let uid = null;
+        let blockedUsers = [];
+        let location = null;
+        let isPremium = false;
+        let gender = null;
+
+        let birthdate = null;
+        let filters = {};
+        let skippedPartner = null;
 
         if (typeof userData === 'string') {
             name = userData;
-        } else if (typeof userData === 'object' && userData !== null) {
+        } else if (typeof userData === 'object') {
             name = userData.name || 'Stranger';
             uid = userData.uid;
             blockedUsers = userData.blockedUsers || [];
@@ -530,44 +444,259 @@ io.on('connection', (socket) => {
             skippedPartner = userData.skippedPartner || null;
         }
 
-        const user = { id: socket.id, name, uid, blockedUsers, location, isPremium, gender, birthdate, filters, skippedPartner };
+        const user = {
+            id: socket.id,
+            name,
+            uid,
+            blockedUsers,
+            location,
+            isPremium,
+            gender,
+            birthdate,
+            filters,
+            skippedPartner
+        };
 
-        // Geo-block check
+        // --- GEO-BLOCK CHECK ---
         const userCountry = typeof location === 'object' ? (location?.country || '') : (location || '');
         if (userCountry) {
             try {
                 const blockedCountries = await getGeoBlocks();
+                const countryUpper = userCountry.toUpperCase();
                 const isBlocked = blockedCountries.some(code =>
-                    code === userCountry.toUpperCase() ||
+                    code === countryUpper ||
                     userCountry.toLowerCase().includes(code.toLowerCase())
                 );
                 if (isBlocked) {
-                    socket.emit('geo-blocked', { reason: 'Your country is currently restricted.' });
+                    console.log(`[GeoBlock] Blocked user from: ${userCountry}`);
+                    socket.emit('geo-blocked', { reason: 'Your country is currently restricted from this platform.' });
                     return;
                 }
             } catch (e) {
                 console.error('[GeoBlock] Check failed:', e);
             }
         }
+        // -----------------------
 
-        // Deduplicate queue
+        // Avoid duplicates
         const existingIdx = waitingUsers.findIndex(u => u.id === socket.id);
         if (existingIdx === -1) {
             waitingUsers.push(user);
         } else {
-            waitingUsers[existingIdx] = user;
+            waitingUsers[existingIdx] = user; // Update info if already in queue
         }
 
-        console.log(`[Queue] ${user.name} joined. Pool: ${waitingUsers.length}`);
+        console.log(`[Queue] User ${user.uid || user.id} (${user.name}) joined. Pool: ${waitingUsers.length}`);
+        io.emit('waiting-count', io.engine.clientsCount);
 
-        // FIX 3: Only emit to this socket, not entire server
-        socket.emit('waiting-count', waitingUsers.length);
+        // Matching function (extracted so it can be called later for retries)
+        const attemptMatching = () => {
+            // Check if we can match
+            if (waitingUsers.length >= 2) {
+                console.log(`[MatchEngine] Attempting to match from pool of ${waitingUsers.length}...`);
+
+                // 1. Sort users: priority users (paid filters) first
+                const isPriority = (u) => {
+                    const f = u.filters || {};
+                    return (f.gender && f.gender !== 'Both') ||
+                        (f.ageRange && f.ageRange !== 'Any') ||
+                        (f.location && f.location !== 'Global');
+                };
+
+                waitingUsers.sort((a, b) => {
+                    const aPrio = isPriority(a) ? 1 : 0;
+                    const bPrio = isPriority(b) ? 1 : 0;
+                    return bPrio - aPrio;
+                });
+
+                let matchFound = false;
+                let user1Index = -1;
+                let user2Index = -1;
+
+                // Helper to calculate age from birthdate
+                const calculateAge = (birthdate) => {
+                    if (!birthdate) return null;
+                    const birth = new Date(birthdate);
+                    const today = new Date();
+                    let age = today.getFullYear() - birth.getFullYear();
+                    const m = today.getMonth() - birth.getMonth();
+                    if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+                    return age;
+                };
+
+                // Helper to check if a user matches another's filters
+                const matchesFilters = (user, filterer) => {
+                    const filters = filterer.filters || {};
+
+                    // 1. Gender check
+                    if (filters.gender && filters.gender !== 'Both') {
+                        if (user.gender !== filters.gender) return false;
+                    }
+
+                    // 2. Age check
+                    if (filters.ageRange && filters.ageRange !== 'Any') {
+                        const age = calculateAge(user.birthdate);
+                        if (age === null) return false; // If no birthdate, can't match age filters
+
+                        if (filters.ageRange === '18-25') {
+                            if (age < 18 || age > 25) return false;
+                        } else if (filters.ageRange === '26-35') {
+                            if (age < 26 || age > 35) return false;
+                        } else if (filters.ageRange === '36+') {
+                            if (age < 36) return false;
+                        }
+                    }
+
+                    // 3. Location check
+                    if (filters.location && filters.location !== 'Global') {
+                        // Assuming location is a country string or object with country
+                        const userCountry = typeof user.location === 'string' ? user.location : (user.location?.country || '');
+                        if (!userCountry.toLowerCase().includes(filters.location.toLowerCase())) return false;
+                    }
+
+                    return true;
+                };
+
+                // Matching loop
+                for (let i = 0; i < waitingUsers.length && !matchFound; i++) {
+                    const u1 = waitingUsers[i];
+
+                    for (let j = i + 1; j < waitingUsers.length; j++) {
+                        const u2 = waitingUsers[j];
+
+                        // Check blocks
+                        const u1BlocksU2 = (u1.blockedUsers || []).includes(u2.uid) || (u1.uid && (u2.blockedUsers || []).includes(u1.uid));
+                        const u2BlocksU1 = (u2.blockedUsers || []).includes(u1.uid) || (u2.uid && (u1.blockedUsers || []).includes(u2.uid));
+
+                        if (u1BlocksU2 || u2BlocksU1) continue;
+
+                        // SKIP CHECK: Don't re-match users who just skipped each other
+                        if (u1.skippedPartner && u1.skippedPartner === u2.uid) {
+                            console.log(`[MatchEngine] Skipping pair: ${u1.name} recently skipped ${u2.name}`);
+                            continue;
+                        }
+                        if (u2.skippedPartner && u2.skippedPartner === u1.uid) {
+                            console.log(`[MatchEngine] Skipping pair: ${u2.name} recently skipped ${u1.name}`);
+                            continue;
+                        }
+
+                        // CHECK FREE MALE FEMALE RATIO LIMIT (3 out of 10 matches)
+                        const checkRatioLimit = (userA, userB) => {
+                            const aGender = userA.gender || 'Male'; // default unknown to Male
+                            const bGender = userB.gender || 'Male';
+
+                            // Condition applies if userA is Male and userB is Female
+                            if (aGender !== 'Male' || bGender !== 'Female') return false;
+
+                            // Only applies if userA (Male) is NOT paying for a gender filter
+                            if (userA.filters?.gender && userA.filters.gender !== 'Both') return false;
+
+                            const history = userMatchHistory.get(userA.uid) || [];
+                            const femaleCount = history.filter(g => g === 'Female').length;
+                            return femaleCount >= 3; // Limit to 3 females per 10 matches
+                        };
+
+                        if (checkRatioLimit(u1, u2) || checkRatioLimit(u2, u1)) {
+                            continue; // Skip this match, save female creator for paid/eligible users
+                        }
+
+                        // CHECK FILTERS ONE-WAY: each user's filter applies to their partner
+                        // u1's filter must match u2's gender/age/location, AND u2's filter must match u1
+                        const u1FiltersMatchU2 = matchesFilters(u2, u1); // does u2 match what u1 wants?
+                        const u2FiltersMatchU1 = matchesFilters(u1, u2); // does u1 match what u2 wants?
+                        if (u1FiltersMatchU2 && u2FiltersMatchU1) {
+                            user1Index = i;
+                            user2Index = j;
+                            matchFound = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (matchFound) {
+                    const u1 = waitingUsers[user1Index];
+                    const u2 = waitingUsers[user2Index];
+
+                    // Remove both from queue (higher index first)
+                    waitingUsers.splice(user2Index, 1);
+                    waitingUsers.splice(user1Index, 1);
+
+                    // Create a globally UNIQUE room ID to prevent race conditions on Next/Skip
+                    const roomId = `room_${u1.id}_${u2.id}_${Date.now()}`;
+                    console.log(`[Match] Pair Found: ${u1.name} & ${u2.name} -> ${roomId}`);
+
+                    // Record the match in history for both users
+                    const recordMatch = (uid, partnerGender) => {
+                        if (!uid) return;
+                        const gender = partnerGender || 'Male';
+                        const history = userMatchHistory.get(uid) || [];
+                        history.push(gender);
+                        if (history.length > 10) history.shift(); // Keep only last 10
+                        userMatchHistory.set(uid, history);
+                    };
+                    recordMatch(u1.uid, u2.gender);
+                    recordMatch(u2.uid, u1.gender);
+
+                    // Join both users to the room
+                    io.to(u1.id).socketsJoin(roomId);
+                    io.to(u2.id).socketsJoin(roomId);
+
+                    // Track which room each socket is in
+                    socketRooms.set(u1.id, roomId);
+                    socketRooms.set(u2.id, roomId);
+
+                    // Notify users they are matched
+                    io.to(u1.id).emit('matched', {
+                        roomId,
+                        initiator: true,
+                        partnerId: u2.uid,
+                        partnerName: u2.name,
+                        partnerLocation: u2.location,
+                        partnerIsPremium: u2.isPremium,
+                        partnerGender: u2.gender,
+                        partnerBirthdate: u2.birthdate
+                    });
+                    io.to(u2.id).emit('matched', {
+                        roomId,
+                        initiator: false,
+                        partnerId: u1.uid,
+                        partnerName: u1.name,
+                        partnerLocation: u1.location,
+                        partnerIsPremium: u1.isPremium,
+                        partnerGender: u1.gender,
+                        partnerBirthdate: u1.birthdate
+                    });
+                } else {
+                    console.log(`[MatchEngine] No suitable pairs found in current pool. Queue status: ${waitingUsers.length} waiting.`);
+
+                    // If only skipped-partner pairs remain, clear skippedPartner after 5 seconds so they can rematch
+                    if (waitingUsers.length >= 2) {
+                        setTimeout(() => {
+                            let cleared = false;
+                            waitingUsers.forEach(u => {
+                                if (u.skippedPartner) {
+                                    console.log(`[MatchEngine] Clearing stale skippedPartner for ${u.name}`);
+                                    u.skippedPartner = null;
+                                    cleared = true;
+                                }
+                            });
+                            // Re-attempt matching after clearing
+                            if (cleared && waitingUsers.length >= 2) {
+                                console.log(`[MatchEngine] Retrying matching after clearing skipped partners...`);
+                                attemptMatching();
+                            }
+                        }, 5000);
+                    }
+                }
+            } // end if waitingUsers.length >= 2
+        }; // end attemptMatching()
 
         attemptMatching();
     });
 
-    // --- WEBRTC SIGNALING ---
+    // WebRTC Signaling Events
     socket.on('offer', ({ offer, roomId }) => {
+        console.log(`[Signal] Offer from ${socket.id} to room ${roomId}`);
         socket.to(roomId).emit('offer', offer);
     });
 
@@ -579,131 +708,199 @@ io.on('connection', (socket) => {
         socket.to(roomId).emit('ice-candidate', candidate);
     });
 
+    // Handle Disconnection
     socket.on('share-log-id', ({ logId, roomId }) => {
-        socket.currentLogId = logId;
+        socket.currentLogId = logId; // Track on this socket for cleanup
         socket.to(roomId).emit('share-log-id', { logId });
     });
 
-    // --- DISCONNECT ---
     socket.on('disconnect', async () => {
-        console.log(`[Socket] Disconnected: ${socket.id} | Remaining: ${io.engine.clientsCount - 1}`);
+        const sid = socket.id;
+        console.log(`User disconnected: ${sid} | Remaining: ${io.engine.clientsCount - 1}`);
 
-        // Close dangling chat log
+        // --- DB CLEANUP FOR DANGLING LOGS ---
         if (socket.currentLogId && supabase) {
             try {
-                const { data: log } = await supabase.from('chat_logs')
-                    .select('start_time, end_time').eq('id', socket.currentLogId).single();
+                // Get the log to check if it's already ended
+                const { data: log } = await supabase
+                    .from('chat_logs')
+                    .select('start_time, end_time')
+                    .eq('id', socket.currentLogId)
+                    .single();
+
                 if (log && !log.end_time) {
                     const endTime = new Date();
                     const duration = Math.floor((endTime - new Date(log.start_time)) / 1000);
-                    await supabase.from('chat_logs').update({
-                        end_time: endTime.toISOString(),
-                        duration: duration > 0 ? duration : 0
-                    }).eq('id', socket.currentLogId);
-                    console.log(`[DB Cleanup] Closed log: ${socket.currentLogId}`);
+
+                    await supabase
+                        .from('chat_logs')
+                        .update({
+                            end_time: endTime.toISOString(),
+                            duration: duration > 0 ? duration : 0
+                        })
+                        .eq('id', socket.currentLogId);
+
+                    console.log(`[DB Cleanup] Auto-closed dangling log: ${socket.currentLogId} | Dur: ${duration}s`);
                 }
             } catch (e) {
                 console.error('[DB Cleanup Error]', e);
             }
         }
+        // ------------------------------------
 
+        // Cancel pending call if caller disconnected
         if (socket.pendingCallTargetId) {
             io.to(socket.pendingCallTargetId).emit('call-cancelled', { callerSocketId: socket.id });
             socket.pendingCallTargetId = null;
         }
 
+        // Remove from waiting list if there
         waitingUsers = waitingUsers.filter(u => u.id !== socket.id);
 
+        // Notify partner in active room
         const roomId = socketRooms.get(socket.id);
         if (roomId) {
             socket.to(roomId).emit('partner-disconnected');
             socketRooms.delete(socket.id);
         }
 
+        // Remove from UID mapping
         for (const [uid, sid] of userSockets.entries()) {
-            if (sid === socket.id) { userSockets.delete(uid); break; }
-        }
-
-        for (const [uid, cData] of onlineCreators.entries()) {
-            if (cData.socketId === socket.id) { onlineCreators.delete(uid); break; }
-        }
-
-        setTimeout(() => {
-            for (const [key] of socketRateLimits) {
-                if (key.startsWith(`${socket.id}:`)) socketRateLimits.delete(key);
+            if (sid === socket.id) {
+                userSockets.delete(uid);
+                break;
             }
-            // FIX 3: Broadcast updated count to all on disconnect is fine (infrequent)
-            io.emit('waiting-count', waitingUsers.length);
+        }
+
+        // Remove from Online Creators
+        for (const [uid, cData] of onlineCreators.entries()) {
+            if (cData.socketId === socket.id) {
+                onlineCreators.delete(uid);
+                break;
+            }
+        }
+
+        // Broadcast updated online count to all remaining clients
+        // Use setTimeout to ensure the client has fully disconnected before counting
+        setTimeout(() => {
+            // Clean up rate limits
+            for (const [key] of socketRateLimits) {
+                if (key.startsWith(`${socket.id}:`)) {
+                    socketRateLimits.delete(key);
+                }
+            }
+
+            io.emit('waiting-count', io.engine.clientsCount);
         }, 100);
     });
 
+    // Explicit leave/next
     socket.on('leave-room', ({ roomId }) => {
+        // Cancel pending call if caller cancels before match
         if (socket.pendingCallTargetId) {
             io.to(socket.pendingCallTargetId).emit('call-cancelled', { callerSocketId: socket.id });
             socket.pendingCallTargetId = null;
         }
+
         socket.leave(roomId);
         socket.to(roomId).emit('partner-disconnected');
         socketRooms.delete(socket.id);
     });
 
+    // Track UID -> socketId for private calls
     socket.on('register-uid', (uid) => {
         if (uid) {
             userSockets.set(uid, socket.id);
-            console.log(`[Socket] Registered UID: ${uid}`);
+            console.log(`[Socket] Registered UID: ${uid} for Socket: ${socket.id}`);
         }
     });
 
-    // --- PRIVATE INVITE CALLS ---
+    // Direct/Private Call Invite
     socket.on('send-private-invite', ({ targetUid, senderName, senderPhoto, senderUid }) => {
         const targetSocketId = userSockets.get(targetUid);
+        console.log(`[Invite] From ${senderName} (${senderUid}) to UID: ${targetUid} | Found: ${!!targetSocketId}`);
+
         if (targetSocketId) {
-            io.to(targetSocketId).emit('incoming-call', { senderUid, senderName, senderPhoto });
+            io.to(targetSocketId).emit('incoming-call', {
+                senderUid,
+                senderName,
+                senderPhoto
+            });
         }
     });
 
     socket.on('accept-private-invite', ({ targetUid, senderUid }) => {
+        console.log(`[Accept] User ${targetUid} accepted call from ${senderUid}`);
         const targetSocketId = userSockets.get(senderUid);
+
         if (targetSocketId) {
             const roomId = `private_${Math.min(targetUid, senderUid)}_${Math.max(targetUid, senderUid)}`.replace(/[^a-zA-Z0-9_]/g, '');
+
+            // Join both to the room
             io.to(socket.id).socketsJoin(roomId);
             io.to(targetSocketId).socketsJoin(roomId);
+
             socketRooms.set(socket.id, roomId);
             socketRooms.set(targetSocketId, roomId);
-            io.to(socket.id).emit('matched', { roomId, initiator: true, partnerId: senderUid, partnerName: 'User', partnerLocation: null, partnerIsPremium: false });
-            io.to(targetSocketId).emit('matched', { roomId, initiator: false, partnerId: targetUid, partnerName: 'User', partnerLocation: null, partnerIsPremium: false });
+
+            // Notify both to start WebRTC
+            io.to(socket.id).emit('matched', {
+                roomId,
+                initiator: true,
+                partnerId: senderUid,
+                partnerName: 'User', // Would be better with real names
+                partnerLocation: null,
+                partnerIsPremium: false
+            });
+            io.to(targetSocketId).emit('matched', {
+                roomId,
+                initiator: false,
+                partnerId: targetUid,
+                partnerName: 'User',
+                partnerLocation: null,
+                partnerIsPremium: false
+            });
         }
     });
 
     socket.on('decline-private-invite', ({ targetUid, senderUid }) => {
+        console.log(`[Decline] User ${targetUid} declined call from ${senderUid}`);
         const targetSocketId = userSockets.get(senderUid);
-        if (targetSocketId) io.to(targetSocketId).emit('call-declined', { targetUid });
+        if (targetSocketId) {
+            io.to(targetSocketId).emit('call-declined', { targetUid });
+        }
     });
 
-    // --- TEXT CHAT ---
-    // FIX 4: Removed reference to undefined `activeRooms` — was causing silent crash
+    // Text Chat: Send message to room
     socket.on('send-message', ({ roomId, message }) => {
-        if (isRateLimited(socket.id, 'message', 333)) return; // ~3 msg/sec
+        if (isRateLimited(socket.id, 'message', 3)) return; // Max 3 messages per second approx
+        // --- KEYWORD SCAN ---
         if (containsFlaggedKeyword(message?.text || '')) {
-            console.log(`[SafetySystem] Flagged keyword in room ${roomId}`);
-            io.to(roomId).emit('system-disconnect', {
-                reason: 'Inappropriate language detected. Connection closed by safety system.'
-            });
-            // Clean up both sockets in this room
-            for (const [sid, rid] of socketRooms.entries()) {
-                if (rid === roomId) socketRooms.delete(sid);
+            console.log(`[SafetySystem] Flagged keyword detected in room ${roomId}`);
+            io.to(roomId).emit('system-disconnect', { reason: 'Inappropriate language detected. Connection closed by safety system.' });
+
+            // Clean up the room
+            const roomConfig = activeRooms.get(roomId);
+            if (roomConfig) {
+                const { user1, user2 } = roomConfig;
+                socketRooms.delete(user1.id);
+                socketRooms.delete(user2.id);
+                activeRooms.delete(roomId);
             }
             return;
         }
+        // --------------------
+
         socket.to(roomId).emit('receive-message', message);
     });
 
+    // Text Chat: Typing indicator
     socket.on('typing', ({ roomId, isTyping }) => {
         socket.to(roomId).emit('partner-typing', isTyping);
     });
 });
 
-// Catchall for combined deploy
+// The "catchall" handler: only serve React app if build folder exists (combined deploy)
 if (fs.existsSync(buildPath)) {
     app.get('*', (req, res) => {
         res.sendFile(path.join(buildPath, 'index.html'));
@@ -713,10 +910,17 @@ if (fs.existsSync(buildPath)) {
 const PORT = process.env.PORT || 3001;
 server.listen(PORT, '0.0.0.0', () => {
     console.log(`========================================`);
-    console.log(`Strangy Signaling Server — PORT: ${PORT}`);
+    console.log(`Signaling server running on PORT: ${PORT}`);
+    console.log(`Interface: 0.0.0.0 (Publicly Reachable)`);
     console.log(`Frontend URL: ${FRONTEND_URL}`);
-    console.log(`Started: ${new Date().toISOString()}`);
+    console.log(`Current Time: ${new Date().toISOString()}`);
     console.log(`========================================`);
 }).on('error', (err) => {
-    console.error('SERVER LISTEN ERROR:', err.code, err.message);
+    console.error('========================================');
+    console.error('SERVER LISTEN ERROR!');
+    console.error('Error Code:', err.code);
+    console.error('Error Message:', err.message);
+    console.error('========================================');
 });
+
+// Deployment Trigger: 2026-04-02 21:40
