@@ -591,9 +591,11 @@ io.on('connection', (socket) => {
                             // Only applies if userA (Male) is NOT paying for a gender filter
                             if (userA.filters?.gender && userA.filters.gender !== 'Both') return false;
 
-                            const history = userMatchHistory.get(userA.uid) || [];
-                            const femaleCount = history.filter(g => g === 'Female').length;
-                            return femaleCount >= 3; // Limit to 3 females per 10 matches
+                            // Growth Promotion: Increase female match ratio for free users for 3 months (Ends July 9, 2026)
+                            const isPromotionActive = new Date() < new Date('2026-07-09');
+                            const limit = isPromotionActive ? 7 : 3;
+                            
+                            return femaleCount >= limit; 
                         };
 
                         if (checkRatioLimit(u1, u2) || checkRatioLimit(u2, u1)) {
