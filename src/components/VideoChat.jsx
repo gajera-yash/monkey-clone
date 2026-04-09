@@ -901,7 +901,27 @@ const VideoChat = ({ onEndChat }) => {
       let msg = "Call declined.";
       if (reason === 'offline') msg = "User is currently offline or busy.";
       toast.error(msg, { icon: '🚫', duration: 4000 });
-      handleDisconnect();
+      
+      // Cleanup cleanup without triggering auto-rematch logic in handleDisconnect
+      if (peerConnection.current) {
+        peerConnection.current.close();
+        peerConnection.current = null;
+      }
+      if (roomIdRef.current) {
+        socket.emit('leave-room', { roomId: roomIdRef.current });
+        roomIdRef.current = null;
+      }
+      
+      setRemoteStream(null);
+      setPartnerName(null);
+      setPartnerLocation(null);
+      setPartnerIsPremium(false);
+      setMessages([]);
+      setChatTimer(0);
+      setIsPartnerTyping(false);
+      pendingIceCandidates.current = [];
+      hasEmittedJoin.current = false;
+      
       setStatus('Idle');
     };
 
@@ -1562,12 +1582,12 @@ const VideoChat = ({ onEndChat }) => {
                   onClick={() => setShowReportModal(true)}
                   className="w-10 h-10 bg-white/10 backdrop-blur-md rounded-full flex items-center justify-center text-white/70 hover:text-red-400 transition-colors border border-white/10"
                 ><RiFlagLine size={20} /></button>
-                
+
                 <button
-                  onClick={() => setShowConnectedUsers(true)}
-                  className="w-10 h-10 bg-white/10 backdrop-blur-md rounded-full flex items-center justify-center text-white transition-all border border-white/10 active:scale-95"
+                  onClick={handleNext}
+                  className="w-10 h-10 bg-red-500/80 backdrop-blur-md rounded-full flex items-center justify-center text-white transition-all border border-red-400 active:scale-95 shadow-lg shadow-red-500/30"
                 >
-                  <RiMenuLine size={22} />
+                  <RiCloseLine size={24} />
                 </button>
               </div>
             </div>
