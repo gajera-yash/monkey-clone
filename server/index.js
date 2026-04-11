@@ -230,6 +230,29 @@ const verifyAdmin = async (req) => {
     }
 };
 
+// Fetch all coin transactions for Admin Panel (Bypass client-side RLS)
+app.get('/api/admin/coin-transactions', async (req, res) => {
+    const { user: requester, error: verifyError } = await verifyAdmin(req);
+    if (verifyError) return res.status(403).json({ error: verifyError });
+
+    try {
+        const { data, error } = await supabase
+            .from('coin_transactions')
+            .select(`
+                *,
+                user:profiles(username, avatar_url, email)
+            `)
+            .order('created_at', { ascending: false })
+            .limit(500);
+
+        if (error) throw error;
+        res.json(data || []);
+    } catch (err) {
+        console.error('[Admin] Failed to fetch transactions:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // Create Admin User endpoint (bypass confirmation)
 app.post('/api/admin/create-user', async (req, res) => {
     const { user: requester, error: verifyError } = await verifyAdmin(req);

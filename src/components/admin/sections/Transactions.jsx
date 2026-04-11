@@ -29,21 +29,24 @@ const Transactions = () => {
         return () => window.removeEventListener('focus', fetchTransactions);
     }, []);
 
-    const fetchTransactions = async () => {
-        setLoading(true);
         try {
-            // First get all transactions joined with user profile
-            const { data, error } = await supabase
-                .from('coin_transactions')
-                .select(`
-                    *,
-                    user:profiles(username, avatar_url, email)
-                `)
-                .order('created_at', { ascending: false })
-                .limit(500);
+            // Get session for auth token
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) throw new Error("No active session");
 
-            if (error) throw error;
-            
+            // Fetch from backend API instead of client-side Supabase
+            const response = await fetch('/api/admin/coin-transactions', {
+                headers: {
+                    'Authorization': `Bearer ${session.access_token}`
+                }
+            });
+
+            if (!response.ok) {
+                const errData = await response.json();
+                throw new Error(errData.error || "Failed to fetch from server");
+            }
+
+            const data = await response.json();
             setTransactions(data || []);
             
             // Calculate metrics (ideally done via RPC or server, simulating here for speed on last 500)
