@@ -1,5 +1,5 @@
-const fs = require('fs');
-const path = require('path');
+// Robust Environment Loading (Gracefully handle missing .env in production)
+require('dotenv').config();
 if (fs.existsSync(path.join(__dirname, '.env'))) {
     require('dotenv').config({ path: path.join(__dirname, '.env') });
 }
@@ -71,6 +71,33 @@ const supabase = (supabaseUrl && supabaseServiceKey) ? createClient(supabaseUrl,
 // Monetization Routes
 app.use('/api/coins', coinsRoutes);
 app.use('/api/subscriptions', subscriptionsRoutes);
+
+// --- PAYMENT DIAGNOSTICS ENDPOINT ---
+// Visit https://strangy.in/api/payment-debug to check if variables are set
+app.get('/api/payment-debug', (req, res) => {
+    const config = {
+        CASHFREE_APP_ID: {
+            exists: !!process.env.CASHFREE_APP_ID,
+            prefix: process.env.CASHFREE_APP_ID ? process.env.CASHFREE_APP_ID.substring(0, 4) : null,
+            length: process.env.CASHFREE_APP_ID ? process.env.CASHFREE_APP_ID.length : 0
+        },
+        CASHFREE_SECRET_KEY: {
+            exists: !!process.env.CASHFREE_SECRET_KEY,
+            length: process.env.CASHFREE_SECRET_KEY ? process.env.CASHFREE_SECRET_KEY.length : 0
+        },
+        CASHFREE_ENV: process.env.CASHFREE_ENV || 'Not Set (Default: SANDBOX)',
+        SUPABASE_URL: !!process.env.SUPABASE_URL,
+        NODE_ENV: process.env.NODE_ENV || 'development',
+        PORT: process.env.PORT || '3000'
+    };
+    
+    res.json({
+        message: "Payment Gateway Diagnostic Tool",
+        timestamp: new Date().toISOString(),
+        config: config,
+        tip: "If 'exists' is false, you must add the variable to your Railway/Vercel dashboard."
+    });
+});
 
 // Serve static files from the React app (only if build folder exists - for combined deploy)
 const buildPath = path.join(__dirname, '../build');

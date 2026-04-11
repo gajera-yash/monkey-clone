@@ -15,7 +15,14 @@ const getCashfreeConfig = () => {
 
     const isConfigured = Boolean(appId && secretKey);
     const isTestAppId = appId.startsWith('TEST');
-    const mode = env === 'PRODUCTION' && !isTestAppId ? 'production' : 'sandbox';
+    
+    // Safety check: Don't allow PRODUCTION mode with a TEST App ID
+    const mode = (env === 'PRODUCTION' && !isTestAppId) ? 'production' : 'sandbox';
+    
+    if (!isConfigured) {
+        console.error('[Cashfree Config] Error: Keys are missing in process.env!');
+    }
+
     const baseUrl = mode === 'production'
         ? 'https://api.cashfree.com/pg/orders'
         : 'https://sandbox.cashfree.com/pg/orders';
