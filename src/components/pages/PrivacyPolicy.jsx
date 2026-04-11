@@ -20,7 +20,7 @@ const PrivacyPolicy = () => {
             subsections: [
                 {
                     subtitle: "1.1 Information You Provide Directly",
-                    text: "**Account Info:** Email, Display name, DOB, Profile photo, Gender, Location. **Creator Info:** Full legal name, ID verification, Face/Voice samples, Bank details, PAN (India). **Payments:** Processed by Razorpay; we only receive confirmations."
+                    text: "**Account Info:** Email, Display name, DOB, Profile photo, Gender, Location. **Creator Info:** Full legal name, ID verification, Face/Voice samples, Bank details, PAN (India). **Payments:** Processed by Cashfree Payments; we only receive confirmations."
                 },
                 {
                     subtitle: "1.2 Information Collected Automatically",
@@ -66,7 +66,7 @@ const PrivacyPolicy = () => {
                 },
                 {
                     subtitle: "3.2 With Service Providers",
-                    text: "Razorpay (Payments), Supabase (Storage), Google Analytics (Statistics)."
+                    text: "Cashfree Payments (Payments), Supabase (Storage), Google Analytics (Statistics)."
                 },
                 {
                     subtitle: "3.3 Legal and Business",
@@ -188,6 +188,10 @@ const PrivacyPolicy = () => {
                 {
                     subtitle: "Grievance Officer (India)",
                     text: "Email: grievance@strangy.com. Response within 24 hours; resolution within 15 days."
+                },
+                {
+                    subtitle: "Registered Entity & Address",
+                    text: "Strangy Video Chat, Yoginagar Society, opp. Bapasitaram Society, Yogi Chowk, Puna Simada Road, Surat, Gujarat - 395010"
                 }
             ]
         },
@@ -361,7 +365,7 @@ const PrivacyPolicy = () => {
                         {/* Final Footer */}
                         <div className="mt-24 text-center border-t border-white/5 pt-12">
                             <p className="text-white/20 text-xs font-black uppercase tracking-[0.3em]">
-                                © 2026 Strangy. Prioritizing your data security and privacy.
+                                © 2026 Strangy Video Chat. Prioritizing your data security and privacy.
                             </p>
                         </div>
                     </div>

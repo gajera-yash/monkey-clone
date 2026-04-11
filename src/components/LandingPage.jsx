@@ -322,6 +322,11 @@ const LandingPage = ({ onStartChat }) => {
             </Link>
 
             <p>Connecting people globally through spontaneous video chat.</p>
+            <p className="mt-3 text-sm opacity-80">
+              Legal Entity: <strong>Strangy Video Chat</strong><br />
+              Yoginagar Society, opp. Bapasitaram Society, Yogi Chowk, Puna Simada Road, Surat, Gujarat - 395010<br />
+              Support: <a href="mailto:support.strangy@gmail.com">support.strangy@gmail.com</a>
+            </p>
           </div>
           <div className="flinks-landing">
             <h4>Company</h4>
@@ -358,9 +363,10 @@ const LandingPage = ({ onStartChat }) => {
           </div>
         </div>
         <div className="footer-bottom-landing">
-          <p>© 2026 Strangy. All rights reserved. &nbsp;·&nbsp;
+          <p>© 2026 Strangy Video Chat. All rights reserved. &nbsp;·&nbsp;
             <Link to="/safety" style={{ color: 'inherit', opacity: .65 }}>Safety Guidelines</Link> &nbsp;·&nbsp;
-            <Link to="/terms" style={{ color: 'inherit', opacity: .65 }}>Terms of Service</Link>
+            <Link to="/terms" style={{ color: 'inherit', opacity: .65 }}>Terms of Service</Link> &nbsp;·&nbsp;
+            <Link to="/privacy" style={{ color: 'inherit', opacity: .65 }}>Privacy Policy</Link>
           </p>
 
           <div className="socials-landing">

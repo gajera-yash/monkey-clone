@@ -84,7 +84,7 @@ const TermsOfService = () => {
             subsections: [
                 {
                     subtitle: "5.1 Virtual Currency",
-                    text: "Strangy uses a virtual currency system called \"Coins\" which can be purchased using real money through our payment processor (Razorpay)."
+                    text: "Strangy uses a virtual currency system called \"Coins\" which can be purchased using real money through our payment processor (Cashfree Payments)."
                 },
                 {
                     subtitle: "5.2 Coin Packages",
@@ -222,7 +222,7 @@ const TermsOfService = () => {
             subsections: [
                 {
                     subtitle: "11.1 Payment Processing",
-                    text: "We use Razorpay. By purchasing, you agree to Razorpay's terms and privacy policy."
+                    text: "We use Cashfree Payments. By purchasing, you agree to Cashfree's terms and privacy policy."
                 },
                 {
                     subtitle: "11.2 Analytics",
@@ -367,7 +367,7 @@ const TermsOfService = () => {
                 },
                 {
                     subtitle: "Address",
-                    text: "Surat, Gujarat, India"
+                    text: "Strangy Video Chat, Yoginagar Society, opp. Bapasitaram Society, Yogi Chowk, Puna Simada Road, Surat, Gujarat - 395010"
                 }
             ]
         },
@@ -544,7 +544,7 @@ const TermsOfService = () => {
                                 <span className="text-xs font-black uppercase tracking-widest text-white/40">Secured & Moderated Documentation</span>
                             </div>
                             <p className="text-white/20 text-xs font-black uppercase tracking-[0.3em]">
-                                © 2026 Strangy. All rights reserved. Professional Video Chat Platform.
+                                © 2026 Strangy Video Chat. All rights reserved. Professional Video Chat Platform.
                             </p>
                         </div>
                     </div>

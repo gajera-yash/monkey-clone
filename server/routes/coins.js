@@ -1,7 +1,6 @@
 const express = require('express');
 const router = express.Router();
 const { createClient } = require('@supabase/supabase-js');
-const crypto = require('crypto');
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -9,24 +8,37 @@ const supabase = createClient(
 );
 
 // ============ CASHFREE CONFIG ============
-const getCashfreeHeaders = () => {
+const getCashfreeConfig = () => {
+    const appId = (process.env.CASHFREE_APP_ID || '').trim();
+    const secretKey = (process.env.CASHFREE_SECRET_KEY || '').trim();
+    const env = (process.env.CASHFREE_ENV || 'SANDBOX').trim().toUpperCase();
+
+    const isConfigured = Boolean(appId && secretKey);
+    const isTestAppId = appId.startsWith('TEST');
+    const mode = env === 'PRODUCTION' && !isTestAppId ? 'production' : 'sandbox';
+    const baseUrl = mode === 'production'
+        ? 'https://api.cashfree.com/pg/orders'
+        : 'https://sandbox.cashfree.com/pg/orders';
+
     return {
-        'x-client-id': process.env.CASHFREE_APP_ID || "TEST110318160b1c0d9b14535af06f5e61813011",
-        'x-client-secret': process.env.CASHFREE_SECRET_KEY || "cfsk_ma_test_7f8dc4850ce067d9694c1355c45b9609_",
+        appId,
+        secretKey,
+        env,
+        mode,
+        isConfigured,
+        isTestAppId,
+        baseUrl
+    };
+};
+
+const getCashfreeHeaders = (cashfreeConfig) => {
+    return {
+        'x-client-id': cashfreeConfig.appId,
+        'x-client-secret': cashfreeConfig.secretKey,
         'x-api-version': '2023-08-01',
         'Content-Type': 'application/json',
         'Accept': 'application/json'
     };
-};
-
-const getCashfreeUrl = () => {
-    const appId = process.env.CASHFREE_APP_ID || "TEST110318160b1c0d9b14535af06f5e61813011";
-    if (appId.startsWith("TEST")) {
-        return 'https://sandbox.cashfree.com/pg/orders';
-    }
-    return process.env.CASHFREE_ENV === 'PRODUCTION' ? 
-        'https://api.cashfree.com/pg/orders' : 
-        'https://sandbox.cashfree.com/pg/orders';
 };
 
 // ============ COIN PACKAGES ============
@@ -60,7 +72,13 @@ router.get('/packages', async (req, res) => {
 // Create Cashfree order for coin purchase
 router.post('/purchase/create-order', async (req, res) => {
   try {
-    // Environment is ready
+    const cashfreeConfig = getCashfreeConfig();
+    if (!cashfreeConfig.isConfigured) {
+        return res.status(500).json({
+            error: 'Payment gateway not configured',
+            message: 'CASHFREE_APP_ID and CASHFREE_SECRET_KEY are required on server.'
+        });
+    }
 
     const { userId, packageId } = req.body;
     
@@ -109,11 +127,16 @@ router.post('/purchase/create-order', async (req, res) => {
         }
     };
 
-    console.log('[Coins] Creating Cashfree order:', { orderId, amount: orderAmount, env: process.env.CASHFREE_ENV });
+    console.log('[Coins] Creating Cashfree order:', {
+        orderId,
+        amount: orderAmount,
+        env: cashfreeConfig.env,
+        mode: cashfreeConfig.mode
+    });
 
-    const response = await fetch(getCashfreeUrl(), {
+    const response = await fetch(cashfreeConfig.baseUrl, {
         method: 'POST',
-        headers: getCashfreeHeaders(),
+        headers: getCashfreeHeaders(cashfreeConfig),
         body: JSON.stringify(requestBody)
     });
 
@@ -121,23 +144,22 @@ router.post('/purchase/create-order', async (req, res) => {
     
     if (!response.ok) {
         console.error("Cashfree Order Error:", JSON.stringify(data));
+        const isAuthError = /auth|unauthor|credential|forbidden|key/i.test(JSON.stringify(data || {}));
         return res.status(500).json({ 
             error: 'Payment gateway error', 
             details: data,
-            message: data?.message || 'Cashfree rejected the order. Check API keys and environment.'
+            message: isAuthError
+                ? 'Cashfree authentication failed. Check CASHFREE_APP_ID / CASHFREE_SECRET_KEY and CASHFREE_ENV.'
+                : (data?.message || 'Cashfree rejected the order. Please retry.')
         });
     }
-
-    // Return cashfreeEnv so frontend can dynamically set mode
-    const cashfreeEnv = (process.env.CASHFREE_ENV || 'SANDBOX').toUpperCase();
-    const activeAppId = process.env.CASHFREE_APP_ID || "TEST110318160b1c0d9b14535af06f5e61813011";
 
     res.json({
         orderId: data.order_id,
         paymentSessionId: data.payment_session_id,
         amount: orderAmount,
         currency: "INR",
-        cashfreeMode: (cashfreeEnv === 'PRODUCTION' && !activeAppId.startsWith("TEST")) ? 'production' : 'sandbox'
+        cashfreeMode: cashfreeConfig.mode
     });
 
   } catch (error) {
@@ -150,13 +172,34 @@ router.post('/purchase/create-order', async (req, res) => {
 router.post('/purchase/verify', async (req, res) => {
   try {
     const { orderId, userId, packageId } = req.body;
+
+    const cashfreeConfig = getCashfreeConfig();
+    if (!cashfreeConfig.isConfigured) {
+        return res.status(500).json({
+            success: false,
+            error: 'Payment gateway not configured',
+            message: 'CASHFREE_APP_ID and CASHFREE_SECRET_KEY are required on server.'
+        });
+    }
     
-    const response = await fetch(`${getCashfreeUrl()}/${orderId}`, {
+    const response = await fetch(`${cashfreeConfig.baseUrl}/${orderId}`, {
         method: 'GET',
-        headers: getCashfreeHeaders()
+        headers: getCashfreeHeaders(cashfreeConfig)
     });
     
     const orderStat = await response.json();
+
+    if (!response.ok) {
+        const isAuthError = /auth|unauthor|credential|forbidden|key/i.test(JSON.stringify(orderStat || {}));
+        return res.status(500).json({
+            success: false,
+            error: 'Failed to verify payment',
+            message: isAuthError
+                ? 'Cashfree authentication failed during verification. Check CASHFREE_APP_ID / CASHFREE_SECRET_KEY and CASHFREE_ENV.'
+                : (orderStat?.message || 'Unable to verify payment status with gateway.'),
+            details: orderStat
+        });
+    }
     
     if (orderStat.order_status !== 'PAID') {
         return res.status(400).json({ success: false, error: 'Payment not successful' });
