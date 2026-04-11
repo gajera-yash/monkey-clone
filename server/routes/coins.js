@@ -278,8 +278,7 @@ router.post('/purchase/verify', async (req, res) => {
         return res.status(500).json({ 
             success: false, 
             error: 'Failed to update user wallet', 
-            message: updateError.message,
-            code: updateError.code
+            message: 'Your payment was successful but we encountered an error updating your balance. Please contact support.'
         });
     }
 
@@ -287,11 +286,12 @@ router.post('/purchase/verify', async (req, res) => {
       .from('coin_transactions')
       .insert({
         user_id: userId,
-        transaction_type: 'purchased',
+        transaction_type: 'purchase',
         coins_amount: pkgCoins,
         coins_balance_after: newCoins,
         description: `Purchased ${pkg.name}`,
         payment_status: 'completed',
+        payment_id: orderId, // Standardize with payment_id for searchable logs
         metadata: {
             orderId: orderId,
             gateway: 'cashfree',
@@ -311,6 +311,8 @@ router.post('/purchase/verify', async (req, res) => {
             type: 'coins',
             amount: pkgPrice,
             status: 'success',
+            description: `Purchased ${pkg.name}`,
+            coins_amount: pkgCoins,
             metadata: {
                 payment_gateway: 'cashfree',
                 order_id: orderId,

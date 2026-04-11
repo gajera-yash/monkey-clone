@@ -32,29 +32,36 @@ const CoinStoreModal = ({ isOpen, onClose }) => {
         if (!isOpen) return;
         
         const fetchPackages = async () => {
-            const { data, error } = await supabase
-                .from('subscription_plans')
-                .select('*')
-                .eq('is_active', true)
-                .order('sort_order', { ascending: true });
+            setLoading(true);
+            try {
+                const { data, error } = await supabase
+                    .from('subscription_plans')
+                    .select('*')
+                    .eq('is_active', true)
+                    .order('sort_order', { ascending: true });
 
-            if (error) throw error;
+                if (error) throw error;
 
-            console.log("[CoinStore] Fetched plans:", data);
+                console.log("[CoinStore] Fetched plans:", data);
 
-            // Mapping for UI consistency
-            const formattedPackages = data.map(pkg => ({
-                id: pkg.id,
-                coins: pkg.coins,
-                price: pkg.price_monthly_inr || pkg.price || 0,
-                label: pkg.name || pkg.label || `${pkg.coins} Coins`,
-                discount: pkg.discount_label,
-                icon: pkg.icon || '🪙',
-                popular: pkg.is_popular
-            }));
+                // Mapping for UI consistency
+                const formattedPackages = data.map(pkg => ({
+                    id: pkg.id,
+                    coins: pkg.coins,
+                    price: pkg.price_monthly_inr || pkg.price || 0,
+                    label: pkg.name || pkg.label || `${pkg.coins} Coins`,
+                    discount: pkg.discount_label,
+                    icon: pkg.icon || '🪙',
+                    popular: pkg.is_popular
+                }));
 
-            setPackages(formattedPackages);
-            setLoading(false);
+                setPackages(formattedPackages);
+            } catch (err) {
+                console.error("[CoinStore] Failed to fetch packages:", err);
+                toast.error("Unable to load coin packages.");
+            } finally {
+                setLoading(false);
+            }
         };
         fetchPackages();
     }, [isOpen]);
@@ -188,6 +195,7 @@ const CoinStoreModal = ({ isOpen, onClose }) => {
         setCvv('');
         setFormError('');
         setProcessing(false);
+        setLoading(true); // Reset loading for next open
         onClose();
     };
 
