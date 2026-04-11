@@ -35,12 +35,37 @@ const Revenue = () => {
     useEffect(() => {
         const initRevenue = async () => {
             setLoading(true);
-            await Promise.all([
-                fetchRevenueStats(),
-                fetchChartData(),
-                fetchTransactions()
-            ]);
-            setLoading(false);
+            try {
+                // Get session for auth token
+                const { data: { session } } = await supabase.auth.getSession();
+                if (!session) throw new Error("No active session");
+
+                // Fetch consolidated data from backend API
+                const response = await fetch('/api/admin/revenue-data', {
+                    headers: {
+                        'Authorization': `Bearer ${session.access_token}`
+                    }
+                });
+
+                if (!response.ok) {
+                    const errData = await response.json();
+                    throw new Error(errData.error || "Failed to fetch from server");
+                }
+
+                const data = await response.json();
+                
+                // Map API response to state
+                setStats(data.stats);
+                setSegments(data.segments);
+                setChartData(data.chartData);
+                setTransactions(data.recentTransactions);
+
+            } catch (err) {
+                console.error("Revenue Dashboard Error:", err);
+                toast.error("Failed to load revenue data.");
+            } finally {
+                setLoading(false);
+            }
         };
         initRevenue();
 
@@ -54,68 +79,7 @@ const Revenue = () => {
         coins: 0
     });
 
-    const fetchRevenueStats = async () => {
-        try {
-            // 1. Total Revenue
-            const { data: revData } = await supabase.from('transactions').select('amount, type').eq('status', 'success');
-            const total = revData?.reduce((sum, tx) => sum + (tx.amount || 0), 0) || 0;
-
-            // 2. Active Subscriptions
-            const { count: subCount } = await supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('is_premium', true);
-
-            // 3. Segment Calculation
-            const subData = revData?.filter(t => t.type === 'subscription') || [];
-            const coinData = revData?.filter(t => t.type === 'coins') || [];
-
-            setSegments({
-                plus_annual: 42, // Mocking distribution ratios for now but based on real totals soon
-                plus_monthly: 35,
-                coins: total > 0 ? Math.round((coinData.reduce((s, t) => s + (t.amount || 0), 0) / total) * 100) : 0
-            });
-
-            // Calculate trends (Simple mock based on last week vs previous)
-            setStats({
-                totalRevenue: total,
-                mrr: subData.reduce((s, t) => s + (t.amount || 0), 0),
-                subscriptions: subCount || 0,
-                avgTicket: revData?.length ? (total / revData.length) : 0
-            });
-        } catch (err) {
-            console.error("Revenue Stats Error:", err);
-        }
-    };
-
-    const fetchChartData = async () => {
-        const now = new Date();
-        const data = [];
-        for (let i = 3; i >= 0; i--) {
-            const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (i * 7)).toISOString();
-            const { data: weekRev } = await supabase.from('transactions').select('amount').eq('status', 'success').gte('created_at', start);
-            const weeklyTotal = weekRev?.reduce((sum, tx) => sum + (tx.amount || 0), 0) || 0;
-            data.push({ name: `Week ${4 - i}`, revenue: weeklyTotal });
-        }
-        setChartData(data);
-    };
-
-    const fetchTransactions = async () => {
-        setLoading(true);
-        const { data, error } = await supabase
-            .from('transactions')
-            .select(`
-                *,
-                user:profiles(username, avatar_url)
-            `)
-            .order('created_at', { ascending: false })
-            .limit(50);
-
-        if (error) {
-            console.error("Failed to load transactions:", error);
-            toast.error("Failed to load transactions: " + error.message);
-        } else {
-            setTransactions(data || []);
-        }
-        setLoading(false);
-    };
+    // Note: Local fetch functions removed as data is now consolidated in the main useEffect
 
     const StatCard = ({ title, value, subtext, trend, icon: Icon, color }) => (
         <div className="bg-white p-8 rounded-[40px] border border-slate-200 shadow-sm relative overflow-hidden group">
