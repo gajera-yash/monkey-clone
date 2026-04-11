@@ -276,7 +276,12 @@ router.post('/purchase/verify', async (req, res) => {
 
     if (updateError) {
         console.error('[Cashfree Verify] Profile update failed:', updateError);
-        return res.status(500).json({ success: false, error: 'Failed to update user wallet' });
+        return res.status(500).json({ 
+            success: false, 
+            error: 'Failed to update user wallet', 
+            message: updateError.message,
+            code: updateError.code
+        });
     }
 
     const { error: txError } = await supabase
