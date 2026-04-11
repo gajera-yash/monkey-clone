@@ -269,8 +269,7 @@ router.post('/purchase/verify', async (req, res) => {
       .from('profiles')
       .update({
         coins: newCoins,
-        total_coins_purchased: newTotalPurchased,
-        updated_at: new Date().toISOString()
+        total_coins_purchased: newTotalPurchased
       })
       .eq('id', userId);
 
@@ -397,8 +396,7 @@ router.post('/spend', async (req, res) => {
       .from('profiles')
       .update({
         coins: newCoins,
-        total_coins_spent: newTotalSpent,
-        updated_at: new Date().toISOString()
+        total_coins_spent: newTotalSpent
       })
       .eq('id', userId);
     
@@ -489,8 +487,7 @@ router.post('/daily-reward', async (req, res) => {
     await supabase
       .from('profiles')
       .update({
-        coins: newCoins,
-        updated_at: new Date().toISOString()
+        coins: newCoins
       })
       .eq('id', userId);
     

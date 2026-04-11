@@ -191,8 +191,7 @@ router.post('/subscribe/verify', async (req, res) => {
         subscription_tier: plan.tier_level,
         subscription_status: 'active',
         subscription_expires_at: expiry.toISOString(),
-        subscription_auto_renew: true,
-        updated_at: new Date().toISOString()
+        subscription_auto_renew: true
       })
       .eq('id', userId);
 
@@ -232,8 +231,7 @@ router.post('/cancel', async (req, res) => {
     await supabase
       .from('profiles')
       .update({
-        subscription_auto_renew: false,
-        updated_at: new Date().toISOString()
+        subscription_auto_renew: false
       })
       .eq('id', userId);
     
