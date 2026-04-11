@@ -260,7 +260,6 @@ const Revenue = () => {
                                 <th className="px-8 py-5 text-[10px] font-black uppercase text-slate-400 tracking-widest">Subscriber</th>
                                 <th className="px-8 py-5 text-[10px] font-black uppercase text-slate-400 tracking-widest">Type</th>
                                 <th className="px-8 py-5 text-[10px] font-black uppercase text-slate-400 tracking-widest">Amount</th>
-                                <th className="px-8 py-5 text-[10px] font-black uppercase text-slate-400 tracking-widest">Status</th>
                                 <th className="px-8 py-5 text-[10px] font-black uppercase text-slate-400 tracking-widest text-right">Actions</th>
                             </tr>
                         </thead>
@@ -289,14 +288,6 @@ const Revenue = () => {
                                     <td className="px-8 py-5">
                                         <div className="text-sm font-black text-slate-800">{formatCurrency(tx.amount)}</div>
                                         <div className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">{currency} Currency</div>
-                                    </td>
-                                    <td className="px-8 py-5">
-                                        <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border shadow-sm ${tx.status === 'success'
-                                            ? 'bg-green-50 text-green-600 border-green-100'
-                                            : 'bg-red-50 text-red-600 border-red-100'
-                                            }`}>
-                                            {tx.status}
-                                        </span>
                                     </td>
                                     <td className="px-8 py-5 text-right">
                                         <button className="p-2.5 hover:bg-white hover:shadow-md rounded-xl text-slate-400 hover:text-indigo-600 border border-transparent hover:border-slate-100 transition-all">

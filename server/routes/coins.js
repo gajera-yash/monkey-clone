@@ -310,8 +310,7 @@ router.post('/purchase/verify', async (req, res) => {
             user_id: userId,
             type: 'coins',
             amount: pkgPrice,
-            status: 'success',
-            description: `Purchased ${pkg.name}`,
+            description: `Purchase of ${pkgCoins} coins bundle`,
             coins_amount: pkgCoins,
             metadata: {
                 payment_gateway: 'cashfree',

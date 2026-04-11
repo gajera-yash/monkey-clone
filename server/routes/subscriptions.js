@@ -202,7 +202,6 @@ router.post('/subscribe/verify', async (req, res) => {
             user_id: userId,
             type: 'subscription',
             amount: amount,
-            status: 'success',
             metadata: {
                 payment_gateway: 'cashfree',
                 order_id: orderId,

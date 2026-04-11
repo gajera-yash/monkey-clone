@@ -251,8 +251,7 @@ app.get('/api/admin/revenue-data', async (req, res) => {
         // 1. Total Successful Transactions
         const { data: revData, error: revError } = await supabase
             .from('transactions')
-            .select('amount, type, status, created_at')
-            .eq('status', 'success');
+            .select('amount, type, created_at');
 
         if (revError) {
             console.error('[Admin Revenue] revData query failed:', revError);

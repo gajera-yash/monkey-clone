@@ -129,7 +129,7 @@ const AdminLayout = () => {
 
             const [usersRes, txsRes, reportsRes, verRes] = await Promise.all([
                 supabase.from('profiles').select('id, username, email, gender, created_at').order('created_at', { ascending: false }).limit(5),
-                supabase.from('transactions').select('id, amount, type, created_at, user:profiles(username)').eq('status', 'success').order('created_at', { ascending: false }).limit(5),
+                supabase.from('transactions').select('id, amount, type, created_at, user:profiles(username)').order('created_at', { ascending: false }).limit(5),
                 supabase.from('reports').select('id, reason, created_at, reporter:profiles!reports_reporter_id_fkey(username), reported:profiles!reports_reported_user_id_fkey(username)').order('created_at', { ascending: false }).limit(5),
                 supabase.from('verifications').select('id, status, created_at, user_id, profiles(username, email, gender)').order('created_at', { ascending: false }).limit(5),
             ]);
