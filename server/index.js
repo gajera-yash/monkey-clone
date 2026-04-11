@@ -1,3 +1,6 @@
+const fs = require('fs');
+const path = require('path');
+
 // Robust Environment Loading (Gracefully handle missing .env in production)
 require('dotenv').config();
 if (fs.existsSync(path.join(__dirname, '.env'))) {
