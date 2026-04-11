@@ -367,7 +367,7 @@ const TermsOfService = () => {
                 },
                 {
                     subtitle: "Address",
-                    text: "Strangy Video Chat, Yoginagar Society, opp. Bapasitaram Society, Yogi Chowk, Puna Simada Road, Surat, Gujarat - 395010"
+                    text: "Legal Owner: GAJERA YASH VIPULBHAI. Address: Yoginagar Society, opp. Bapasitaram Society, Yogi Chowk, Puna Simada Road, Surat, Gujarat - 395010"
                 }
             ]
         },

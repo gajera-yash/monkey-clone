@@ -12,7 +12,7 @@ const Footer = () => {
                     </Link>
                     <p>Connecting people globally through spontaneous video chat.</p>
                     <p style={{ marginTop: 10, fontSize: '0.9rem', opacity: 0.8, lineHeight: 1.6 }}>
-                        Legal Entity: <strong>Strangy Video Chat</strong><br />
+                        Legal Entity: <strong>GAJERA YASH VIPULBHAI</strong> (Strangy Video Chat)<br />
                         Yoginagar Society, opp. Bapasitaram Society, Yogi Chowk, Puna Simada Road, Surat, Gujarat - 395010<br />
                         Support: <a href="mailto:support.strangy@gmail.com">support.strangy@gmail.com</a>
                     </p>

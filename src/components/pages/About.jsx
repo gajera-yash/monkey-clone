@@ -42,10 +42,18 @@ const About = () => {
                             a friendly chat, a new language partner, or just someone to share a laugh with, 
                             Strangy is the place for you.
                         </p>
-                        <div className="flex justify-center">
+                        <div className="flex justify-center mb-12">
                              <a href="/" className="px-10 py-4 bg-gradient-to-r from-purple-600 to-pink-600 rounded-full font-bold text-lg hover:scale-105 transition-transform shadow-lg shadow-purple-500/25">
                                 Start Chatting Now
                              </a>
+                        </div>
+
+                        <div className="pt-8 border-t border-white/10">
+                            <h3 className="text-xl font-bold mb-4 text-purple-400 text-center uppercase tracking-widest">Legal Information</h3>
+                            <p className="text-gray-400 text-sm leading-relaxed text-center">
+                                Strangy Video Chat is owned and operated by <strong>GAJERA YASH VIPULBHAI</strong>.<br />
+                                Registered Address: Yoginagar Society, opp. Bapasitaram Society, Yogi Chowk, Puna Simada Road, Surat, Gujarat - 395010
+                            </p>
                         </div>
                     </section>
                 </div>
