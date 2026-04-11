@@ -20,7 +20,7 @@ const formatExpiry = (val) => {
 };
 
 const CoinStoreModal = ({ isOpen, onClose }) => {
-    const { addCoins } = useCoins();
+    const { addCoins, refreshCoins } = useCoins();
     const { currentUser } = useAuth();
     const [step, setStep] = useState('packages'); // 'packages' | 'payment' | 'success'
     const [selectedPkg, setSelectedPkg] = useState(null);
