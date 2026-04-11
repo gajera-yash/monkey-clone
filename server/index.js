@@ -66,10 +66,22 @@ app.get('/health', (req, res) => {
     res.status(200).json({ status: 'ok', time: new Date().toISOString(), port: process.env.PORT || 3001 });
 });
 
-// Supabase admin client for server-side checks
-const supabaseUrl = process.env.SUPABASE_URL || process.env.REACT_APP_SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY || process.env.REACT_APP_SUPABASE_ANON_KEY;
-const supabase = (supabaseUrl && supabaseServiceKey) ? createClient(supabaseUrl, supabaseServiceKey) : null;
+// Helper to get Supabase Admin Client
+const getSupabaseAdmin = () => {
+    const url = process.env.SUPABASE_URL || process.env.REACT_APP_SUPABASE_URL;
+    const key = process.env.SUPABASE_SERVICE_KEY || process.env.REACT_APP_SUPABASE_SERVICE_KEY;
+    
+    if (!url || !key) {
+        console.error('[Supabase] Missing credentials for admin client!');
+        return null;
+    }
+    return createClient(url, key);
+};
+
+const supabase = getSupabaseAdmin();
+if (!supabase) {
+    console.error('Critical Error: Supabase Admin client failed to initialize. RLS bypass will not work.');
+}
 
 // Monetization Routes
 app.use('/api/coins', coinsRoutes);
@@ -262,15 +274,15 @@ app.get('/api/admin/revenue-data', async (req, res) => {
         if (txError) throw txError;
 
         // --- CALCULATIONS ---
-        const totalRevenue = revData?.reduce((sum, tx) => sum + (tx.amount || 0), 0) || 0;
+        const totalRevenue = revData?.reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0) || 0;
         const subData = revData?.filter(t => t.type === 'subscription') || [];
         const coinData = revData?.filter(t => t.type === 'coins') || [];
         
-        const mrr = subData.reduce((s, t) => s + (t.amount || 0), 0);
+        const mrr = subData.reduce((s, t) => s + (Number(t.amount) || 0), 0);
         const avgTicket = revData?.length ? (totalRevenue / revData.length) : 0;
 
         // Segment Calculation
-        const coinRev = coinData.reduce((s, t) => s + (t.amount || 0), 0);
+        const coinRev = coinData.reduce((s, t) => s + (Number(t.amount) || 0), 0);
         const coinPercent = totalRevenue > 0 ? Math.round((coinRev / totalRevenue) * 100) : 0;
 
         // Weekly Chart Data
@@ -283,7 +295,7 @@ app.get('/api/admin/revenue-data', async (req, res) => {
             const weeklyRev = revData?.filter(tx => {
                 const date = new Date(tx.created_at);
                 return date >= weekStart && date <= weekEnd;
-            }).reduce((sum, tx) => sum + (tx.amount || 0), 0) || 0;
+            }).reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0) || 0;
 
             chartData.push({ name: `Week ${4 - i}`, revenue: weeklyRev });
         }
