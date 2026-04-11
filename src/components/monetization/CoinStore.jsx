@@ -72,7 +72,7 @@ export default function CoinStore({ userId, onClose }) {
           return;
       }
 
-      // Verify payment with our server
+      // Verify payment with our server (Using relative path)
       const verifyRes = await fetch('/api/coins/purchase/verify', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

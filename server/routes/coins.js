@@ -196,19 +196,32 @@ router.post('/purchase/verify', async (req, res) => {
         headers: getCashfreeHeaders(cashfreeConfig)
     });
     
-    const orderStat = await response.json();
+    let orderStat;
+    try {
+        orderStat = await response.json();
+    } catch (parseError) {
+        console.error('[Cashfree Verify] Failed to parse response as JSON:', parseError);
+        return res.status(500).json({ 
+            success: false, 
+            error: 'Gateway Communication Error', 
+            message: 'Failed to parse response from Cashfree.' 
+        });
+    }
 
     if (!response.ok) {
+        console.error('[Cashfree Verify] Gateway Error Response:', JSON.stringify(orderStat));
         const isAuthError = /auth|unauthor|credential|forbidden|key/i.test(JSON.stringify(orderStat || {}));
-        return res.status(500).json({
+        return res.status(response.status || 500).json({
             success: false,
             error: 'Failed to verify payment',
             message: isAuthError
-                ? 'Cashfree authentication failed during verification. Check CASHFREE_APP_ID / CASHFREE_SECRET_KEY and CASHFREE_ENV.'
+                ? 'Cashfree authentication failed during verification.'
                 : (orderStat?.message || 'Unable to verify payment status with gateway.'),
             details: orderStat
         });
     }
+    
+    console.log(`[Cashfree Verify] Order ${orderId} status: ${orderStat.order_status}`);
     
     if (orderStat.order_status !== 'PAID') {
         return res.status(400).json({ success: false, error: 'Payment not successful' });

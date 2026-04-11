@@ -87,8 +87,8 @@ const CoinStoreModal = ({ isOpen, onClose }) => {
         setProcessing(true);
         
         try {
-            // 1. Create order on backend
-            const orderRes = await fetch(`${API_BASE_URL}/api/coins/purchase/create-order`, {
+            // 1. Create order on backend (Using relative path for Vercel proxy)
+            const orderRes = await fetch('/api/coins/purchase/create-order', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -136,8 +136,8 @@ const CoinStoreModal = ({ isOpen, onClose }) => {
                 return;
             }
 
-            // 3. Verify on backend
-            const verifyRes = await fetch(`${API_BASE_URL}/api/coins/purchase/verify`, {
+            // 3. Verify on backend (Using relative path for Vercel proxy)
+            const verifyRes = await fetch('/api/coins/purchase/verify', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -159,10 +159,17 @@ const CoinStoreModal = ({ isOpen, onClose }) => {
             const verifyData = await verifyRes.json();
             
             if (verifyData.success) {
-                await addCoins(selectedPkg.coins, `Purchased ${selectedPkg.coins} Coins`);
+                // Success state first to clear the loader/processing screen
                 setStep('success');
+                
+                // Add coins locally to update UI immediately
+                try {
+                    await addCoins(selectedPkg.coins, `Purchased ${selectedPkg.coins} Coins`);
+                } catch (addError) {
+                    console.warn("[CoinStore] Local balance update deferred:", addError);
+                }
             } else {
-                toast.error("Payment verification failed");
+                toast.error(verifyData.message || "Payment verification failed");
             }
         } catch (error) {
             console.error("Payment Error:", error);
