@@ -507,21 +507,11 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
-    // Auth State Listener
-    useEffect(() => {
-        let mounted = true;
-
-        // --- LOADING SAFETY TIMEOUT ---
-        // If Supabase takes > 5 seconds to respond, force resolve loading
-        // so the user isn't stuck on a spinner forever.
-        const loadingSafetyTimeout = setTimeout(() => {
-            if (mounted) {
-                console.warn("[AuthContext] Auth state check timed out. Forcing resolve.");
-                setLoading(false);
-            }
-        }, 5000);
-
-        const handleAuthState = async (event, session) => {
+        // Auth State Listener
+        useEffect(() => {
+            let mounted = true;
+    
+            const handleAuthState = async (event, session) => {
             console.log("[AuthContext] Auth state change event:", event);
 
             if (!mounted) return;
@@ -729,7 +719,6 @@ export const AuthProvider = ({ children }) => {
             } finally {
                 if (mounted) {
                     setLoading(false);
-                    clearTimeout(loadingSafetyTimeout);
                 }
             }
         };
@@ -743,13 +732,11 @@ export const AuthProvider = ({ children }) => {
                 handleAuthState('INITIAL_SESSION', session);
             } else {
                 setLoading(false);
-                clearTimeout(loadingSafetyTimeout);
             }
         });
 
         return () => {
             mounted = false;
-            clearTimeout(loadingSafetyTimeout);
             if (subscription) subscription.unsubscribe();
         };
     }, [isGuest]);
