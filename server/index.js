@@ -254,7 +254,11 @@ app.get('/api/admin/revenue-data', async (req, res) => {
             .select('amount, type, status, created_at')
             .eq('status', 'success');
 
-        if (revError) throw revError;
+        if (revError) {
+            console.error('[Admin Revenue] revData query failed:', revError);
+            throw revError;
+        }
+        console.log('[Admin Revenue] revData fetched:', revData?.length || 0, 'rows');
 
         // 2. Active Premium Users Count
         const { count: subCount, error: subError } = await supabase
@@ -262,7 +266,11 @@ app.get('/api/admin/revenue-data', async (req, res) => {
             .select('*', { count: 'exact', head: true })
             .eq('is_premium', true);
 
-        if (subError) throw subError;
+        if (subError) {
+            console.error('[Admin Revenue] subCount query failed:', subError);
+            throw subError;
+        }
+        console.log('[Admin Revenue] subCount fetched:', subCount);
 
         // 3. Recent Transactions with User Details
         const { data: recentTxs, error: txError } = await supabase
@@ -271,7 +279,11 @@ app.get('/api/admin/revenue-data', async (req, res) => {
             .order('created_at', { ascending: false })
             .limit(50);
 
-        if (txError) throw txError;
+        if (txError) {
+            console.error('[Admin Revenue] recentTxs query failed:', txError);
+            throw txError;
+        }
+        console.log('[Admin Revenue] recentTxs fetched:', recentTxs?.length || 0, 'rows');
 
         // --- CALCULATIONS ---
         const totalRevenue = revData?.reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0) || 0;

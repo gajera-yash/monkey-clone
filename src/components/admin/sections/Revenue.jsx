@@ -62,7 +62,7 @@ const Revenue = () => {
 
             } catch (err) {
                 console.error("Revenue Dashboard Error:", err);
-                toast.error("Failed to load revenue data.");
+                toast.error(err.message || "Failed to load revenue data.");
             } finally {
                 setLoading(false);
             }
