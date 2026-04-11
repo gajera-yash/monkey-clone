@@ -1,7 +1,6 @@
 const express = require('express');
 const router = express.Router();
 const { createClient } = require('@supabase/supabase-js');
-const crypto = require('crypto');
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -9,24 +8,29 @@ const supabase = createClient(
 );
 
 // ============ CASHFREE CONFIG ============
-const getCashfreeHeaders = () => {
+const getCashfreeConfig = () => {
+    const appId = (process.env.CASHFREE_APP_ID || '').trim();
+    const secretKey = (process.env.CASHFREE_SECRET_KEY || '').trim();
+    const env = (process.env.CASHFREE_ENV || 'SANDBOX').trim().toUpperCase();
+
+    const isConfigured = Boolean(appId && secretKey);
+    const isTestAppId = appId.startsWith('TEST');
+    const mode = env === 'PRODUCTION' && !isTestAppId ? 'production' : 'sandbox';
+    const baseUrl = mode === 'production'
+        ? 'https://api.cashfree.com/pg/orders'
+        : 'https://sandbox.cashfree.com/pg/orders';
+
+    return { appId, secretKey, env, mode, isConfigured, baseUrl };
+};
+
+const getCashfreeHeaders = (cashfreeConfig) => {
     return {
-        'x-client-id': process.env.CASHFREE_APP_ID || "TEST110318160b1c0d9b14535af06f5e61813011",
-        'x-client-secret': process.env.CASHFREE_SECRET_KEY || "cfsk_ma_test_7f8dc4850ce067d9694c1355c45b9609_",
+        'x-client-id': cashfreeConfig.appId,
+        'x-client-secret': cashfreeConfig.secretKey,
         'x-api-version': '2023-08-01',
         'Content-Type': 'application/json',
         'Accept': 'application/json'
     };
-};
-
-const getCashfreeUrl = () => {
-    const appId = process.env.CASHFREE_APP_ID || "TEST110318160b1c0d9b14535af06f5e61813011";
-    if (appId.startsWith("TEST")) {
-        return 'https://sandbox.cashfree.com/pg/orders';
-    }
-    return process.env.CASHFREE_ENV === 'PRODUCTION' ? 
-        'https://api.cashfree.com/pg/orders' : 
-        'https://sandbox.cashfree.com/pg/orders';
 };
 
 // Get all subscription plans
@@ -50,6 +54,14 @@ router.get('/plans', async (req, res) => {
 // Create subscription order
 router.post('/subscribe/create-order', async (req, res) => {
   try {
+    const cashfreeConfig = getCashfreeConfig();
+    if (!cashfreeConfig.isConfigured) {
+        return res.status(500).json({
+            error: 'Payment gateway not configured',
+            message: 'CASHFREE_APP_ID and CASHFREE_SECRET_KEY are required on server.'
+        });
+    }
+
     const { userId, planId, billingPeriod } = req.body;
     
     const { data: plan } = await supabase
@@ -85,9 +97,9 @@ router.post('/subscribe/create-order', async (req, res) => {
         }
     };
 
-    const response = await fetch(getCashfreeUrl(), {
+    const response = await fetch(cashfreeConfig.baseUrl, {
         method: 'POST',
-        headers: getCashfreeHeaders(),
+        headers: getCashfreeHeaders(cashfreeConfig),
         body: JSON.stringify(requestBody)
     });
 
@@ -98,16 +110,12 @@ router.post('/subscribe/create-order', async (req, res) => {
         return res.status(500).json({ error: 'Payment gateway error', details: data });
     }
 
-    // Return cashfreeEnv so frontend can dynamically set mode
-    const cashfreeEnv = (process.env.CASHFREE_ENV || 'SANDBOX').toUpperCase();
-    const activeAppId = process.env.CASHFREE_APP_ID || "TEST110318160b1c0d9b14535af06f5e61813011";
-
     res.json({
         orderId: data.order_id,
         paymentSessionId: data.payment_session_id,
         amount: amount,
         currency: "INR",
-        cashfreeMode: (cashfreeEnv === 'PRODUCTION' && !activeAppId.startsWith("TEST")) ? 'production' : 'sandbox'
+        cashfreeMode: cashfreeConfig.mode
     });
 
   } catch (error) {
@@ -120,10 +128,19 @@ router.post('/subscribe/create-order', async (req, res) => {
 router.post('/subscribe/verify', async (req, res) => {
   try {
     const { orderId, userId, planId, billingPeriod } = req.body;
+
+    const cashfreeConfig = getCashfreeConfig();
+    if (!cashfreeConfig.isConfigured) {
+        return res.status(500).json({
+            success: false,
+            error: 'Payment gateway not configured',
+            message: 'CASHFREE_APP_ID and CASHFREE_SECRET_KEY are required on server.'
+        });
+    }
     
-    const response = await fetch(`${getCashfreeUrl()}/${orderId}`, {
+    const response = await fetch(`${cashfreeConfig.baseUrl}/${orderId}`, {
         method: 'GET',
-        headers: getCashfreeHeaders()
+        headers: getCashfreeHeaders(cashfreeConfig)
     });
     
     const orderStat = await response.json();
