@@ -37,7 +37,7 @@ const Transactions = () => {
                 .from('coin_transactions')
                 .select(`
                     *,
-                    user:profiles!coin_transactions_user_id_fkey(username, avatar_url, email)
+                    user:profiles(username, avatar_url, email)
                 `)
                 .order('created_at', { ascending: false })
                 .limit(500);
