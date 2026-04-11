@@ -29,6 +29,8 @@ const Transactions = () => {
         return () => window.removeEventListener('focus', fetchTransactions);
     }, []);
 
+    const fetchTransactions = async () => {
+        setLoading(true);
         try {
             // Get session for auth token
             const { data: { session } } = await supabase.auth.getSession();
