@@ -162,11 +162,11 @@ const CoinStoreModal = ({ isOpen, onClose }) => {
                 // Success state first to clear the loader/processing screen
                 setStep('success');
                 
-                // Add coins locally to update UI immediately
+                // Refresh coins from database (source of truth)
                 try {
-                    await addCoins(selectedPkg.coins, `Purchased ${selectedPkg.coins} Coins`);
-                } catch (addError) {
-                    console.warn("[CoinStore] Local balance update deferred:", addError);
+                    await refreshCoins();
+                } catch (refreshError) {
+                    console.warn("[CoinStore] Balance refresh failed, user may need to reload:", refreshError);
                 }
             } else {
                 toast.error(verifyData.message || "Payment verification failed");

@@ -238,24 +238,34 @@ router.post('/purchase/verify', async (req, res) => {
         return res.json({ success: true, message: 'Already verified' });
     }
 
-    const { data: pkg } = await supabase
+    const { data: pkg, error: pkgError } = await supabase
       .from('subscription_plans')
       .select('coins, price_monthly_inr, price, name')
       .eq('id', packageId)
       .single();
 
-    const { data: user } = await supabase
+    if (pkgError || !pkg) {
+        console.error('[Cashfree Verify] Package not found:', pkgError);
+        return res.status(404).json({ success: false, error: 'Package not found' });
+    }
+
+    const { data: user, error: userError } = await supabase
       .from('profiles')
       .select('coins, total_coins_purchased')
       .eq('id', userId)
       .single();
+
+    if (userError || !user) {
+        console.error('[Cashfree Verify] User not found:', userError);
+        return res.status(404).json({ success: false, error: 'User not found' });
+    }
 
     const pkgCoins = pkg.coins || 0;
     const pkgPrice = pkg.price_monthly_inr || pkg.price || 0;
     const newCoins = (user.coins || 0) + pkgCoins;
     const newTotalPurchased = (user.total_coins_purchased || 0) + pkgCoins;
 
-    await supabase
+    const { error: updateError } = await supabase
       .from('profiles')
       .update({
         coins: newCoins,
@@ -264,7 +274,12 @@ router.post('/purchase/verify', async (req, res) => {
       })
       .eq('id', userId);
 
-    await supabase
+    if (updateError) {
+        console.error('[Cashfree Verify] Profile update failed:', updateError);
+        return res.status(500).json({ success: false, error: 'Failed to update user wallet' });
+    }
+
+    const { error: txError } = await supabase
       .from('coin_transactions')
       .insert({
         user_id: userId,
@@ -279,6 +294,11 @@ router.post('/purchase/verify', async (req, res) => {
             amount_paid: pkgPrice
         }
       });
+
+    if (txError) {
+        console.error('[Cashfree Verify] Transaction log failed:', txError);
+        // We continue because the coins were already added, but we log the error
+    }
       
     await supabase
         .from('transactions')
