@@ -48,11 +48,17 @@ const Users = () => {
     const [userTransactions, setUserTransactions] = useState([]);
     const [txLoading, setTxLoading] = useState(false);
 
-    useEffect(() => {
-        fetchUsers();
+    const hasLoadedOnce = React.useRef(false);
 
-        window.addEventListener('focus', fetchUsers);
-        return () => window.removeEventListener('focus', fetchUsers);
+    useEffect(() => {
+        fetchUsers(true); // Initial load with spinner
+
+        // Silently refresh on tab focus (no spinner, data stays visible)
+        const handleFocus = () => {
+            if (hasLoadedOnce.current) fetchUsers(false);
+        };
+        window.addEventListener('focus', handleFocus);
+        return () => window.removeEventListener('focus', handleFocus);
     }, []);
 
     useEffect(() => {
@@ -64,14 +70,40 @@ const Users = () => {
     const fetchUserTransactions = async (userId) => {
         setTxLoading(true);
         try {
-            const { data, error } = await supabase
+            // 1. Fetch from coin_transactions (internal coin movements)
+            const { data: coinTxs, error: coinErr } = await supabase
                 .from('coin_transactions')
                 .select('*')
                 .eq('user_id', userId)
                 .order('created_at', { ascending: false });
 
-            if (error) throw error;
-            setUserTransactions(data || []);
+            if (coinErr) console.warn("coin_transactions query failed:", coinErr);
+
+            // 2. Also fetch from transactions (purchases/payments)
+            const { data: payTxs, error: payErr } = await supabase
+                .from('transactions')
+                .select('*')
+                .eq('user_id', userId)
+                .order('created_at', { ascending: false });
+
+            if (payErr) console.warn("transactions query failed:", payErr);
+
+            // 3. Merge both — normalize payment transactions to match coin format
+            const normalizedPayTxs = (payTxs || []).map(tx => ({
+                id: `pay-${tx.id}`,
+                user_id: tx.user_id,
+                coins_amount: tx.coins_amount || tx.amount || 0,
+                coins_balance_after: tx.coins_after || null,
+                transaction_type: tx.type || 'purchase',
+                description: tx.description || `${tx.type || 'Purchase'} — ₹${tx.amount || 0}`,
+                created_at: tx.created_at
+            }));
+
+            // Merge and sort by date (newest first)
+            const merged = [...(coinTxs || []), ...normalizedPayTxs]
+                .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+            setUserTransactions(merged);
         } catch (error) {
             console.error("Failed to load user transactions:", error);
             toast.error("Failed to load user transactions.");
@@ -79,8 +111,10 @@ const Users = () => {
         setTxLoading(false);
     };
 
-    const fetchUsers = async () => {
-        setLoading(true);
+    const fetchUsers = async (showSpinner = true) => {
+        // Only show loader on first load — prevents data disappearing on tab switch
+        if (showSpinner && !hasLoadedOnce.current) setLoading(true);
+        
         const { data, error } = await supabase
             .from('profiles')
             .select('*')
@@ -89,11 +123,12 @@ const Users = () => {
 
         if (error) {
             console.error("Failed to load users:", error);
-            toast.error("Failed to load users: " + error.message);
+            if (!hasLoadedOnce.current) toast.error("Failed to load users: " + error.message);
         } else {
             setUsers(data || []);
         }
         setLoading(false);
+        hasLoadedOnce.current = true;
     };
 
     const handleBanUser = async (user) => {

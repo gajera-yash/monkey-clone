@@ -49,7 +49,7 @@ const socket = io(SOCKET_URL, {
     secure: true,
     withCredentials: false,
     perMessageDeflate: false,
-    path: '/s/'   // Custom path — Jio DPI blocks '/socket.io/'
+    path: '/s/'   // Custom path to bypass Jio DPI DPI
 });
 
 // --- Fallback Logic ---

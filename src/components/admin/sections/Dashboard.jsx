@@ -23,12 +23,12 @@ const Dashboard = () => {
     const [chartData, setChartData] = useState([]);
     const [activities, setActivities] = useState([]);
     const [loading, setLoading] = useState(true);
+    const hasLoadedOnce = React.useRef(false);
 
     useEffect(() => {
         const initDashboard = async () => {
-            // Only show loader if we have no data yet (prevents "0 0" flicker)
-            const isInitial = stats.totalUsers === 0;
-            if (isInitial) setLoading(true);
+            // Only show loader on very first load — never reset data on refetch
+            if (!hasLoadedOnce.current) setLoading(true);
             
             try {
                 await Promise.all([
@@ -39,20 +39,26 @@ const Dashboard = () => {
             } catch (err) {
                 console.error("Dashboard Global Fetch Error:", err);
             } finally {
-                if (isInitial) setLoading(false);
+                setLoading(false);
+                hasLoadedOnce.current = true;
             }
         };
         initDashboard();
 
-        // Auto-refresh every 60 seconds
+        // Auto-refresh every 60 seconds (silently in background)
         const refreshInterval = setInterval(initDashboard, 60000);
 
-        window.addEventListener('focus', initDashboard);
+        // Refresh data when tab regains focus (silently)
+        const handleFocus = () => {
+            if (hasLoadedOnce.current) initDashboard();
+        };
+        window.addEventListener('focus', handleFocus);
         return () => {
-            window.removeEventListener('focus', initDashboard);
+            window.removeEventListener('focus', handleFocus);
             clearInterval(refreshInterval);
         };
-    }, [stats.totalUsers]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const fetchDashboardStats = async () => {
         try {
