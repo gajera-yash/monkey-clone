@@ -1,79 +1,65 @@
 import io from 'socket.io-client';
 
 // ========================================================================
-// Strangy Socket Connection — with Jio DPI Bypass & Multi-URL Fallback
+// Strangy Socket Connection — The Ultimate Jio Bypass (Vercel Proxy)
 // ========================================================================
 
-// --- URL Configuration ---
-let SOCKET_URL;
-let FALLBACK_URL = null;
-
 const hostname = window.location.hostname;
+const isLocalhost = hostname === 'localhost' || hostname.startsWith('192.168.');
 
-if (hostname === 'localhost' || hostname.startsWith('192.168.')) {
-    SOCKET_URL = `http://${hostname}:3001`;
-} else if (process.env.REACT_APP_SOCKET_URL) {
-    SOCKET_URL = process.env.REACT_APP_SOCKET_URL;
-    FALLBACK_URL = 'https://strangy-production-9664.up.railway.app';
-} else {
-    SOCKET_URL = 'https://api.strangy.in';
-    FALLBACK_URL = 'https://strangy-production-9664.up.railway.app';
-}
+// URL Configuration
+// For local development, point directly to the local backend.
+// For production, we use an EMPTY string. This forces Socket.IO to connect to the current domain (e.g., strangy.in).
+// Vercel serverless functions will then catch the '/s/' path and proxy it to the Railway backend.
+let SOCKET_URL = isLocalhost ? `http://${hostname}:3001` : '';
 
-// Clean URLs
-SOCKET_URL = SOCKET_URL.replace(/\/+$/, "");
-if (!SOCKET_URL.startsWith('http') && SOCKET_URL !== '/') {
-    SOCKET_URL = `https://${SOCKET_URL}`;
-}
-if (FALLBACK_URL) FALLBACK_URL = FALLBACK_URL.replace(/\/+$/, "");
+// Direct Railway Fallback (if Vercel proxy fails)
+let FALLBACK_URL = 'https://strangy-production-9664.up.railway.app';
 
-// Detect mobile network (Jio/Airtel etc)
-const isMobileNetwork = /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent);
-
-console.log("[Socket] Primary:", SOCKET_URL, "| Mobile:", isMobileNetwork);
+console.log("[Socket] Init via Vercel Proxy Strategy | Localhost:", isLocalhost);
 
 // --- Create Socket ---
-// CRITICAL: Custom path '/s/' bypasses Jio DPI which detects & blocks '/socket.io/'
+// CRITICAL: Custom path '/s/' bypasses Jio DPI. Vercel vercel.json routes this to the backend.
 const socket = io(SOCKET_URL, {
     autoConnect: false,
     reconnection: true,
-    reconnectionAttempts: 10,  // Try 10 times on primary before fallback
+    reconnectionAttempts: 7,  // Try primary (Vercel proxy) 7 times before fallback
     reconnectionDelay: 1000,
     reconnectionDelayMax: 8000,
     randomizationFactor: 0.5,
     timeout: 20000,
-    // WebSocket first on mobile — WSS on 443 looks like HTTPS to Jio DPI
-    // Polling first on desktop — more reliable through corporate proxies
-    transports: isMobileNetwork ? ['websocket', 'polling'] : ['polling', 'websocket'],
-    upgrade: true,
+    // CRITICAL: Vercel does NOT support WebSockets through rewrites/proxies.
+    // We MUST force 'polling' only for production. It has slight delay but 100% bypasses Jio firewall.
+    transports: isLocalhost ? ['polling', 'websocket'] : ['polling'],
+    upgrade: isLocalhost, // Disable upgrade attempt on production proxy
     secure: true,
     withCredentials: false,
     perMessageDeflate: false,
-    path: '/s/'   // Custom path to bypass Jio DPI DPI
+    path: '/s/'   // Client requests /s/ -> Vercel proxies to Railway /s/
 });
 
 // --- Fallback Logic ---
 let consecutiveErrors = 0;
 let hasSwitchedToFallback = false;
-let isConnecting = false;
 
 const switchToFallback = () => {
-    if (!FALLBACK_URL || hasSwitchedToFallback) return;
+    if (!FALLBACK_URL || hasSwitchedToFallback || isLocalhost) return;
     hasSwitchedToFallback = true;
     consecutiveErrors = 0;
 
-    console.log(`[Socket] 🔄 Switching to fallback: ${FALLBACK_URL}`);
+    console.log(`[Socket] 🔄 Vercel Proxy blocked. Switching to direct fallback: ${FALLBACK_URL}`);
 
-    // Change the URI on the existing socket manager — keeps same socket instance!
+    // Change the URI to direct Railway domain
     socket.io.uri = FALLBACK_URL;
     
-    // Reset transport strategy for fallback URL
+    // Reset transport strategy for fallback URL (maybe WS works directly)
     socket.io.opts.transports = ['polling', 'websocket'];
+    socket.io.opts.upgrade = true;
     
     // Reset reconnection attempts for fresh start
     socket.io.opts.reconnectionAttempts = Infinity;
 
-    // Force reconnect to new URL
+    // Force reconnect
     socket.disconnect();
     setTimeout(() => socket.connect(), 500);
 };
@@ -84,44 +70,23 @@ socket.io.on('error', (error) => {
 });
 
 socket.io.on('reconnect_attempt', (attempt) => {
-    console.log(`[Socket] Reconnect attempt #${attempt}`);
-
-    // Progressive transport strategy for Jio bypass:
-    if (isMobileNetwork) {
-        if (attempt === 2) {
-            // Try polling-only (maybe WebSocket is blocked)
-            socket.io.opts.transports = ['polling'];
-            console.log('[Socket] → Trying polling-only');
-        } else if (attempt === 4) {
-            // Try WebSocket-only (maybe polling is blocked)
-            socket.io.opts.transports = ['websocket'];
-            console.log('[Socket] → Trying WebSocket-only');
-        } else if (attempt === 6) {
-            // Restore both
-            socket.io.opts.transports = ['websocket', 'polling'];
-            console.log('[Socket] → Trying both transports');
-        }
-    }
+    console.log(`[Socket] Reconnect attempt #${attempt} via ${hasSwitchedToFallback ? 'Fallback' : 'Vercel Proxy'}`);
 });
 
 socket.io.on('reconnect', (attempt) => {
     console.log(`[Socket] ✅ Reconnected after ${attempt} attempts | Transport:`, socket.io.engine?.transport?.name);
     consecutiveErrors = 0;
-    // Restore default transports
-    socket.io.opts.transports = isMobileNetwork ? ['websocket', 'polling'] : ['polling', 'websocket'];
 });
 
 socket.io.on('reconnect_failed', () => {
     console.error('[Socket] ❌ All reconnection attempts exhausted');
-    // Last resort: try fallback URL
-    switchToFallback();
+    if (!hasSwitchedToFallback) switchToFallback();
 });
 
 socket.on('connect', () => {
     consecutiveErrors = 0;
-    isConnecting = false;
     const transport = socket.io.engine?.transport?.name || 'unknown';
-    console.log(`[Socket] ✅ Connected! ID: ${socket.id} | URL: ${socket.io.uri} | Transport: ${transport}`);
+    console.log(`[Socket] ✅ Connected! ID: ${socket.id} | Transport: ${transport} | Proxy: ${!hasSwitchedToFallback && !isLocalhost}`);
 });
 
 socket.on('connect_error', (err) => {
@@ -129,7 +94,7 @@ socket.on('connect_error', (err) => {
     const msg = err?.message || 'Unknown error';
     console.error(`[Socket] ❌ Connect error #${consecutiveErrors}: ${msg}`);
 
-    // After 4 consecutive errors on primary, try fallback
+    // After 4 consecutive errors on Vercel Proxy, fall back to direct Railway
     if (consecutiveErrors >= 4 && !hasSwitchedToFallback) {
         switchToFallback();
     }
@@ -137,8 +102,6 @@ socket.on('connect_error', (err) => {
 
 socket.on('disconnect', (reason) => {
     console.warn("[Socket] Disconnected:", reason);
-    // If server-initiated, auto-reconnect is handled by Socket.IO
-    // If client-initiated (transport close), we may need manual reconnect
     if (reason === 'transport close' || reason === 'transport error') {
         consecutiveErrors++;
     }
@@ -146,5 +109,6 @@ socket.on('disconnect', (reason) => {
 
 // --- Exports ---
 export { SOCKET_URL };
-export const API_BASE_URL = SOCKET_URL;
+// For API calls (like flag-report), always use direct Railway API to avoid Vercel timeouts/payload limits on large uploads
+export const API_BASE_URL = 'https://api.strangy.in';
 export default socket;
