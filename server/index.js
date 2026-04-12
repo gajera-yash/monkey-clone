@@ -127,9 +127,12 @@ const io = new Server(server, {
         methods: ["GET", "POST", "OPTIONS"],
         credentials: false
     },
+    // CRITICAL: Custom path to bypass Jio DPI (Deep Packet Inspection)
+    // Jio blocks '/socket.io/' in HTTP traffic. '/s/' looks like normal API calls.
+    path: '/s/',
     transports: ['polling', 'websocket'],
     pingInterval: 12000,  // 12s — balanced for Jio/mobile latency without Vercel timeout
-    pingTimeout: 20000,   // 20s — Jio CGNAT causes latency spikes up to 8-10s, 5s was too aggressive
+    pingTimeout: 20000,   // 20s — Jio CGNAT causes latency spikes up to 8-10s
     allowEIO3: true,      // Support older clients if any
     maxHttpBufferSize: 1e6, // 1MB — handle large ICE candidate payloads
     httpCompression: false, // Disable compression to avoid mobile network issues

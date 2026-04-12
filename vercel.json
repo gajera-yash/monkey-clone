@@ -4,6 +4,10 @@
     "framework": "create-react-app",
     "rewrites": [
         {
+            "source": "/s/:path*",
+            "destination": "https://api.strangy.in/s/:path*"
+        },
+        {
             "source": "/api/:path*",
             "destination": "https://api.strangy.in/api/:path*"
         },
