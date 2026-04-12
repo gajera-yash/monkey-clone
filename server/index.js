@@ -128,9 +128,12 @@ const io = new Server(server, {
         credentials: false
     },
     transports: ['polling', 'websocket'],
-    pingInterval: 8000, // Frequent pings keep Vercel from timing out long-polling
-    pingTimeout: 5000,
-    allowEIO3: true // Support older clients if any
+    pingInterval: 12000,  // 12s — balanced for Jio/mobile latency without Vercel timeout
+    pingTimeout: 20000,   // 20s — Jio CGNAT causes latency spikes up to 8-10s, 5s was too aggressive
+    allowEIO3: true,      // Support older clients if any
+    maxHttpBufferSize: 1e6, // 1MB — handle large ICE candidate payloads
+    httpCompression: false, // Disable compression to avoid mobile network issues
+    perMessageDeflate: false // Prevent WebSocket compression issues on Jio/mobile
 });
 
 // Queue for users waiting to be matched [{id, name}]

@@ -26,32 +26,68 @@ import StrangyIcon from './common/StrangyIcon';
 
 const buildRtcConfig = () => {
   const iceServers = [
+    // STUN Servers (free, unlimited) — for basic NAT traversal
     { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' }
+    { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'stun:stun.relay.metered.ca:80' },
   ];
 
-  // Optional TURN fallback for strict NAT/firewall networks.
-  // Configure these in frontend env (Vercel) to improve connection reliability:
-  // REACT_APP_TURN_URL, REACT_APP_TURN_USERNAME, REACT_APP_TURN_CREDENTIAL
+  // TURN Servers — CRITICAL for WiFi (Symmetric NAT) & Jio (CGNAT) connectivity
+  // These relay traffic when direct P2P fails (which is ~30% of real-world connections)
   const turnUrl = process.env.REACT_APP_TURN_URL;
   const turnUsername = process.env.REACT_APP_TURN_USERNAME;
   const turnCredential = process.env.REACT_APP_TURN_CREDENTIAL;
 
   if (turnUrl && turnUsername && turnCredential) {
+    // Custom TURN server from env (production override)
+    const turnUrls = turnUrl.split(',').map(u => u.trim());
+    turnUrls.forEach(url => {
+      iceServers.push({
+        urls: url,
+        username: turnUsername,
+        credential: turnCredential
+      });
+    });
+  } else {
+    // Free Metered.ca TURN fallback (500MB/month free tier)
+    // UDP — fastest, works on most networks
     iceServers.push({
-      urls: turnUrl,
-      username: turnUsername,
-      credential: turnCredential
+      urls: 'turn:global.relay.metered.ca:80',
+      username: 'e8dd65d92f3b5b1b1ee4b787',
+      credential: 'mBJJOCyn6SxS/xMz'
+    });
+    // TCP on port 80 — bypasses UDP-blocking firewalls (Jio hotspot)
+    iceServers.push({
+      urls: 'turn:global.relay.metered.ca:80?transport=tcp',
+      username: 'e8dd65d92f3b5b1b1ee4b787',
+      credential: 'mBJJOCyn6SxS/xMz'
+    });
+    // TLS on port 443 — bypasses DPI & corporate firewalls (WiFi networks)
+    iceServers.push({
+      urls: 'turn:global.relay.metered.ca:443',
+      username: 'e8dd65d92f3b5b1b1ee4b787',
+      credential: 'mBJJOCyn6SxS/xMz'
+    });
+    // TURNS (TLS-secured TURN) — ultimate fallback for strictest networks
+    iceServers.push({
+      urls: 'turns:global.relay.metered.ca:443?transport=tcp',
+      username: 'e8dd65d92f3b5b1b1ee4b787',
+      credential: 'mBJJOCyn6SxS/xMz'
     });
   }
 
   return {
     iceServers,
-    iceCandidatePoolSize: 10
+    iceCandidatePoolSize: 10,
+    iceTransportPolicy: 'all' // Try direct first, fallback to relay
   };
 };
 
 const RTC_CONFIG = buildRtcConfig();
+
+// Connection timeout — prevent infinite "connecting" on bad networks
+const ICE_CONNECTION_TIMEOUT_MS = 20000; // 20 seconds
+const ICE_RESTART_MAX_ATTEMPTS = 2;
 
 const VideoChat = ({ onEndChat }) => {
   const location = useLocation();
@@ -137,23 +173,42 @@ const VideoChat = ({ onEndChat }) => {
   useEffect(() => {
     let errorToastId = null;
 
+    let wasDisconnected = false;
+
     const onConnect = () => { 
-        console.log("[VideoChat] Socket Connected"); 
+        console.log("[VideoChat] Socket Connected | Transport:", socket.io?.engine?.transport?.name); 
         setSocketStatus('Connected'); 
         if (errorToastId) {
             toast.dismiss(errorToastId);
             errorToastId = null;
         }
+        // Show recovery toast if we were previously disconnected
+        if (wasDisconnected) {
+            toast.success("Connected! 🟢", { duration: 2000, id: 'socket-reconnect' });
+            wasDisconnected = false;
+        }
     };
 
     const onConnectError = (err) => { 
-        console.error("[VideoChat] Socket Connection Error", err); 
+        console.error("[VideoChat] Socket Connection Error:", err?.message || err); 
         setSocketStatus('Error'); 
+        wasDisconnected = true;
         
-        // Show a helpful message if not already showing
+        // Show network-specific helpful message
         if (!errorToastId) {
-            errorToastId = toast.error("Network connection unstable. Retrying...", { 
-                duration: 5000,
+            const errMsg = err?.message || '';
+            let userMessage = "Network connection unstable. Retrying...";
+            
+            if (errMsg.includes('timeout')) {
+                userMessage = "Server response slow. Retrying connection...";
+            } else if (errMsg.includes('websocket') || errMsg.includes('transport')) {
+                userMessage = "Switching connection mode. Please wait...";
+            } else if (errMsg.includes('xhr') || errMsg.includes('poll')) {
+                userMessage = "Network blocked. Trying alternate route...";
+            }
+            
+            errorToastId = toast.error(userMessage, { 
+                duration: 6000,
                 id: 'socket-error'
             });
         }
@@ -773,9 +828,98 @@ const VideoChat = ({ onEndChat }) => {
       const pc = new RTCPeerConnection(RTC_CONFIG);
       peerConnection.current = pc;
 
+      // --- COMPREHENSIVE CONNECTION STATE MONITORING ---
+      let iceRestartAttempts = 0;
+      let connectionTimer = null;
+
+      // Start connection timeout — if no connection in 20s, force retry
+      connectionTimer = setTimeout(() => {
+        if (pc && pc.iceConnectionState !== 'connected' && pc.iceConnectionState !== 'completed') {
+          console.warn('[WebRTC] Connection timeout (20s) — ICE gathering stuck or TURN unreachable');
+          toast.error('Connection timed out. Trying next partner...', { icon: '⏱️', duration: 3000 });
+          // Force cleanup and re-match
+          if (peerConnection.current === pc) {
+            handleNext();
+          }
+        }
+      }, ICE_CONNECTION_TIMEOUT_MS);
+
       pc.onconnectionstatechange = () => {
-        if (pc.connectionState === 'failed') {
-          console.warn('[WebRTC] Connection failed - likely NAT/firewall issue. TURN fallback may be required.');
+        console.log(`[WebRTC] connectionState: ${pc.connectionState}`);
+        if (pc.connectionState === 'connected') {
+          // Clear timeout — we're connected!
+          if (connectionTimer) { clearTimeout(connectionTimer); connectionTimer = null; }
+          console.log('[WebRTC] ✅ Peer connected successfully!');
+        } else if (pc.connectionState === 'failed') {
+          if (connectionTimer) { clearTimeout(connectionTimer); connectionTimer = null; }
+          console.warn('[WebRTC] ❌ Connection FAILED — NAT/firewall issue');
+          toast.error('Connection failed. Finding new partner...', { icon: '❌', duration: 3000 });
+          if (peerConnection.current === pc) {
+            handleNext();
+          }
+        } else if (pc.connectionState === 'disconnected') {
+          console.warn('[WebRTC] ⚠️ Connection disconnected — may recover automatically');
+          // Wait 5s for auto-recovery before taking action
+          setTimeout(() => {
+            if (pc && pc.connectionState === 'disconnected' && peerConnection.current === pc) {
+              console.warn('[WebRTC] Still disconnected after 5s — triggering cleanup');
+              toast.error('Partner connection lost.', { icon: '📡', duration: 3000 });
+              handleNext();
+            }
+          }, 5000);
+        }
+      };
+
+      // ICE Connection State — handles network-level recovery
+      pc.oniceconnectionstatechange = () => {
+        console.log(`[WebRTC] iceConnectionState: ${pc.iceConnectionState}`);
+        if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
+          if (connectionTimer) { clearTimeout(connectionTimer); connectionTimer = null; }
+          iceRestartAttempts = 0;
+        } else if (pc.iceConnectionState === 'failed') {
+          // Attempt ICE restart before giving up
+          if (iceRestartAttempts < ICE_RESTART_MAX_ATTEMPTS && initiator) {
+            iceRestartAttempts++;
+            console.log(`[WebRTC] 🔄 Attempting ICE restart (attempt ${iceRestartAttempts})...`);
+            toast.loading('Reconnecting...', { id: 'ice-restart', duration: 5000 });
+            pc.createOffer({ iceRestart: true }).then(offer => {
+              if (pc.signalingState !== 'closed') {
+                return pc.setLocalDescription(offer);
+              }
+            }).then(() => {
+              if (pc.signalingState !== 'closed') {
+                socket.emit('offer', { offer: pc.localDescription, roomId });
+              }
+            }).catch(err => {
+              console.error('[WebRTC] ICE restart failed:', err);
+              toast.dismiss('ice-restart');
+            });
+          } else {
+            // All ICE restart attempts exhausted
+            if (connectionTimer) { clearTimeout(connectionTimer); connectionTimer = null; }
+            console.warn('[WebRTC] ICE failed after all restart attempts');
+            toast.dismiss('ice-restart');
+          }
+        } else if (pc.iceConnectionState === 'disconnected') {
+          console.warn('[WebRTC] ICE disconnected — waiting for auto-recovery (Jio network switch)');
+          // Mobile networks (especially Jio) often briefly disconnect during handoff
+          // Give it 8 seconds before taking action
+          setTimeout(() => {
+            if (pc && pc.iceConnectionState === 'disconnected' && peerConnection.current === pc) {
+              // Try ICE restart first
+              if (iceRestartAttempts < ICE_RESTART_MAX_ATTEMPTS && initiator) {
+                iceRestartAttempts++;
+                console.log(`[WebRTC] 🔄 ICE restart after disconnect (attempt ${iceRestartAttempts})`);
+                pc.createOffer({ iceRestart: true }).then(offer => {
+                  if (pc.signalingState !== 'closed') return pc.setLocalDescription(offer);
+                }).then(() => {
+                  if (pc.signalingState !== 'closed') {
+                    socket.emit('offer', { offer: pc.localDescription, roomId });
+                  }
+                }).catch(() => {});
+              }
+            }
+          }, 8000);
         }
       };
 

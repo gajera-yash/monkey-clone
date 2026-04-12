@@ -6,14 +6,15 @@ let SOCKET_URL;
 
 const hostname = window.location.hostname;
 
-if (process.env.REACT_APP_SOCKET_URL) {
-    SOCKET_URL = process.env.REACT_APP_SOCKET_URL;
-} else if (hostname === 'localhost' || hostname.startsWith('192.168.')) {
+if (hostname === 'localhost' || hostname.startsWith('192.168.')) {
     // Development mode (Split frontend/backend) - Localhost or Local IP
     // Backend signaling server runs on 3001 by default
     SOCKET_URL = `http://${hostname}:3001`;
+} else if (process.env.REACT_APP_SOCKET_URL) {
+    // Explicit env override (only used when NOT localhost)
+    SOCKET_URL = process.env.REACT_APP_SOCKET_URL;
 } else if (hostname.includes('vercel.app') || hostname.includes('strangy.in')) {
-    // New Custom Subdomain for Railway (Bypasses Jio blocks and Vercel proxy limits)
+    // Custom subdomain for Railway (Bypasses Jio blocks and Vercel proxy limits)
     SOCKET_URL = 'https://api.strangy.in';
 } else {
     // Production URL fallback
@@ -37,12 +38,18 @@ const socket = io(SOCKET_URL, {
     reconnection: true,
     reconnectionAttempts: Infinity,
     reconnectionDelay: 1000,
-    reconnectionDelayMax: 5000,
+    reconnectionDelayMax: 8000,      // Increased from 5000 — Jio needs more breathing room
+    randomizationFactor: 0.5,         // Add jitter to prevent reconnection storms
     timeout: 30000,
     transports: ['polling', 'websocket'], // Polling first for ISP resilience, then upgrade to WS
     upgrade: true,
     secure: true,
-    withCredentials: false
+    withCredentials: false,
+    forceNew: false,
+    // Jio/Mobile network resilience — disable perMessageDeflate to avoid compression issues
+    perMessageDeflate: false,
+    // Path override — ensure we're hitting the right endpoint
+    path: '/socket.io/'
 });
 
 // Implement a fallback if polling fails too (rare)
@@ -50,9 +57,29 @@ socket.io.on('error', (error) => {
     console.warn("[SocketDebug] IO Error:", error);
 });
 
+// Reconnection monitoring — useful for debugging Jio instability
+socket.io.on('reconnect_attempt', (attempt) => {
+    console.log(`[SocketDebug] Reconnection attempt #${attempt}`);
+    // On 3rd+ attempt, force polling-only to avoid WebSocket issues on Jio
+    if (attempt >= 3) {
+        socket.io.opts.transports = ['polling'];
+        console.log('[SocketDebug] Forcing polling-only transport after 3 failed attempts');
+    }
+});
+
+socket.io.on('reconnect', (attempt) => {
+    console.log(`[SocketDebug] Reconnected after ${attempt} attempts`);
+    // Restore WebSocket upgrade capability after successful reconnect
+    socket.io.opts.transports = ['polling', 'websocket'];
+});
+
+socket.io.on('reconnect_failed', () => {
+    console.error('[SocketDebug] All reconnection attempts failed!');
+});
+
 // Global debug listeners
 socket.on('connect', () => {
-    console.log("[SocketDebug] Connected to server!", socket.id);
+    console.log("[SocketDebug] Connected to server!", socket.id, "| Transport:", socket.io.engine?.transport?.name);
 });
 socket.on('connect_error', (err) => console.error("[SocketDebug] Connection Error:", err.message));
 socket.on('disconnect', (reason) => console.warn("[SocketDebug] Disconnected:", reason));
