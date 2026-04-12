@@ -53,8 +53,6 @@ socket.io.on('error', (error) => {
 // Global debug listeners
 socket.on('connect', () => {
     console.log("[SocketDebug] Connected to server!", socket.id);
-    // Reset to preferred transport order on successful connection
-    socket.io.opts.transports = ['websocket', 'polling'];
 });
 socket.on('connect_error', (err) => console.error("[SocketDebug] Connection Error:", err.message));
 socket.on('disconnect', (reason) => console.warn("[SocketDebug] Disconnected:", reason));

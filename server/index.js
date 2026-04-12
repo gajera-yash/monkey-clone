@@ -418,9 +418,9 @@ app.post('/api/flag-report', async (req, res) => {
 });
 
 io.on('connection', (socket) => {
-    console.log(`[Socket] Connected: ${socket.id} | Total: ${io.engine.clientsCount}`);
-
-    // Immediately tell the new client and everyone else the updated total count
+    socket.on('connect', () => {
+        console.log("[SocketDebug] Connected to server!", socket.id);
+    });
     io.emit('waiting-count', io.engine.clientsCount);
 
     // --- DIRECT 1-TO-1 CALLS LOGIC ---
@@ -756,9 +756,11 @@ io.on('connection', (socket) => {
                             return femaleCount >= limit; 
                         };
 
+/*
                         if (checkRatioLimit(u1, u2) || checkRatioLimit(u2, u1)) {
                             continue; // Skip this match, save female creator for paid/eligible users
                         }
+*/
 
                         // CHECK FILTERS ONE-WAY: each user's filter applies to their partner
                         // u1's filter must match u2's gender/age/location, AND u2's filter must match u1
