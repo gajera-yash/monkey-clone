@@ -16,12 +16,12 @@ if (process.env.REACT_APP_SOCKET_URL) {
     // Railway Production URL for Vercel
     SOCKET_URL = 'https://strangy-production-56d4.up.railway.app';
 } else {
-    // Railway Production URL
-    SOCKET_URL = 'https://strangy-production-56d4.up.railway.app';
+    // Vercel proxy bypass for Jio! We route to window.location.origin
+    SOCKET_URL = window.location.origin;
 }
 
 // Ensure URL has protocol and NO trailing slash
-if (SOCKET_URL !== '/') {
+if (SOCKET_URL !== '/' && SOCKET_URL !== window.location.origin) {
     // Remove trailing slash if present
     SOCKET_URL = SOCKET_URL.replace(/\/+$/, "");
     
@@ -32,6 +32,9 @@ if (SOCKET_URL !== '/') {
 
 console.log("[SocketDebug] Connecting to:", SOCKET_URL);
 
+// If proxied via Vercel, MUST use polling exclusively (Vercel kills WebSockets)
+const isVercelProxied = SOCKET_URL === window.location.origin;
+
 const socket = io(SOCKET_URL, {
     autoConnect: false,
     reconnection: true,
@@ -39,8 +42,8 @@ const socket = io(SOCKET_URL, {
     reconnectionDelay: 1000,
     reconnectionDelayMax: 5000,
     timeout: 30000,
-    transports: ['polling', 'websocket'], // MUST be polling first for Jio Data/Strict Firewalls!
-    upgrade: true,
+    transports: isVercelProxied ? ['polling'] : ['polling', 'websocket'],
+    upgrade: !isVercelProxied,
     secure: true,
     withCredentials: false
 });

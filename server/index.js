@@ -128,6 +128,8 @@ const io = new Server(server, {
         credentials: false
     },
     transports: ['polling', 'websocket'],
+    pingInterval: 8000, // Frequent pings keep Vercel from timing out long-polling
+    pingTimeout: 5000,
     allowEIO3: true // Support older clients if any
 });
 
