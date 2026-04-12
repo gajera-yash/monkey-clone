@@ -127,7 +127,7 @@ const io = new Server(server, {
         methods: ["GET", "POST", "OPTIONS"],
         credentials: false
     },
-    transports: ['websocket', 'polling'],
+    transports: ['polling', 'websocket'],
     allowEIO3: true // Support older clients if any
 });
 

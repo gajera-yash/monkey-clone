@@ -135,18 +135,43 @@ const VideoChat = ({ onEndChat }) => {
 
   // Monitor socket status
   useEffect(() => {
-    const onConnect = () => { console.log("[VideoChat] Socket Connected"); setSocketStatus('Connected'); };
-    const onConnectError = (err) => { console.error("[VideoChat] Socket Connection Error", err); setSocketStatus('Error'); };
+    let errorToastId = null;
+
+    const onConnect = () => { 
+        console.log("[VideoChat] Socket Connected"); 
+        setSocketStatus('Connected'); 
+        if (errorToastId) {
+            toast.dismiss(errorToastId);
+            errorToastId = null;
+        }
+    };
+
+    const onConnectError = (err) => { 
+        console.error("[VideoChat] Socket Connection Error", err); 
+        setSocketStatus('Error'); 
+        
+        // Show a helpful message if not already showing
+        if (!errorToastId) {
+            errorToastId = toast.error("Network connection unstable. Retrying...", { 
+                duration: 5000,
+                id: 'socket-error'
+            });
+        }
+    };
+    
     const onDisconnect = () => { console.log("[VideoChat] Socket Disconnected"); setSocketStatus('Disconnected'); };
 
     socket.on('connect', onConnect);
+    socket.io.on('error', onConnectError); // Catch IO-level errors
     socket.on('connect_error', onConnectError);
     socket.on('disconnect', onDisconnect);
 
     return () => {
       socket.off('connect', onConnect);
+      socket.io.off('error', onConnectError);
       socket.off('connect_error', onConnectError);
       socket.off('disconnect', onDisconnect);
+      if (errorToastId) toast.dismiss(errorToastId);
     };
   }, []);
 
