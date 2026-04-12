@@ -611,8 +611,8 @@ const VideoChat = ({ onEndChat }) => {
       
       // Notify server to check auto-disconnect on the reported user
       try {
-        const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:3001';
-        fetch(`${apiUrl}/api/flag-report`, {
+        const { API_BASE_URL } = await import('../utils/socket');
+        fetch(`${API_BASE_URL}/api/flag-report`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ reportedUid: targetId })

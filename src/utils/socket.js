@@ -12,16 +12,16 @@ if (process.env.REACT_APP_SOCKET_URL) {
     // Development mode (Split frontend/backend) - Localhost or Local IP
     // Backend signaling server runs on 3001 by default
     SOCKET_URL = `http://${hostname}:3001`;
-} else if (hostname.includes('vercel.app')) {
-    // Railway Production URL for Vercel
-    SOCKET_URL = 'https://strangy-production-56d4.up.railway.app';
+} else if (hostname.includes('vercel.app') || hostname.includes('strangy.in')) {
+    // New Custom Subdomain for Railway (Bypasses Jio blocks and Vercel proxy limits)
+    SOCKET_URL = 'https://api.strangy.in';
 } else {
-    // Vercel proxy bypass for Jio! We route to window.location.origin
-    SOCKET_URL = window.location.origin;
+    // Production URL fallback
+    SOCKET_URL = 'https://api.strangy.in';
 }
 
 // Ensure URL has protocol and NO trailing slash
-if (SOCKET_URL !== '/' && SOCKET_URL !== window.location.origin) {
+if (SOCKET_URL !== '/') {
     // Remove trailing slash if present
     SOCKET_URL = SOCKET_URL.replace(/\/+$/, "");
     
@@ -32,9 +32,6 @@ if (SOCKET_URL !== '/' && SOCKET_URL !== window.location.origin) {
 
 console.log("[SocketDebug] Connecting to:", SOCKET_URL);
 
-// If proxied via Vercel, MUST use polling exclusively (Vercel kills WebSockets)
-const isVercelProxied = SOCKET_URL === window.location.origin;
-
 const socket = io(SOCKET_URL, {
     autoConnect: false,
     reconnection: true,
@@ -42,8 +39,8 @@ const socket = io(SOCKET_URL, {
     reconnectionDelay: 1000,
     reconnectionDelayMax: 5000,
     timeout: 30000,
-    transports: isVercelProxied ? ['polling'] : ['polling', 'websocket'],
-    upgrade: !isVercelProxied,
+    transports: ['polling', 'websocket'], // Polling first for ISP resilience, then upgrade to WS
+    upgrade: true,
     secure: true,
     withCredentials: false
 });

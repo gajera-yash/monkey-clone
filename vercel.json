@@ -5,11 +5,7 @@
     "rewrites": [
         {
             "source": "/api/:path*",
-            "destination": "https://strangy-production-56d4.up.railway.app/api/:path*"
-        },
-        {
-            "source": "/socket.io/:path*",
-            "destination": "https://strangy-production-56d4.up.railway.app/socket.io/:path*"
+            "destination": "https://api.strangy.in/api/:path*"
         },
         {
             "source": "/(.*)",
