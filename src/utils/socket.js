@@ -16,14 +16,12 @@ if (process.env.REACT_APP_SOCKET_URL) {
     // Railway Production URL for Vercel
     SOCKET_URL = 'https://strangy-production-56d4.up.railway.app';
 } else {
-    // For custom domain strangy.in served by Vercel, use the same origin!
-    // Vercel vercel.json will proxy /socket.io/ to Railway.
-    // This perfectly bypasses ISP blocks on railway.app domains!
-    SOCKET_URL = window.location.origin;
+    // Railway Production URL
+    SOCKET_URL = 'https://strangy-production-56d4.up.railway.app';
 }
 
 // Ensure URL has protocol and NO trailing slash
-if (SOCKET_URL !== '/' && SOCKET_URL !== window.location.origin) {
+if (SOCKET_URL !== '/') {
     // Remove trailing slash if present
     SOCKET_URL = SOCKET_URL.replace(/\/+$/, "");
     
@@ -34,10 +32,6 @@ if (SOCKET_URL !== '/' && SOCKET_URL !== window.location.origin) {
 
 console.log("[SocketDebug] Connecting to:", SOCKET_URL);
 
-// Use ONLY POLLING for Vercel Proxied connections because Vercel doesn't support WebSocket proxying.
-// This is the ultimate fix for Jio networks blocking direct websocket/railway connections.
-const isVercelProxied = SOCKET_URL === window.location.origin;
-
 const socket = io(SOCKET_URL, {
     autoConnect: false,
     reconnection: true,
@@ -45,8 +39,8 @@ const socket = io(SOCKET_URL, {
     reconnectionDelay: 1000,
     reconnectionDelayMax: 5000,
     timeout: 30000,
-    transports: isVercelProxied ? ['polling'] : ['polling', 'websocket'], // Strict polling if proxied
-    upgrade: !isVercelProxied, // Disable upgrade if proxied through Vercel
+    transports: ['polling', 'websocket'], // MUST be polling first for Jio Data/Strict Firewalls!
+    upgrade: true,
     secure: true,
     withCredentials: false
 });

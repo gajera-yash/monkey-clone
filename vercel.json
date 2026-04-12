@@ -8,10 +8,6 @@
             "destination": "https://strangy-production-56d4.up.railway.app/api/:path*"
         },
         {
-            "source": "/socket.io/:path*",
-            "destination": "https://strangy-production-56d4.up.railway.app/socket.io/:path*"
-        },
-        {
             "source": "/(.*)",
             "destination": "/index.html"
         }
