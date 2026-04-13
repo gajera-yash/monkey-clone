@@ -49,7 +49,7 @@ const AdminLayout = () => {
     const [unreadCount, setUnreadCount] = useState(0);
     const [audio] = useState(new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3'));
     const [isSoundEnabled, setIsSoundEnabled] = useState(() => {
-        return localStorage.getItem('admin_sound_enabled') === 'true';
+        return localStorage.getItem('admin_sound_enabled') !== 'false';
     });
 
     const handleNewNotification = (notif) => {

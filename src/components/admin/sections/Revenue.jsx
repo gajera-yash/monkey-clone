@@ -22,7 +22,7 @@ const Revenue = () => {
     const [transactions, setTransactions] = useState([]);
     const [chartData, setChartData] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [currency, setCurrency] = useState('USD');
+    const [currency, setCurrency] = useState('INR');
     const INR_RATE = 83.5;
 
     const formatCurrency = (amount) => {
