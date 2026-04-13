@@ -24,66 +24,95 @@ import SafetyInfoModal from './safety/SafetyInfoModal';
 import { loadNsfwModel, checkVideoForNsfw } from '../utils/nsfwDetector';
 import StrangyIcon from './common/StrangyIcon';
 
-const buildRtcConfig = () => {
-  const iceServers = [
-    // STUN Servers (free, unlimited) — for basic NAT traversal
-    { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' },
-    { urls: 'stun:stun.relay.metered.ca:80' },
-  ];
+// Metered.ca API Key for fetching dynamic TURN credentials
+const METERED_API_KEY = '3f49a656f350431caa11cb4e3c7c08faa88c';
 
-  // TURN Servers — CRITICAL for WiFi (Symmetric NAT) & Jio (CGNAT) connectivity
-  // These relay traffic when direct P2P fails (which is ~30% of real-world connections)
+// Static fallback TURN credentials (used if API fetch fails)
+const STATIC_TURN_SERVERS = [
+  { urls: 'stun:stun.relay.metered.ca:80' },
+  { urls: 'stun:stun.l.google.com:19302' },
+  {
+    urls: 'turn:global.relay.metered.ca:80',
+    username: '003d25ccfbdef1de0f41f07c',
+    credential: 'Hcx68LArN9Yx46KU'
+  },
+  {
+    urls: 'turn:global.relay.metered.ca:80?transport=tcp',
+    username: '003d25ccfbdef1de0f41f07c',
+    credential: 'Hcx68LArN9Yx46KU'
+  },
+  {
+    urls: 'turn:global.relay.metered.ca:443',
+    username: '003d25ccfbdef1de0f41f07c',
+    credential: 'Hcx68LArN9Yx46KU'
+  },
+  {
+    urls: 'turns:global.relay.metered.ca:443?transport=tcp',
+    username: '003d25ccfbdef1de0f41f07c',
+    credential: 'Hcx68LArN9Yx46KU'
+  }
+];
+
+// Cache for dynamic TURN credentials (refreshed every 10 minutes)
+let cachedIceServers = null;
+let cacheTimestamp = 0;
+const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+
+const fetchTurnCredentials = async () => {
+  // Return cache if still valid
+  if (cachedIceServers && (Date.now() - cacheTimestamp < CACHE_TTL)) {
+    console.log('[TURN] Using cached credentials');
+    return cachedIceServers;
+  }
+
+  try {
+    const response = await fetch(
+      `https://strangy.metered.live/api/v1/turn/credentials?apiKey=${METERED_API_KEY}`
+    );
+    if (!response.ok) throw new Error(`API returned ${response.status}`);
+    
+    const iceServers = await response.json();
+    console.log('[TURN] Fetched fresh credentials from Metered API:', iceServers.length, 'servers');
+    
+    cachedIceServers = iceServers;
+    cacheTimestamp = Date.now();
+    return iceServers;
+  } catch (err) {
+    console.warn('[TURN] API fetch failed, using static fallback:', err.message);
+    return STATIC_TURN_SERVERS;
+  }
+};
+
+const buildRtcConfig = async () => {
+  // Check for env-based custom TURN override first
   const turnUrl = process.env.REACT_APP_TURN_URL;
   const turnUsername = process.env.REACT_APP_TURN_USERNAME;
   const turnCredential = process.env.REACT_APP_TURN_CREDENTIAL;
 
+  let iceServers;
+
   if (turnUrl && turnUsername && turnCredential) {
-    // Custom TURN server from env (production override)
+    iceServers = [
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:stun.relay.metered.ca:80' },
+    ];
     const turnUrls = turnUrl.split(',').map(u => u.trim());
     turnUrls.forEach(url => {
-      iceServers.push({
-        urls: url,
-        username: turnUsername,
-        credential: turnCredential
-      });
+      iceServers.push({ urls: url, username: turnUsername, credential: turnCredential });
     });
   } else {
-    // Free Metered.ca TURN fallback
-    // UDP — fastest, works on most networks
-    iceServers.push({
-      urls: 'turn:global.relay.metered.ca:80',
-      username: '003d25ccfbdef1de0f41f07c',
-      credential: 'Hcx68LArN9Yx46KU'
-    });
-    // TCP on port 80 — bypasses UDP-blocking firewalls (Jio hotspot)
-    iceServers.push({
-      urls: 'turn:global.relay.metered.ca:80?transport=tcp',
-      username: '003d25ccfbdef1de0f41f07c',
-      credential: 'Hcx68LArN9Yx46KU'
-    });
-    // TLS on port 443 — bypasses DPI & corporate firewalls (WiFi networks)
-    iceServers.push({
-      urls: 'turn:global.relay.metered.ca:443',
-      username: '003d25ccfbdef1de0f41f07c',
-      credential: 'Hcx68LArN9Yx46KU'
-    });
-    // TURNS (TLS-secured TURN) — ultimate fallback for strictest networks
-    iceServers.push({
-      urls: 'turns:global.relay.metered.ca:443?transport=tcp',
-      username: '003d25ccfbdef1de0f41f07c',
-      credential: 'Hcx68LArN9Yx46KU'
-    });
+    // Fetch dynamic credentials from Metered.ca API
+    iceServers = await fetchTurnCredentials();
   }
 
   return {
     iceServers,
     iceCandidatePoolSize: 10,
-    iceTransportPolicy: 'all' // Try direct first, fallback to relay
+    // 'all' tries direct P2P first, then TURN relay
+    // On Jio CGNAT, direct always fails — but 'all' is still better for non-Jio users
+    iceTransportPolicy: 'all'
   };
 };
-
-const RTC_CONFIG = buildRtcConfig();
 
 // Connection timeout — prevent infinite "connecting" on bad networks
 const ICE_CONNECTION_TIMEOUT_MS = 20000; // 20 seconds
@@ -831,7 +860,11 @@ const VideoChat = ({ onEndChat }) => {
         peerConnection.current.close();
       }
       pendingIceCandidates.current = [];
-      const pc = new RTCPeerConnection(RTC_CONFIG);
+      
+      // Fetch fresh TURN credentials before creating peer connection
+      const rtcConfig = await buildRtcConfig();
+      console.log('[WebRTC] Using ICE servers:', rtcConfig.iceServers.length, 'servers');
+      const pc = new RTCPeerConnection(rtcConfig);
       peerConnection.current = pc;
 
       // --- COMPREHENSIVE CONNECTION STATE MONITORING ---
