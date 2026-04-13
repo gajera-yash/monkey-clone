@@ -49,30 +49,30 @@ const buildRtcConfig = () => {
       });
     });
   } else {
-    // Free Metered.ca TURN fallback (500MB/month free tier)
+    // Free Metered.ca TURN fallback
     // UDP — fastest, works on most networks
     iceServers.push({
       urls: 'turn:global.relay.metered.ca:80',
-      username: 'e8dd65d92f3b5b1b1ee4b787',
-      credential: 'mBJJOCyn6SxS/xMz'
+      username: '003d25ccfbdef1de0f41f07c',
+      credential: 'Hcx68LArN9Yx46KU'
     });
     // TCP on port 80 — bypasses UDP-blocking firewalls (Jio hotspot)
     iceServers.push({
       urls: 'turn:global.relay.metered.ca:80?transport=tcp',
-      username: 'e8dd65d92f3b5b1b1ee4b787',
-      credential: 'mBJJOCyn6SxS/xMz'
+      username: '003d25ccfbdef1de0f41f07c',
+      credential: 'Hcx68LArN9Yx46KU'
     });
     // TLS on port 443 — bypasses DPI & corporate firewalls (WiFi networks)
     iceServers.push({
       urls: 'turn:global.relay.metered.ca:443',
-      username: 'e8dd65d92f3b5b1b1ee4b787',
-      credential: 'mBJJOCyn6SxS/xMz'
+      username: '003d25ccfbdef1de0f41f07c',
+      credential: 'Hcx68LArN9Yx46KU'
     });
     // TURNS (TLS-secured TURN) — ultimate fallback for strictest networks
     iceServers.push({
       urls: 'turns:global.relay.metered.ca:443?transport=tcp',
-      username: 'e8dd65d92f3b5b1b1ee4b787',
-      credential: 'mBJJOCyn6SxS/xMz'
+      username: '003d25ccfbdef1de0f41f07c',
+      credential: 'Hcx68LArN9Yx46KU'
     });
   }
 
@@ -402,7 +402,10 @@ const VideoChat = ({ onEndChat }) => {
 
   const performJoin = useCallback(() => {
     if (hasEmittedJoin.current) return;
-    if (!userInitiatedJoin.current) return; // Only join if user clicked Start
+    if (!userInitiatedJoin.current) {
+      console.log("[VideoChat] Join suppressed: User has not clicked Start Chat yet.");
+      return; 
+    }
     
     if (!socket.connected) {
         console.log("[SocketDebug] Connecting socket...");
@@ -740,8 +743,11 @@ const VideoChat = ({ onEndChat }) => {
   // Re-join the waiting queue automatically if socket reconnects
   useEffect(() => {
     const handleConnect = () => {
-      console.log("Socket connected, retrying join...");
-      performJoin();
+      // ONLY re-join if the user had already started a session in this component instance
+      if (userInitiatedJoin.current) {
+        console.log("Socket connected, re-joining matching queue...");
+        performJoin();
+      }
     };
 
     socket.on('connect', handleConnect);

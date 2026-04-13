@@ -27,9 +27,9 @@ const Revenue = () => {
 
     const formatCurrency = (amount) => {
         if (currency === 'INR') {
-            return `₹${(amount * INR_RATE).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
+            return `₹${amount.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
         }
-        return `$${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        return `$${(amount / INR_RATE).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     };
 
     useEffect(() => {

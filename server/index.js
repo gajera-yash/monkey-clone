@@ -642,12 +642,13 @@ io.on('connection', (socket) => {
         }
         // -----------------------
 
-        // Avoid duplicates
-        const existingIdx = waitingUsers.findIndex(u => u.id === socket.id);
+        // Avoid duplicates (Socket ID or UID)
+        const existingIdx = waitingUsers.findIndex(u => u.id === socket.id || (uid && u.uid === uid));
         if (existingIdx === -1) {
             waitingUsers.push(user);
         } else {
-            waitingUsers[existingIdx] = user; // Update info if already in queue
+            console.log(`[Queue] Updating existing entry for UID: ${uid || 'N/A'} (Socket: ${socket.id})`);
+            waitingUsers[existingIdx] = user; // Update info/socket if already in queue
         }
 
         console.log(`[Queue] User ${user.uid || user.id} (${user.name}) joined. Pool: ${waitingUsers.length}`);
