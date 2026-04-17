@@ -95,33 +95,33 @@ const LandingPage = ({ onStartChat }) => {
   };
 
   const profilesRow1 = [
-    { img: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=320&h=460&fit=crop&crop=face', name: '🇺🇸 David, 29', online: true },
-    { img: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=320&h=460&fit=crop&crop=face', name: '🇻🇳 LNgọc Anh, 23', online: false },
-    { img: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=320&h=460&fit=crop&crop=face', name: '🇰🇷 현우, 29', online: false },
-    { img: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=320&h=460&fit=crop&crop=face', name: '🇰🇷 지수, 23', online: true },
-    { img: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=320&h=460&fit=crop&crop=face', name: '🇺🇸 Amelia, 22', online: true },
-    { img: 'https://images.unsplash.com/photo-1531384441138-2736e62e0919?w=320&h=460&fit=crop&crop=face', name: '🇺🇸 Joshua, 25', online: true },
-    { img: 'https://images.unsplash.com/photo-1488426862026-3ee34a7d66df?w=320&h=460&fit=crop&crop=face', name: '🇯🇵 Yuki, 24', online: true },
-    { img: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=320&h=460&fit=crop&crop=face', name: '🇮🇹 Marco, 27', online: false },
-    { img: 'https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=320&h=460&fit=crop&crop=face', name: '🇧🇷 Sofia, 21', online: true },
-    { img: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=320&h=460&fit=crop&crop=face', name: '🇬🇧 Ethan, 26', online: false },
-    { img: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=320&h=460&fit=crop&crop=face', name: '🇮🇳 Priya, 22', online: true },
-    { img: 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=320&h=460&fit=crop&crop=face', name: '🇫🇷 Luca, 28', online: true },
+    { img: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&h=300&fit=crop&crop=face&q=60', name: '🇺🇸 David, 29', online: true },
+    { img: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&h=300&fit=crop&crop=face&q=60', name: '🇻🇳 LNgọc Anh, 23', online: false },
+    { img: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=200&h=300&fit=crop&crop=face&q=60', name: '🇰🇷 현우, 29', online: false },
+    { img: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=200&h=300&fit=crop&crop=face&q=60', name: '🇰🇷 지수, 23', online: true },
+    { img: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=200&h=300&fit=crop&crop=face&q=60', name: '🇺🇸 Amelia, 22', online: true },
+    { img: 'https://images.unsplash.com/photo-1531384441138-2736e62e0919?w=200&h=300&fit=crop&crop=face&q=60', name: '🇺🇸 Joshua, 25', online: true },
+    { img: 'https://images.unsplash.com/photo-1488426862026-3ee34a7d66df?w=200&h=300&fit=crop&crop=face&q=60', name: '🇯🇵 Yuki, 24', online: true },
+    { img: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=200&h=300&fit=crop&crop=face&q=60', name: '🇮🇹 Marco, 27', online: false },
+    { img: 'https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=200&h=300&fit=crop&crop=face&q=60', name: '🇧🇷 Sofia, 21', online: true },
+    { img: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200&h=300&fit=crop&crop=face&q=60', name: '🇬🇧 Ethan, 26', online: false },
+    { img: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&h=300&fit=crop&crop=face&q=60', name: '🇮🇳 Priya, 22', online: true },
+    { img: 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=200&h=300&fit=crop&crop=face&q=60', name: '🇫🇷 Luca, 28', online: true },
   ];
 
   const profilesRow2 = [
-    { img: 'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=320&h=460&fit=crop&crop=face', name: '🇩🇪 Felix, 26', online: true },
-    { img: 'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=320&h=460&fit=crop&crop=face', name: '🇨🇳 Mei, 24', online: true },
-    { img: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=320&h=460&fit=crop&crop=face', name: '🇳🇬 Kofi, 28', online: false },
-    { img: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=320&h=460&fit=crop&crop=face', name: '🇸🇪 Hanna, 25', online: true },
-    { img: 'https://images.unsplash.com/photo-1552374196-c4e7ffc6e126?w=320&h=460&fit=crop&crop=face', name: '🇺🇸 Tyler, 23', online: false },
-    { img: 'https://images.unsplash.com/photo-1526510747491-58f928ec870f?w=320&h=460&fit=crop&crop=face', name: '🇯🇵 Hina, 22', online: true },
-    { img: 'https://images.unsplash.com/photo-1463453091185-61582044d556?w=320&h=460&fit=crop&crop=face', name: '🇲🇽 Carlos, 30', online: false },
-    { img: 'https://images.unsplash.com/photo-1548142813-c348350df52b?w=320&h=460&fit=crop&crop=face', name: '🇵🇭 Anika, 21', online: true },
-    { img: 'https://images.unsplash.com/photo-1564564321837-a57b7070ac4f?w=320&h=460&fit=crop&crop=face', name: '🇺🇸 Jake, 27', online: true },
-    { img: 'https://images.unsplash.com/photo-1524638431109-93d95c968f03?w=320&h=460&fit=crop&crop=face', name: '🇷🇺 Natasha, 24', online: false },
-    { img: 'https://images.unsplash.com/photo-1500917293891-ef795e70e1f6?w=320&h=460&fit=crop&crop=face', name: '🇹🇷 Ayse, 23', online: true },
-    { img: 'https://images.unsplash.com/photo-1566492031773-4f4e44671857?w=320&h=460&fit=crop&crop=face', name: '🇰🇷 Minjun, 26', online: true },
+    { img: 'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=200&h=300&fit=crop&crop=face&q=60', name: '🇩🇪 Felix, 26', online: true },
+    { img: 'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=200&h=300&fit=crop&crop=face&q=60', name: '🇨🇳 Mei, 24', online: true },
+    { img: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=200&h=300&fit=crop&crop=face&q=60', name: '🇳🇬 Kofi, 28', online: false },
+    { img: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=200&h=300&fit=crop&crop=face&q=60', name: '🇸🇪 Hanna, 25', online: true },
+    { img: 'https://images.unsplash.com/photo-1552374196-c4e7ffc6e126?w=200&h=300&fit=crop&crop=face&q=60', name: '🇺🇸 Tyler, 23', online: false },
+    { img: 'https://images.unsplash.com/photo-1526510747491-58f928ec870f?w=200&h=300&fit=crop&crop=face&q=60', name: '🇯🇵 Hina, 22', online: true },
+    { img: 'https://images.unsplash.com/photo-1463453091185-61582044d556?w=200&h=300&fit=crop&crop=face&q=60', name: '🇲🇽 Carlos, 30', online: false },
+    { img: 'https://images.unsplash.com/photo-1548142813-c348350df52b?w=200&h=300&fit=crop&crop=face&q=60', name: '🇵🇭 Anika, 21', online: true },
+    { img: 'https://images.unsplash.com/photo-1564564321837-a57b7070ac4f?w=200&h=300&fit=crop&crop=face&q=60', name: '🇺🇸 Jake, 27', online: true },
+    { img: 'https://images.unsplash.com/photo-1524638431109-93d95c968f03?w=200&h=300&fit=crop&crop=face&q=60', name: '🇷🇺 Natasha, 24', online: false },
+    { img: 'https://images.unsplash.com/photo-1500917293891-ef795e70e1f6?w=200&h=300&fit=crop&crop=face&q=60', name: '🇹🇷 Ayse, 23', online: true },
+    { img: 'https://images.unsplash.com/photo-1566492031773-4f4e44671857?w=200&h=300&fit=crop&crop=face&q=60', name: '🇰🇷 Minjun, 26', online: true },
   ];
 
   const faqItems = [
@@ -194,7 +194,7 @@ const LandingPage = ({ onStartChat }) => {
             <div className="profiles-track-landing">
               {[...profilesRow1, ...profilesRow1].map((p, i) => (
                 <div key={i} className="pcard-landing">
-                  <img src={p.img} alt="" />
+                  <img src={p.img} alt="" loading="lazy" width="160" height="230" />
                   <div className="pcard-overlay-landing"></div>
                   {p.online && <div className="pcard-online-landing"><span className="odot-landing"></span>Online</div>}
                   <div className="pcard-info-landing"><div className="pcard-name-landing">{p.name}</div></div>
@@ -207,7 +207,7 @@ const LandingPage = ({ onStartChat }) => {
             <div className="profiles-track-rev-landing">
               {[...profilesRow2, ...profilesRow2].map((p, i) => (
                 <div key={i} className="pcard-landing">
-                  <img src={p.img} alt="" />
+                  <img src={p.img} alt="" loading="lazy" width="160" height="230" />
                   <div className="pcard-overlay-landing"></div>
                   {p.online && <div className="pcard-online-landing"><span className="odot-landing"></span>Online</div>}
                   <div className="pcard-info-landing"><div className="pcard-name-landing">{p.name}</div></div>

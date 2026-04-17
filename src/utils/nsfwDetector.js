@@ -25,13 +25,30 @@ export const loadNsfwModel = async () => {
 
   isModelLoading = true;
   try {
-    const tf = getTf();
-    const nsfwjs = getNsfwjs();
+    let tf = getTf();
+    let nsfwjs = getNsfwjs();
 
     if (!tf || !nsfwjs) {
-        console.warn("[NSFW] Global dependencies not found yet, retrying in 2s...");
-        await new Promise(r => setTimeout(r, 2000));
-        return loadNsfwModel();
+        console.log("[NSFW] Injecting TF and NSFWJS scripts dynamically...");
+        
+        await new Promise((resolve, reject) => {
+            const scriptTF = document.createElement('script');
+            scriptTF.src = "https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.4.0/dist/tf.min.js";
+            scriptTF.onload = resolve;
+            scriptTF.onerror = reject;
+            document.head.appendChild(scriptTF);
+        });
+
+        await new Promise((resolve, reject) => {
+            const scriptNSFW = document.createElement('script');
+            scriptNSFW.src = "https://cdn.jsdelivr.net/npm/nsfwjs@4.2.0/dist/nsfwjs.min.js";
+            scriptNSFW.onload = resolve;
+            scriptNSFW.onerror = reject;
+            document.head.appendChild(scriptNSFW);
+        });
+
+        tf = getTf();
+        nsfwjs = getNsfwjs();
     }
 
     // Initialize backend
