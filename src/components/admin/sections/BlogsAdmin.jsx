@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../../supabase';
-import { Plus, Edit2, Trash2, Check, X, Image as ImageIcon, Search } from 'lucide-react';
+import { Plus, Edit2, Trash2, Check, X, Image as ImageIcon, Search, BookOpen } from 'lucide-react';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
 import toast from 'react-hot-toast';
