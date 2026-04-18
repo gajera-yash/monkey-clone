@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../../supabase';
-import { Plus, Edit2, Trash2, Check, X, Image as ImageIcon, Search, BookOpen } from 'lucide-react';
-import ReactQuill from 'react-quill';
-import 'react-quill/dist/quill.snow.css';
+import { Plus, Edit2, Trash2, Check, X, Image as ImageIcon, Search, BookOpen, Eye, Code, Type, Bold, Italic, Link as LinkIcon, List, Image as ImageControl } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const BlogsAdmin = () => {
@@ -12,6 +10,7 @@ const BlogsAdmin = () => {
     
     // Form State
     const [isEditing, setIsEditing] = useState(false);
+    const [previewMode, setPreviewMode] = useState(false);
     const [currentBlog, setCurrentBlog] = useState(null);
     const [formData, setFormData] = useState({
         title: '',
@@ -46,6 +45,7 @@ const BlogsAdmin = () => {
     };
 
     const handleOpenForm = (blog = null) => {
+        setPreviewMode(false);
         if (blog) {
             setCurrentBlog(blog);
             setFormData({
@@ -171,19 +171,25 @@ const BlogsAdmin = () => {
         }
     };
 
-    // Quill Toolbar configuration for Rich Text Editor
-    const modules = {
-        toolbar: [
-            [{ 'header': [1, 2, 3, 4, false] }],
-            ['bold', 'italic', 'underline', 'strike'],
-            [{ 'color': [] }, { 'background': [] }],
-            [{ 'script': 'sub' }, { 'script': 'super' }],
-            ['blockquote', 'code-block'],
-            [{ 'list': 'ordered' }, { 'list': 'bullet' }],
-            [{ 'align': [] }],
-            ['link', 'image', 'video'],
-            ['clean']
-        ],
+    // Helper for custom editor actions
+    const insertTag = (startTag, endTag = '') => {
+        const textarea = document.getElementById('blog-content-area');
+        if (!textarea) return;
+
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        const text = formData.content;
+        const selectedText = text.substring(start, end);
+        const newText = text.substring(0, start) + startTag + selectedText + endTag + text.substring(end);
+        
+        setFormData(prev => ({ ...prev, content: newText }));
+        
+        // Refocus and set cursor
+        setTimeout(() => {
+            textarea.focus();
+            const newCursor = start + startTag.length + selectedText.length + endTag.length;
+            textarea.setSelectionRange(newCursor, newCursor);
+        }, 0);
     };
 
     const filteredBlogs = blogs.filter(b => 
@@ -194,6 +200,13 @@ const BlogsAdmin = () => {
     if (isEditing) {
         return (
             <div className="p-8 pb-32 max-w-6xl mx-auto text-slate-800 animate-fade-in">
+                <style dangerouslySetInnerHTML={{__html: `
+                    .editor-preview h2 { font-size: 1.5rem; font-weight: 800; margin: 1rem 0; color: #1e293b; }
+                    .editor-preview p { margin-bottom: 1rem; color: #64748b; }
+                    .editor-preview ul { list-style: disc; margin-left: 1.5rem; margin-bottom: 1rem; }
+                    .editor-preview strong { font-weight: 800; }
+                `}} />
+                
                 <div className="flex items-center justify-between mb-10">
                     <div>
                         <h2 className="text-3xl font-black uppercase text-slate-900 tracking-tighter">
@@ -204,14 +217,6 @@ const BlogsAdmin = () => {
                         </p>
                     </div>
                     <div className="flex gap-3">
-                        {currentBlog && (
-                            <button 
-                                onClick={() => window.open(`/blog/${currentBlog.slug}`, '_blank')}
-                                className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 font-black rounded-xl transition-all flex items-center gap-2 text-xs uppercase tracking-widest"
-                            >
-                                <Search size={14} /> Preview Live
-                            </button>
-                        )}
                         <button 
                             onClick={() => setIsEditing(false)}
                             className="px-5 py-2.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-500 font-black rounded-xl transition-all flex items-center gap-2 text-xs uppercase tracking-widest"
@@ -223,8 +228,27 @@ const BlogsAdmin = () => {
 
                 <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     <div className="lg:col-span-2 space-y-6">
-                        <div className="bg-white p-8 rounded-[32px] shadow-sm border border-slate-200">
-                            <label className="block text-xs font-black text-indigo-500 uppercase tracking-[2px] mb-4">Core Content</label>
+                        <div className="bg-white p-8 rounded-[32px] font-sans shadow-sm border border-slate-200 overflow-hidden">
+                            <div className="flex items-center justify-between mb-6">
+                                <label className="block text-xs font-black text-indigo-500 uppercase tracking-[2px]">Content System</label>
+                                <div className="flex bg-slate-100 p-1 rounded-xl">
+                                    <button 
+                                        type="button"
+                                        onClick={() => setPreviewMode(false)}
+                                        className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${!previewMode ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400'}`}
+                                    >
+                                        <div className="flex items-center gap-2"><Code size={12}/> Write</div>
+                                    </button>
+                                    <button 
+                                        type="button"
+                                        onClick={() => setPreviewMode(true)}
+                                        className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${previewMode ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400'}`}
+                                    >
+                                        <div className="flex items-center gap-2"><Eye size={12}/> Preview</div>
+                                    </button>
+                                </div>
+                            </div>
+
                             <div className="space-y-6">
                                 <div>
                                     <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Article Title</label>
@@ -238,16 +262,33 @@ const BlogsAdmin = () => {
                                 
                                 <div className="min-h-[500px] flex flex-col">
                                     <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Write Story</label>
-                                    <div className="flex-1 bg-slate-50 rounded-2xl overflow-hidden border-2 border-slate-100 focus-within:border-indigo-500 focus-within:bg-white transition-all">
-                                        <ReactQuill 
-                                            theme="snow" 
-                                            value={formData.content} 
-                                            onChange={content => setFormData({...formData, content})}
-                                            modules={modules}
-                                            className="h-[450px]"
-                                            placeholder="Tell your story..."
-                                        />
-                                    </div>
+                                    
+                                    {!previewMode ? (
+                                        <div className="flex-1 bg-slate-50 rounded-2xl overflow-hidden border-2 border-slate-100 focus-within:border-indigo-500 focus-within:bg-white transition-all flex flex-col">
+                                            {/* Toolbar */}
+                                            <div className="p-2 border-b border-slate-200 flex flex-wrap gap-1 bg-white">
+                                                <button type="button" onClick={() => insertTag('<h2>', '</h2>')} className="p-2 hover:bg-slate-100 rounded-lg text-slate-600" title="H2"><Type size={16}/></button>
+                                                <button type="button" onClick={() => insertTag('<strong>', '</strong>')} className="p-2 hover:bg-slate-100 rounded-lg text-slate-600" title="Bold"><Bold size={16}/></button>
+                                                <button type="button" onClick={() => insertTag('<em>', '</em>')} className="p-2 hover:bg-slate-100 rounded-lg text-slate-600" title="Italic"><Italic size={16}/></button>
+                                                <button type="button" onClick={() => insertTag('<a href="#">', '</a>')} className="p-2 hover:bg-slate-100 rounded-lg text-slate-600" title="Link"><LinkIcon size={16}/></button>
+                                                <button type="button" onClick={() => insertTag('<ul>\n  <li>', '</li>\n</ul>')} className="p-2 hover:bg-slate-100 rounded-lg text-slate-600" title="Unordered List"><List size={16}/></button>
+                                                <button type="button" onClick={() => insertTag('<img src="', '" alt="image" />')} className="p-2 hover:bg-slate-100 rounded-lg text-slate-600" title="Image Tag"><ImageControl size={16}/></button>
+                                            </div>
+                                            <textarea 
+                                                id="blog-content-area"
+                                                required
+                                                value={formData.content} 
+                                                onChange={e => setFormData({...formData, content: e.target.value})}
+                                                className="flex-1 w-full p-6 outline-none resize-none font-mono text-sm leading-relaxed bg-transparent"
+                                                placeholder="Start writing using HTML or the tools above..."
+                                            />
+                                        </div>
+                                    ) : (
+                                        <div className="flex-1 bg-slate-50 rounded-2xl border-2 border-slate-100 p-8 overflow-y-auto h-[500px] editor-preview">
+                                            <div className="prose prose-slate max-w-none" dangerouslySetInnerHTML={{ __html: formData.content || '<p class="text-slate-300 italic">No content to preview...</p>' }} />
+                                        </div>
+                                    )}
+                                    <p className="mt-2 text-[10px] text-slate-400 font-bold uppercase tracking-widest text-right">React 19 Safe Engine v1.0</p>
                                 </div>
                             </div>
                         </div>
