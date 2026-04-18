@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, Suspense } from 'react';
+import { HelmetProvider } from 'react-helmet-async';
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { useAuth } from './context/AuthContext';
@@ -51,6 +52,8 @@ const HelpCenter = React.lazy(() => import('./components/pages/HelpCenter'));
 const ContactUs = React.lazy(() => import('./components/pages/ContactUs'));
 const ReportBug = React.lazy(() => import('./components/pages/ReportBug'));
 const Community = React.lazy(() => import('./components/pages/Community'));
+const BlogList = React.lazy(() => import('./components/blog/BlogList'));
+const BlogDetail = React.lazy(() => import('./components/blog/BlogDetail'));
 
 
 const AppContent = () => {
@@ -483,6 +486,20 @@ const AppContent = () => {
               <Footer />
             </>
           } />
+          <Route path="/blog" element={
+            <>
+              <Header onStartChat={handleStartChat} />
+              <BlogList />
+              <Footer />
+            </>
+          } />
+          <Route path="/blog/:slug" element={
+            <>
+              <Header onStartChat={handleStartChat} />
+              <BlogDetail />
+              <Footer />
+            </>
+          } />
           {/* Referral Link Route: /ref/:code stores code and redirects home */}
           <Route path="/ref/:code" element={<ReferralRedirect />} />
 
@@ -496,13 +513,15 @@ const AppContent = () => {
 function App() {
   return (
     <Router>
-      <AdminProvider>
-        <CoinsProvider>
-          <PremiumProvider>
-            <AppContent />
-          </PremiumProvider>
-        </CoinsProvider>
-      </AdminProvider>
+      <HelmetProvider>
+        <AdminProvider>
+          <CoinsProvider>
+            <PremiumProvider>
+              <AppContent />
+            </PremiumProvider>
+          </CoinsProvider>
+        </AdminProvider>
+      </HelmetProvider>
     </Router>
   );
 }

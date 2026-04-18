@@ -128,6 +128,13 @@ const Header = ({ onStartChat }) => {
                                 About
                             </Link>
 
+                            <Link
+                                to="/blog"
+                                className="text-gray-300 hover:text-white font-medium transition-colors duration-200 text-sm hidden md:block"
+                            >
+                                Blog
+                            </Link>
+
                             <button
                                 onClick={onStartChat}
                                 className="bg-white/10 hover:bg-white/20 text-white border border-white/10 px-6 py-2 rounded-full font-medium transition-all duration-200 hover:scale-105 backdrop-blur-sm"

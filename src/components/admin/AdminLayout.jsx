@@ -21,6 +21,7 @@ import Creators from './sections/Creators';
 import Chats from './sections/Chats';
 import Revenue from './sections/Revenue';
 import Content from './sections/Content';
+import BlogsAdmin from './sections/BlogsAdmin';
 import SystemSettings from './sections/Settings';
 import SubscriptionPlansAdmin from './sections/SubscriptionPlansAdmin';
 import CoinRewards from './sections/CoinRewards';
@@ -213,6 +214,7 @@ const AdminLayout = () => {
             title: 'Platform System',
             items: [
                 { name: 'Content', path: '/admin/content', id: 'content', icon: <Palette size={18} /> },
+                { name: 'Blogs', path: '/admin/blogs', id: 'content', icon: <FileText size={18} /> },
                 { name: 'Settings', path: '/admin/settings', id: 'settings', icon: <Settings size={18} /> },
                 { name: 'Admins', path: '/admin/roles', id: 'settings', icon: <Lock size={18} /> },
                 { name: 'Geo Blocking', path: '/admin/geo-blocking', id: 'settings', icon: <Globe size={18} /> },
@@ -417,6 +419,7 @@ const AdminLayout = () => {
                         <Route path="revenue" element={<Revenue />} />
                         <Route path="analytics" element={<Analytics />} />
                         <Route path="content" element={<Content />} />
+                        <Route path="blogs" element={<BlogsAdmin />} />
                         <Route path="plans" element={<SubscriptionPlansAdmin />} />
                         <Route path="coin-rewards" element={<CoinRewards />} />
                         <Route path="transactions" element={<Transactions />} />
