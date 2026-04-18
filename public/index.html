@@ -9,7 +9,8 @@
   script-src 'self' 'unsafe-inline' 'unsafe-eval'
     https://sdk.cashfree.com
     https://cdn.jsdelivr.net
-    https://cdn.onesignal.com;
+    https://cdn.onesignal.com
+    https://www.googletagmanager.com;
   connect-src 'self'
     https://*.supabase.co wss://*.supabase.co
     https://api.cashfree.com
@@ -21,9 +22,14 @@
     https://cdn.jsdelivr.net
     https://api.ipinfo.io
     https://ipinfo.io
-    https://freeipapi.com;
+    https://freeipapi.com
+    https://*.google-analytics.com
+    https://*.analytics.google.com
+    https://*.googletagmanager.com;
   img-src 'self' data: blob:
     https://*.supabase.co
+    https://*.google-analytics.com
+    https://*.googletagmanager.com
     https://images.unsplash.com
     https://img.onesignal.com;
   media-src 'self' blob:
@@ -79,6 +85,16 @@
           allowLocalhostAsSecureOrigin: true,
         });
       });
+    </script>
+
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-3KQKYXEYH9"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'G-3KQKYXEYH9');
     </script>
   </head>
   <body>
