@@ -78,21 +78,66 @@ const BlogsAdmin = () => {
         const file = e.target.files[0];
         if (!file) return;
 
-        // Validation
-        if (file.size > 2 * 1024 * 1024) {
-            toast.error("Image too large! Max 2MB.");
+        // Initial check for extremely large files
+        if (file.size > 10 * 1024 * 1024) {
+            toast.error("File is too large (>10MB).");
             return;
         }
 
         try {
             setUploadingImage(true);
-            const fileExt = file.name.split('.').pop();
+            const loadingToast = toast.loading("Optimizing image...");
+
+            // 1. Load image into memory
+            const image = new Image();
+            const objectUrl = URL.createObjectURL(file);
+            
+            await new Promise((resolve, reject) => {
+                image.onload = resolve;
+                image.onerror = reject;
+                image.src = objectUrl;
+            });
+
+            // 2. Prepare Canvas for Compression
+            const MAX_WIDTH = 800;
+            const MAX_HEIGHT = 800;
+            let width = image.width;
+            let height = image.height;
+
+            if (width > height) {
+                if (width > MAX_WIDTH) {
+                    height *= MAX_WIDTH / width;
+                    width = MAX_WIDTH;
+                }
+            } else {
+                if (height > MAX_HEIGHT) {
+                    width *= MAX_HEIGHT / height;
+                    height = MAX_HEIGHT;
+                }
+            }
+
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(image, 0, 0, width, height);
+
+            // 3. Convert to Blob (JPEG, 0.7 quality)
+            const compressedBlob = await new Promise((resolve) => {
+                canvas.toBlob(resolve, 'image/jpeg', 0.7);
+            });
+
+            URL.revokeObjectURL(objectUrl);
+            toast.loading("Uploading small file...", { id: loadingToast });
+
+            // 4. Upload to Supabase
+            const fileExt = 'jpg';
             const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}.${fileExt}`;
             const filePath = `${fileName}`;
 
             const { error: uploadError } = await supabase.storage
                 .from('blogs')
-                .upload(filePath, file);
+                .upload(filePath, compressedBlob, { contentType: 'image/jpeg' });
 
             if (uploadError) throw uploadError;
 
@@ -101,7 +146,7 @@ const BlogsAdmin = () => {
                 .getPublicUrl(filePath);
 
             setFormData(prev => ({ ...prev, thumbnail_url: publicUrl }));
-            toast.success("Image uploaded successfully!");
+            toast.success("Image uploaded & optimized!", { id: loadingToast });
         } catch (error) {
             toast.error("Upload failed: " + error.message);
             console.error(error);
