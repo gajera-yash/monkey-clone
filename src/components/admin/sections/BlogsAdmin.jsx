@@ -220,41 +220,53 @@ const BlogsAdmin = () => {
         };
 
         try {
-            console.log("[BlogsAdmin] Preparing payload...", payload);
+            console.log("[BlogsAdmin] Current Blog:", currentBlog);
+            console.log("[BlogsAdmin] Payload being sent:", payload);
 
             if (currentBlog) {
-                const { error } = await supabase.from('blogs').update(payload).eq('id', currentBlog.id);
+                // Ensure we are using the correct column name for ID
+                const { error, data } = await supabase.from('blogs').update(payload).eq('id', currentBlog.id).select();
                 if (error) {
-                    console.error("[BlogsAdmin] Update error:", error);
-                    throw error;
+                    console.error("[BlogsAdmin] Update operation failed:", error);
+                    throw new Error(`Update failed: ${error.message} (${error.code})`);
                 }
-                toast.success("Blog post updated!");
+                console.log("[BlogsAdmin] Update successful:", data);
+                toast.success("Blog post updated successfully!");
             } else {
-                const { error } = await supabase.from('blogs').insert({...payload, created_at: new Date()});
+                const { error, data } = await supabase.from('blogs').insert([{...payload, created_at: new Date()}]).select();
                 if (error) {
-                    console.error("[BlogsAdmin] Insert error:", error);
-                    throw error;
+                    console.error("[BlogsAdmin] Insert operation failed:", error);
+                    throw new Error(`Publish failed: ${error.message} (${error.code})`);
                 }
+                console.log("[BlogsAdmin] Insert successful:", data);
                 toast.success("New blog post published!");
             }
             setIsEditing(false);
             setLocalPreview('');
             fetchBlogs();
         } catch (error) {
-            console.error("[BlogsAdmin] Submit error details:", error);
-            toast.error(error.message || "Something went wrong. Check console for details.");
+            console.error("[BlogsAdmin] Critical submission error:", error);
+            // Show the actual database error message to the user
+            toast.error(error.message || "Database operation failed. Check console for details.");
         }
     };
 
     const handleDelete = async (id) => {
-        if (!window.confirm("Are you sure you want to delete this article forever?")) return;
+        if (!window.confirm("Are you sure you want to delete this article forever? This action cannot be undone.")) return;
         
-        const { error } = await supabase.from('blogs').delete().eq('id', id);
-        if (error) {
-            toast.error("Failed to delete blog");
-        } else {
-            toast.success("Article deleted");
+        try {
+            const { error } = await supabase.from('blogs').delete().eq('id', id);
+            
+            if (error) {
+                console.error("[BlogsAdmin] Delete failed:", error);
+                throw new Error(`Delete failed: ${error.message}`);
+            }
+            
+            toast.success("Article deleted successfully");
             fetchBlogs();
+        } catch (error) {
+            console.error("[BlogsAdmin] Delete Error:", error);
+            toast.error(error.message || "Failed to delete blog. Check permissions.");
         }
     };
 
