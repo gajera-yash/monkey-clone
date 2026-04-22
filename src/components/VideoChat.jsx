@@ -445,6 +445,9 @@ const VideoChat = ({ onEndChat }) => {
       console.log("[SocketDebug] Emitting join query with filters:", chatFilters);
       hasEmittedJoin.current = true;
       
+      const myName = currentUser.displayName || currentUser?.user_metadata?.full_name || 'User';
+      const myPhoto = currentUser.photoURL || currentUser?.user_metadata?.picture || currentUser?.user_metadata?.avatar_url;
+
       if (incomingDirectCall) {
         console.log("[SocketDebug] Accepting direct call from:", incomingDirectCall.callerData?.name);
         setStatus(`Connecting to ${incomingDirectCall.callerData?.name || 'User'}...`);
@@ -453,8 +456,8 @@ const VideoChat = ({ onEndChat }) => {
             callerData: incomingDirectCall.callerData,
             creatorData: {
                 uid: currentUser?.uid,
-                name: currentUser?.displayName,
-                photoURL: currentUser?.photoURL,
+                name: myName,
+                photoURL: myPhoto,
                 gender: currentUser?.gender || 'Female'
             }
         });
@@ -469,8 +472,8 @@ const VideoChat = ({ onEndChat }) => {
             targetUid: directCallTarget,
             callerData: {
                 uid: currentUser.id || currentUser.uid,
-                name: currentUser.displayName || 'Stranger',
-                photoURL: currentUser.photoURL || currentUser.avatar_url,
+                name: myName,
+                photoURL: myPhoto,
                 gender: currentUser.gender
             }
         });
@@ -480,8 +483,9 @@ const VideoChat = ({ onEndChat }) => {
         
       } else {
         setStatus('Searching for partner...');
+        const myName = currentUser?.safetySettings?.invisibleMode ? 'Ghost User' : (currentUser.displayName || currentUser?.user_metadata?.full_name || 'User');
         socket.emit('join-waiting', {
-          name: currentUser?.safetySettings?.invisibleMode ? 'Ghost User' : (currentUser.displayName || 'Stranger'),
+          name: myName,
           uid: currentUser.uid,
           blockedUsers: blockedUsers || [],
           location: userLocation,

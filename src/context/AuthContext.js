@@ -37,7 +37,7 @@ export const AuthProvider = ({ children }) => {
                 email: data.email,
                 isCreator: data.is_creator,
                 accountStatus: data.account_status,
-                displayName: username,
+                displayName: data.username || 'User',
                 photoURL: data.avatar_url || defaultAvatar,
                 role: data.role || 'user'
             };
@@ -682,7 +682,17 @@ export const AuthProvider = ({ children }) => {
                             }
                         }
 
-                        setCurrentUser({ ...session.user, ...profile });
+                        // Construct safe currentUser with fallbacks
+                        const authMeta = session.user.user_metadata || {};
+                        const safeDisplayName = profile?.displayName || authMeta.full_name || session.user.email?.split('@')[0] || 'User';
+                        const safePhotoURL = profile?.photoURL || authMeta.avatar_url || authMeta.picture || `https://ui-avatars.com/api/?name=${encodeURIComponent(safeDisplayName)}&background=8234f9&color=fff`;
+
+                        setCurrentUser({ 
+                            ...session.user, 
+                            ...profile,
+                            displayName: safeDisplayName,
+                            photoURL: safePhotoURL
+                        });
                         setIsAdmin(profile?.role === 'admin');
 
                         // Update last user info OR clear if it's a new login

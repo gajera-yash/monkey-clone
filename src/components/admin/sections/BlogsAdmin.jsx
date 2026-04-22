@@ -1,7 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../../../supabase';
-import { Plus, Edit2, Trash2, Check, X, Image as ImageIcon, Search, BookOpen, Eye, Code, Type, Bold, Italic, Link as LinkIcon, List, Image as ImageControl } from 'lucide-react';
+import { Plus, Edit2, Trash2, Check, X, Image as ImageIcon, Search, BookOpen } from 'lucide-react';
 import toast from 'react-hot-toast';
+import ReactQuill from 'react-quill-new';
+import 'react-quill-new/dist/quill.snow.css';
 
 const BlogsAdmin = () => {
     const [blogs, setBlogs] = useState([]);
@@ -10,7 +12,7 @@ const BlogsAdmin = () => {
     
     // Form State
     const [isEditing, setIsEditing] = useState(false);
-    const [previewMode, setPreviewMode] = useState(false);
+
     const [currentBlog, setCurrentBlog] = useState(null);
     const [formData, setFormData] = useState({
         title: '',
@@ -45,7 +47,6 @@ const BlogsAdmin = () => {
     };
 
     const handleOpenForm = (blog = null) => {
-        setPreviewMode(false);
         if (blog) {
             setCurrentBlog(blog);
             setFormData({
@@ -84,17 +85,17 @@ const BlogsAdmin = () => {
             return;
         }
 
-        try {
-            setUploadingImage(true);
-            const loadingToast = toast.loading("Optimizing image...");
+        const loadingToast = toast.loading("Optimizing image...");
+        setUploadingImage(true);
 
+        try {
             // 1. Load image into memory
-            const image = new Image();
+            const image = new window.Image();
             const objectUrl = URL.createObjectURL(file);
             
             await new Promise((resolve, reject) => {
                 image.onload = resolve;
-                image.onerror = reject;
+                image.onerror = () => reject(new Error('Failed to load image file'));
                 image.src = objectUrl;
             });
 
@@ -123,35 +124,59 @@ const BlogsAdmin = () => {
             ctx.drawImage(image, 0, 0, width, height);
 
             // 3. Convert to Blob (JPEG, 0.7 quality)
-            const compressedBlob = await new Promise((resolve) => {
-                canvas.toBlob(resolve, 'image/jpeg', 0.7);
+            const compressedBlob = await new Promise((resolve, reject) => {
+                canvas.toBlob((blob) => {
+                    if (blob) {
+                        resolve(blob);
+                    } else {
+                        reject(new Error('Failed to compress image. Try a different image format.'));
+                    }
+                }, 'image/jpeg', 0.7);
             });
 
             URL.revokeObjectURL(objectUrl);
-            toast.loading("Uploading small file...", { id: loadingToast });
+            console.log(`[BlogUpload] Compressed image: ${(compressedBlob.size / 1024).toFixed(1)}KB`);
+            toast.loading("Uploading to storage...", { id: loadingToast });
 
-            // 4. Upload to Supabase
+            // 4. Upload to Supabase with timeout
             const fileExt = 'jpg';
             const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}.${fileExt}`;
             const filePath = `${fileName}`;
 
-            const { error: uploadError } = await supabase.storage
+            // Create a timeout promise
+            const uploadPromise = supabase.storage
                 .from('blogs')
-                .upload(filePath, compressedBlob, { contentType: 'image/jpeg' });
+                .upload(filePath, compressedBlob, { 
+                    contentType: 'image/jpeg',
+                    cacheControl: '3600',
+                    upsert: false 
+                });
 
-            if (uploadError) throw uploadError;
+            const timeoutPromise = new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('Upload timed out after 30 seconds. Check your Supabase storage bucket "blogs" exists and has correct permissions.')), 30000)
+            );
+
+            const { error: uploadError } = await Promise.race([uploadPromise, timeoutPromise]);
+
+            if (uploadError) {
+                console.error('[BlogUpload] Supabase upload error:', uploadError);
+                throw new Error(uploadError.message || 'Storage upload failed. Ensure the "blogs" bucket exists in Supabase Storage.');
+            }
 
             const { data: { publicUrl } } = supabase.storage
                 .from('blogs')
                 .getPublicUrl(filePath);
 
+            console.log('[BlogUpload] Upload successful:', publicUrl);
             setFormData(prev => ({ ...prev, thumbnail_url: publicUrl }));
             toast.success("Image uploaded & optimized!", { id: loadingToast });
         } catch (error) {
-            toast.error("Upload failed: " + error.message);
-            console.error(error);
+            console.error('[BlogUpload] Full error:', error);
+            toast.error("Upload failed: " + error.message, { id: loadingToast });
         } finally {
             setUploadingImage(false);
+            // Reset the file input so the same file can be re-selected
+            e.target.value = '';
         }
     };
 
@@ -216,26 +241,31 @@ const BlogsAdmin = () => {
         }
     };
 
-    // Helper for custom editor actions
-    const insertTag = (startTag, endTag = '') => {
-        const textarea = document.getElementById('blog-content-area');
-        if (!textarea) return;
+    // Quill Editor Configuration
+    const quillModules = useMemo(() => ({
+        toolbar: {
+            container: [
+                [{ 'header': [1, 2, 3, false] }],
+                ['bold', 'italic', 'underline', 'strike'],
+                [{ 'color': [] }, { 'background': [] }],
+                [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+                ['blockquote', 'code-block'],
+                ['link', 'image', 'video'],
+                [{ 'align': [] }],
+                ['clean']
+            ]
+        },
+        clipboard: {
+            matchVisual: false
+        }
+    }), []);
 
-        const start = textarea.selectionStart;
-        const end = textarea.selectionEnd;
-        const text = formData.content;
-        const selectedText = text.substring(start, end);
-        const newText = text.substring(0, start) + startTag + selectedText + endTag + text.substring(end);
-        
-        setFormData(prev => ({ ...prev, content: newText }));
-        
-        // Refocus and set cursor
-        setTimeout(() => {
-            textarea.focus();
-            const newCursor = start + startTag.length + selectedText.length + endTag.length;
-            textarea.setSelectionRange(newCursor, newCursor);
-        }, 0);
-    };
+    const quillFormats = [
+        'header', 'bold', 'italic', 'underline', 'strike',
+        'color', 'background',
+        'list', 'bullet', 'blockquote', 'code-block',
+        'link', 'image', 'video', 'align'
+    ];
 
     const filteredBlogs = blogs.filter(b => 
         b.title.toLowerCase().includes(search.toLowerCase()) || 
@@ -246,10 +276,27 @@ const BlogsAdmin = () => {
         return (
             <div className="p-8 pb-32 max-w-6xl mx-auto text-slate-800 animate-fade-in">
                 <style dangerouslySetInnerHTML={{__html: `
-                    .editor-preview h2 { font-size: 1.5rem; font-weight: 800; margin: 1rem 0; color: #1e293b; }
-                    .editor-preview p { margin-bottom: 1rem; color: #64748b; }
-                    .editor-preview ul { list-style: disc; margin-left: 1.5rem; margin-bottom: 1rem; }
-                    .editor-preview strong { font-weight: 800; }
+                    .blog-quill-editor .ql-container { border: none !important; font-size: 15px; font-family: inherit; }
+                    .blog-quill-editor .ql-toolbar { border: none !important; border-bottom: 2px solid #f1f5f9 !important; background: #fafbfc; padding: 12px 16px !important; border-radius: 24px 24px 0 0; }
+                    .blog-quill-editor .ql-toolbar .ql-formats { margin-right: 12px; }
+                    .blog-quill-editor .ql-editor { min-height: 450px; padding: 24px; line-height: 1.8; color: #334155; }
+                    .blog-quill-editor .ql-editor h1 { font-size: 2rem; font-weight: 800; margin: 1.2rem 0 0.6rem; color: #0f172a; }
+                    .blog-quill-editor .ql-editor h2 { font-size: 1.5rem; font-weight: 700; margin: 1rem 0 0.5rem; color: #1e293b; }
+                    .blog-quill-editor .ql-editor h3 { font-size: 1.25rem; font-weight: 700; margin: 0.8rem 0 0.4rem; color: #334155; }
+                    .blog-quill-editor .ql-editor p { margin-bottom: 0.8rem; }
+                    .blog-quill-editor .ql-editor ul, .blog-quill-editor .ql-editor ol { margin-bottom: 1rem; padding-left: 1.5rem; }
+                    .blog-quill-editor .ql-editor blockquote { border-left: 4px solid #6366f1; padding: 12px 20px; margin: 1rem 0; background: #eef2ff; border-radius: 0 12px 12px 0; color: #4338ca; font-style: italic; }
+                    .blog-quill-editor .ql-editor pre { background: #1e293b; color: #e2e8f0; padding: 16px; border-radius: 12px; margin: 1rem 0; overflow-x: auto; }
+                    .blog-quill-editor .ql-editor img { max-width: 100%; border-radius: 12px; margin: 1rem 0; }
+                    .blog-quill-editor .ql-editor a { color: #6366f1; text-decoration: underline; }
+                    .blog-quill-editor .ql-editor.ql-blank::before { color: #cbd5e1; font-style: italic; }
+                    .blog-quill-editor .ql-snow .ql-picker { color: #64748b; font-weight: 600; }
+                    .blog-quill-editor .ql-snow button { color: #64748b !important; }
+                    .blog-quill-editor .ql-snow button:hover, .blog-quill-editor .ql-snow button.ql-active { color: #6366f1 !important; }
+                    .blog-quill-editor .ql-snow .ql-stroke { stroke: #64748b; }
+                    .blog-quill-editor .ql-snow button:hover .ql-stroke, .blog-quill-editor .ql-snow button.ql-active .ql-stroke { stroke: #6366f1; }
+                    .blog-quill-editor .ql-snow .ql-fill { fill: #64748b; }
+                    .blog-quill-editor .ql-snow button:hover .ql-fill, .blog-quill-editor .ql-snow button.ql-active .ql-fill { fill: #6366f1; }
                 `}} />
                 
                 <div className="flex items-center justify-between mb-10">
@@ -275,23 +322,8 @@ const BlogsAdmin = () => {
                     <div className="lg:col-span-2 space-y-6">
                         <div className="bg-white p-8 rounded-[32px] font-sans shadow-sm border border-slate-200 overflow-hidden">
                             <div className="flex items-center justify-between mb-6">
-                                <label className="block text-xs font-black text-indigo-500 uppercase tracking-[2px]">Content System</label>
-                                <div className="flex bg-slate-100 p-1 rounded-xl">
-                                    <button 
-                                        type="button"
-                                        onClick={() => setPreviewMode(false)}
-                                        className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${!previewMode ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400'}`}
-                                    >
-                                        <div className="flex items-center gap-2"><Code size={12}/> Write</div>
-                                    </button>
-                                    <button 
-                                        type="button"
-                                        onClick={() => setPreviewMode(true)}
-                                        className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${previewMode ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400'}`}
-                                    >
-                                        <div className="flex items-center gap-2"><Eye size={12}/> Preview</div>
-                                    </button>
-                                </div>
+                                <label className="block text-xs font-black text-indigo-500 uppercase tracking-[2px]">Content Editor</label>
+                                <span className="text-[10px] text-slate-300 font-bold uppercase tracking-widest">Quill Rich Text</span>
                             </div>
 
                             <div className="space-y-6">
@@ -308,32 +340,16 @@ const BlogsAdmin = () => {
                                 <div className="min-h-[500px] flex flex-col">
                                     <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Write Story</label>
                                     
-                                    {!previewMode ? (
-                                        <div className="flex-1 bg-slate-50 rounded-2xl overflow-hidden border-2 border-slate-100 focus-within:border-indigo-500 focus-within:bg-white transition-all flex flex-col">
-                                            {/* Toolbar */}
-                                            <div className="p-2 border-b border-slate-200 flex flex-wrap gap-1 bg-white">
-                                                <button type="button" onClick={() => insertTag('<h2>', '</h2>')} className="p-2 hover:bg-slate-100 rounded-lg text-slate-600" title="H2"><Type size={16}/></button>
-                                                <button type="button" onClick={() => insertTag('<strong>', '</strong>')} className="p-2 hover:bg-slate-100 rounded-lg text-slate-600" title="Bold"><Bold size={16}/></button>
-                                                <button type="button" onClick={() => insertTag('<em>', '</em>')} className="p-2 hover:bg-slate-100 rounded-lg text-slate-600" title="Italic"><Italic size={16}/></button>
-                                                <button type="button" onClick={() => insertTag('<a href="#">', '</a>')} className="p-2 hover:bg-slate-100 rounded-lg text-slate-600" title="Link"><LinkIcon size={16}/></button>
-                                                <button type="button" onClick={() => insertTag('<ul>\n  <li>', '</li>\n</ul>')} className="p-2 hover:bg-slate-100 rounded-lg text-slate-600" title="Unordered List"><List size={16}/></button>
-                                                <button type="button" onClick={() => insertTag('<img src="', '" alt="image" />')} className="p-2 hover:bg-slate-100 rounded-lg text-slate-600" title="Image Tag"><ImageControl size={16}/></button>
-                                            </div>
-                                            <textarea 
-                                                id="blog-content-area"
-                                                required
-                                                value={formData.content} 
-                                                onChange={e => setFormData({...formData, content: e.target.value})}
-                                                className="flex-1 w-full p-6 outline-none resize-none font-mono text-sm leading-relaxed bg-transparent"
-                                                placeholder="Start writing using HTML or the tools above..."
-                                            />
-                                        </div>
-                                    ) : (
-                                        <div className="flex-1 bg-slate-50 rounded-2xl border-2 border-slate-100 p-8 overflow-y-auto h-[500px] editor-preview">
-                                            <div className="prose prose-slate max-w-none" dangerouslySetInnerHTML={{ __html: formData.content || '<p class="text-slate-300 italic">No content to preview...</p>' }} />
-                                        </div>
-                                    )}
-                                    <p className="mt-2 text-[10px] text-slate-400 font-bold uppercase tracking-widest text-right">React 19 Safe Engine v1.0</p>
+                                    <div className="flex-1 bg-slate-50 rounded-2xl overflow-hidden border-2 border-slate-100 focus-within:border-indigo-500 transition-all blog-quill-editor">
+                                        <ReactQuill
+                                            theme="snow"
+                                            value={formData.content}
+                                            onChange={(value) => setFormData(prev => ({ ...prev, content: value }))}
+                                            modules={quillModules}
+                                            formats={quillFormats}
+                                            placeholder="Start writing your story here..."
+                                        />
+                                    </div>
                                 </div>
                             </div>
                         </div>

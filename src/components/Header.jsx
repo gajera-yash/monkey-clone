@@ -76,7 +76,7 @@ const Header = ({ onStartChat }) => {
                                 >
                                     <div className="relative">
                                         <img
-                                            src={currentUser.photoURL || `https://ui-avatars.com/api/?name=${currentUser.displayName}&background=random`}
+                                            src={currentUser.photoURL || currentUser?.user_metadata?.picture || currentUser?.user_metadata?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser.displayName || currentUser?.user_metadata?.full_name || 'User')}&background=random`}
                                             alt="User"
                                             className={`w-10 h-10 rounded-full border-2 ${isPremium ? 'border-yellow-400' : 'border-accent-purple'}`}
                                         />
@@ -86,7 +86,7 @@ const Header = ({ onStartChat }) => {
                                             </div>
                                         )}
                                     </div>
-                                    <span className="text-white font-medium hidden md:block">{currentUser.displayName}</span>
+                                    <span className="text-white font-medium hidden md:block">{currentUser.displayName || currentUser?.user_metadata?.full_name || 'User'}</span>
                                 </button>
 
                                 {/* Dropdown */}

@@ -64,9 +64,9 @@ const ProfileCompletionModal = ({ isOpen, user }) => {
                 <div className="relative h-32 bg-gradient-to-br from-indigo-600 to-purple-700 p-8 flex justify-center">
                     <div className="absolute -bottom-10 w-24 h-24 rounded-3xl bg-[#1a172e] p-1 shadow-2xl">
                         <div className="w-full h-full rounded-[22px] bg-indigo-500/20 flex items-center justify-center text-3xl font-black text-white overflow-hidden border border-white/10">
-                            {user?.photoURL && user.photoURL !== 'null' && user.photoURL !== 'undefined' ? (
+                            {(user?.photoURL || user?.user_metadata?.picture || user?.user_metadata?.avatar_url) ? (
                                 <img 
-                                    src={user.photoURL} 
+                                    src={user?.photoURL || user?.user_metadata?.picture || user?.user_metadata?.avatar_url} 
                                     alt="" 
                                     className="w-full h-full object-cover" 
                                     onError={(e) => {
@@ -75,7 +75,7 @@ const ProfileCompletionModal = ({ isOpen, user }) => {
                                     }}
                                 />
                             ) : (
-                                user?.displayName?.charAt(0)?.toUpperCase() || 'U'
+                                (user?.displayName || user?.user_metadata?.full_name || 'U').charAt(0).toUpperCase()
                             )}
                         </div>
                         <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-green-500 rounded-lg flex items-center justify-center border-4 border-[#1a172e] shadow-lg">
@@ -94,7 +94,7 @@ const ProfileCompletionModal = ({ isOpen, user }) => {
                             <label className="text-[10px] font-black uppercase tracking-widest text-white/30 ml-1">Full Name</label>
                             <div className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-3.5 text-sm font-bold text-white/80 flex items-center gap-3">
                                 <User size={16} className="text-indigo-400" />
-                                {user?.displayName || 'Stranger'}
+                                {user?.displayName || user?.user_metadata?.full_name || 'User'}
                             </div>
                         </div>
 
