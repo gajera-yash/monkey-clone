@@ -99,12 +99,6 @@ const BlogsAdmin = () => {
         setLocalPreview(objectUrl);
 
         try {
-            // 0. Check Supabase auth session
-            const { data: { session } } = await supabase.auth.getSession();
-            if (!session) {
-                throw new Error('Not authenticated. Please log in again.');
-            }
-
             // 1. Load image into memory
             const image = new window.Image();
             await new Promise((resolve, reject) => {
