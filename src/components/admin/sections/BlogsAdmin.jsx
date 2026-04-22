@@ -20,12 +20,13 @@ const BlogsAdmin = () => {
         short_description: '',
         meta_description: '',
         content: '',
-        tags: '',
+        tags: [],
         is_published: true,
         thumbnail_url: ''
     });
     const [uploadingImage, setUploadingImage] = useState(false);
     const [localPreview, setLocalPreview] = useState('');
+    const [tagInput, setTagInput] = useState('');
 
     useEffect(() => {
         fetchBlogs();
@@ -53,12 +54,12 @@ const BlogsAdmin = () => {
             setCurrentBlog(blog);
             setFormData({
                 title: blog.title,
-                slug: blog.slug,
+                slug: blog.slug || '',
                 short_description: blog.short_description || '',
                 meta_description: blog.meta_description || '',
                 content: blog.content || '',
-                tags: blog.tags ? blog.tags.join(', ') : '',
-                is_published: blog.is_published,
+                tags: blog.tags || [],
+                is_published: blog.is_published || false,
                 thumbnail_url: blog.thumbnail_url || ''
             });
         } else {
@@ -69,11 +70,12 @@ const BlogsAdmin = () => {
                 short_description: '',
                 meta_description: '',
                 content: '',
-                tags: '',
+                tags: [],
                 is_published: true,
                 thumbnail_url: ''
             });
         }
+        setTagInput('');
         setIsEditing(true);
     };
 
@@ -211,7 +213,7 @@ const BlogsAdmin = () => {
             short_description: formData.short_description,
             meta_description: formData.meta_description,
             content: formData.content,
-            tags: formData.tags.split(',').map(t => t.trim()).filter(Boolean),
+            tags: formData.tags,
             is_published: formData.is_published,
             thumbnail_url: formData.thumbnail_url,
             updated_at: new Date()
@@ -281,6 +283,27 @@ const BlogsAdmin = () => {
         'list', 'bullet', 'blockquote', 'code-block',
         'link', 'image', 'video', 'align'
     ];
+
+    const handleAddTag = (e) => {
+        if (e.key === 'Enter' || e.key === ',') {
+            e.preventDefault();
+            const tag = tagInput.trim().toLowerCase();
+            if (tag && !formData.tags.includes(tag)) {
+                setFormData(prev => ({
+                    ...prev,
+                    tags: [...prev.tags, tag]
+                }));
+            }
+            setTagInput('');
+        }
+    };
+
+    const handleRemoveTag = (tagToRemove) => {
+        setFormData(prev => ({
+            ...prev,
+            tags: prev.tags.filter(t => t !== tagToRemove)
+        }));
+    };
 
     const filteredBlogs = blogs.filter(b => 
         b.title.toLowerCase().includes(search.toLowerCase()) || 
@@ -428,13 +451,37 @@ const BlogsAdmin = () => {
                                 </div>
 
                                 <div>
-                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Tags</label>
-                                    <input 
-                                        type="text" 
-                                        value={formData.tags} onChange={e => setFormData({...formData, tags: e.target.value})}
-                                        className="w-full bg-slate-50 border-2 border-slate-100 focus:border-indigo-500 focus:bg-white rounded-xl px-4 py-2.5 text-xs font-bold outline-none transition-all"
-                                        placeholder="Safety, Guides, Update"
-                                    />
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Category Tags</label>
+                                    <div className="space-y-3">
+                                        <div className="flex flex-wrap gap-2">
+                                            {formData.tags.map(tag => (
+                                                <span 
+                                                    key={tag} 
+                                                    className="flex items-center gap-1 bg-indigo-50 text-indigo-600 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider border border-indigo-100 group/tag"
+                                                >
+                                                    {tag}
+                                                    <button 
+                                                        type="button" 
+                                                        onClick={() => handleRemoveTag(tag)}
+                                                        className="hover:bg-indigo-200 p-0.5 rounded-full transition-colors text-indigo-400 hover:text-indigo-700"
+                                                    >
+                                                        <X size={10} strokeWidth={4}/>
+                                                    </button>
+                                                </span>
+                                            ))}
+                                            {formData.tags.length === 0 && (
+                                                <span className="text-[10px] text-slate-300 font-bold uppercase tracking-widest px-1 italic">No tags added yet</span>
+                                            )}
+                                        </div>
+                                        <input 
+                                            type="text"
+                                            value={tagInput}
+                                            onChange={e => setTagInput(e.target.value)}
+                                            onKeyDown={handleAddTag}
+                                            className="w-full bg-slate-50 border-2 border-slate-100 focus:border-indigo-500 focus:bg-white rounded-xl px-4 py-3 text-xs font-semibold outline-none transition-all"
+                                            placeholder="Type and press Enter to add... (e.g. privacy, safety)"
+                                        />
+                                    </div>
                                 </div>
 
                                 <div className="pt-4 flex items-center justify-between bg-indigo-50/50 p-4 rounded-2xl border border-indigo-100">
