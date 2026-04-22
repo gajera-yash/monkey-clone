@@ -83,7 +83,9 @@ const BlogsAdmin = () => {
         const file = e.target.files[0];
         if (!file) return;
 
-        // Initial check for extremely large files
+        // Reset file input immediately so it can be re-used
+        const fileInput = e.target;
+
         if (file.size > 10 * 1024 * 1024) {
             toast.error("File is too large (>10MB).");
             return;
@@ -97,93 +99,62 @@ const BlogsAdmin = () => {
         setLocalPreview(objectUrl);
 
         try {
+            // 0. Check Supabase auth session
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) {
+                throw new Error('Not authenticated. Please log in again.');
+            }
+
             // 1. Load image into memory
             const image = new window.Image();
-            
             await new Promise((resolve, reject) => {
                 image.onload = resolve;
                 image.onerror = () => reject(new Error('Failed to load image file'));
                 image.src = objectUrl;
             });
 
-            // 2. Prepare Canvas for Compression
-            const MAX_WIDTH = 800;
-            const MAX_HEIGHT = 800;
-            let width = image.width;
-            let height = image.height;
-
-            if (width > height) {
-                if (width > MAX_WIDTH) {
-                    height *= MAX_WIDTH / width;
-                    width = MAX_WIDTH;
-                }
-            } else {
-                if (height > MAX_HEIGHT) {
-                    width *= MAX_HEIGHT / height;
-                    height = MAX_HEIGHT;
-                }
-            }
+            // 2. Resize for compression
+            const MAX_SIZE = 800;
+            let { width, height } = image;
+            if (width > height && width > MAX_SIZE) { height = Math.round(height * MAX_SIZE / width); width = MAX_SIZE; }
+            else if (height > width && height > MAX_SIZE) { width = Math.round(width * MAX_SIZE / height); height = MAX_SIZE; }
 
             const canvas = document.createElement('canvas');
             canvas.width = width;
             canvas.height = height;
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(image, 0, 0, width, height);
+            canvas.getContext('2d').drawImage(image, 0, 0, width, height);
 
-            // 3. Convert to Blob (JPEG, 0.7 quality)
+            // 3. Convert to Blob
             const compressedBlob = await new Promise((resolve, reject) => {
-                canvas.toBlob((blob) => {
-                    if (blob) {
-                        resolve(blob);
-                    } else {
-                        reject(new Error('Failed to compress image. Try a different image format.'));
-                    }
-                }, 'image/jpeg', 0.7);
+                canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error('Image compression failed.')), 'image/jpeg', 0.75);
             });
 
             URL.revokeObjectURL(objectUrl);
-            console.log(`[BlogUpload] Compressed image: ${(compressedBlob.size / 1024).toFixed(1)}KB`);
-            toast.loading("Uploading to storage...", { id: loadingToast });
+            console.log(`[Upload] Size: ${(compressedBlob.size / 1024).toFixed(1)}KB`);
+            toast.loading('Uploading to storage...', { id: loadingToast });
 
-            // 4. Upload to Supabase with timeout
-            const fileExt = 'jpg';
-            const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}.${fileExt}`;
-            const filePath = `${fileName}`;
-
-            // Create a timeout promise
-            const uploadPromise = supabase.storage
+            // 4. Upload to Supabase
+            const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 7)}.jpg`;
+            const { error: uploadError } = await supabase.storage
                 .from('blogs')
-                .upload(filePath, compressedBlob, { 
-                    contentType: 'image/jpeg',
-                    cacheControl: '3600',
-                    upsert: false 
-                });
-
-            const timeoutPromise = new Promise((_, reject) => 
-                setTimeout(() => reject(new Error('Upload timed out after 30 seconds. Check your Supabase storage bucket "blogs" exists and has correct permissions.')), 30000)
-            );
-
-            const { error: uploadError } = await Promise.race([uploadPromise, timeoutPromise]);
+                .upload(fileName, compressedBlob, { contentType: 'image/jpeg', cacheControl: '3600', upsert: false });
 
             if (uploadError) {
-                console.error('[BlogUpload] Supabase upload error:', uploadError);
-                throw new Error(uploadError.message || 'Storage upload failed. Ensure the "blogs" bucket exists in Supabase Storage.');
+                console.error('[Upload] Error:', uploadError);
+                throw new Error(`Upload error: ${uploadError.message}`);
             }
 
-            const { data: { publicUrl } } = supabase.storage
-                .from('blogs')
-                .getPublicUrl(filePath);
-
-            console.log('[BlogUpload] Upload successful:', publicUrl);
+            const { data: { publicUrl } } = supabase.storage.from('blogs').getPublicUrl(fileName);
+            console.log('[Upload] Success:', publicUrl);
             setFormData(prev => ({ ...prev, thumbnail_url: publicUrl }));
-            toast.success("Image uploaded & optimized!", { id: loadingToast });
+            toast.success('Image uploaded!', { id: loadingToast });
         } catch (error) {
-            console.error('[BlogUpload] Full error:', error);
-            toast.error("Upload failed: " + error.message, { id: loadingToast });
+            console.error('[Upload] Failed:', error);
+            setLocalPreview(''); // Clear broken preview
+            toast.error(error.message, { id: loadingToast });
         } finally {
             setUploadingImage(false);
-            // Reset the file input so the same file can be re-selected
-            e.target.value = '';
+            fileInput.value = ''; // Use saved reference, not event
         }
     };
 
@@ -215,39 +186,32 @@ const BlogsAdmin = () => {
             content: formData.content,
             tags: formData.tags,
             is_published: formData.is_published,
-            thumbnail_url: formData.thumbnail_url,
-            updated_at: new Date()
+            thumbnail_url: formData.thumbnail_url || null,
         };
 
         try {
-            console.log("[BlogsAdmin] Current Blog:", currentBlog);
-            console.log("[BlogsAdmin] Payload being sent:", payload);
+            console.log("[BlogsAdmin] Payload:", payload, "| Blog ID:", currentBlog?.id);
 
             if (currentBlog) {
-                // Ensure we are using the correct column name for ID
-                const { error, data } = await supabase.from('blogs').update(payload).eq('id', currentBlog.id).select();
-                if (error) {
-                    console.error("[BlogsAdmin] Update operation failed:", error);
-                    throw new Error(`Update failed: ${error.message} (${error.code})`);
-                }
-                console.log("[BlogsAdmin] Update successful:", data);
-                toast.success("Blog post updated successfully!");
+                const { error } = await supabase
+                    .from('blogs')
+                    .update({ ...payload, updated_at: new Date().toISOString() })
+                    .eq('id', currentBlog.id);
+                if (error) throw new Error(`Update failed: ${error.message}`);
+                toast.success("Blog post updated!");
             } else {
-                const { error, data } = await supabase.from('blogs').insert([{...payload, created_at: new Date()}]).select();
-                if (error) {
-                    console.error("[BlogsAdmin] Insert operation failed:", error);
-                    throw new Error(`Publish failed: ${error.message} (${error.code})`);
-                }
-                console.log("[BlogsAdmin] Insert successful:", data);
+                const { error } = await supabase
+                    .from('blogs')
+                    .insert([{ ...payload, created_at: new Date().toISOString() }]);
+                if (error) throw new Error(`Publish failed: ${error.message}`);
                 toast.success("New blog post published!");
             }
             setIsEditing(false);
             setLocalPreview('');
             fetchBlogs();
         } catch (error) {
-            console.error("[BlogsAdmin] Critical submission error:", error);
-            // Show the actual database error message to the user
-            toast.error(error.message || "Database operation failed. Check console for details.");
+            console.error("[BlogsAdmin] Error:", error);
+            toast.error(error.message);
         }
     };
 
