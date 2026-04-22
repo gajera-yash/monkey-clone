@@ -25,6 +25,7 @@ const BlogsAdmin = () => {
         thumbnail_url: ''
     });
     const [uploadingImage, setUploadingImage] = useState(false);
+    const [localPreview, setLocalPreview] = useState('');
 
     useEffect(() => {
         fetchBlogs();
@@ -47,6 +48,7 @@ const BlogsAdmin = () => {
     };
 
     const handleOpenForm = (blog = null) => {
+        setLocalPreview(''); // Clear local preview when opening form
         if (blog) {
             setCurrentBlog(blog);
             setFormData({
@@ -88,10 +90,13 @@ const BlogsAdmin = () => {
         const loadingToast = toast.loading("Optimizing image...");
         setUploadingImage(true);
 
+        // Instant Local Preview
+        const objectUrl = URL.createObjectURL(file);
+        setLocalPreview(objectUrl);
+
         try {
             // 1. Load image into memory
             const image = new window.Image();
-            const objectUrl = URL.createObjectURL(file);
             
             await new Promise((resolve, reject) => {
                 image.onload = resolve;
@@ -213,19 +218,29 @@ const BlogsAdmin = () => {
         };
 
         try {
+            console.log("[BlogsAdmin] Preparing payload...", payload);
+
             if (currentBlog) {
                 const { error } = await supabase.from('blogs').update(payload).eq('id', currentBlog.id);
-                if (error) throw error;
+                if (error) {
+                    console.error("[BlogsAdmin] Update error:", error);
+                    throw error;
+                }
                 toast.success("Blog post updated!");
             } else {
                 const { error } = await supabase.from('blogs').insert({...payload, created_at: new Date()});
-                if (error) throw error;
+                if (error) {
+                    console.error("[BlogsAdmin] Insert error:", error);
+                    throw error;
+                }
                 toast.success("New blog post published!");
             }
             setIsEditing(false);
+            setLocalPreview('');
             fetchBlogs();
         } catch (error) {
-            toast.error(error.message || "Something went wrong.");
+            console.error("[BlogsAdmin] Submit error details:", error);
+            toast.error(error.message || "Something went wrong. Check console for details.");
         }
     };
 
@@ -386,9 +401,14 @@ const BlogsAdmin = () => {
                                 <div>
                                     <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Thumbnail</label>
                                     <div className="space-y-3">
-                                        {formData.thumbnail_url && (
-                                            <div className="aspect-video w-full rounded-2xl border-2 border-slate-100 overflow-hidden shadow-inner">
-                                                <img src={formData.thumbnail_url} alt="Preview" className="w-full h-full object-cover" />
+                                        {(localPreview || formData.thumbnail_url) && (
+                                            <div className="aspect-video w-full rounded-2xl border-2 border-slate-100 overflow-hidden shadow-inner bg-slate-50 relative">
+                                                <img src={localPreview || formData.thumbnail_url} alt="Preview" className="w-full h-full object-cover" />
+                                                {localPreview && uploadingImage && (
+                                                    <div className="absolute inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center">
+                                                        <div className="w-8 h-8 border-4 border-t-white border-white/20 rounded-full animate-spin"></div>
+                                                    </div>
+                                                )}
                                             </div>
                                         )}
                                         <div className="relative group">
