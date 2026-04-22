@@ -99,11 +99,12 @@ const BlogsAdmin = () => {
         setLocalPreview(objectUrl);
 
         try {
-            // 1. Load image into memory
+            // 1. Load image into memory (with 10s timeout)
             const image = new window.Image();
             await new Promise((resolve, reject) => {
-                image.onload = resolve;
-                image.onerror = () => reject(new Error('Failed to load image file'));
+                const timer = setTimeout(() => reject(new Error('Image load timed out. Try a different file.')), 10000);
+                image.onload = () => { clearTimeout(timer); resolve(); };
+                image.onerror = () => { clearTimeout(timer); reject(new Error('Failed to load image file')); };
                 image.src = objectUrl;
             });
 
@@ -118,9 +119,13 @@ const BlogsAdmin = () => {
             canvas.height = height;
             canvas.getContext('2d').drawImage(image, 0, 0, width, height);
 
-            // 3. Convert to Blob
+            // 3. Convert to Blob (with 10s timeout)
             const compressedBlob = await new Promise((resolve, reject) => {
-                canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error('Image compression failed.')), 'image/jpeg', 0.75);
+                const timer = setTimeout(() => reject(new Error('Image compression timed out. Try a smaller file.')), 10000);
+                canvas.toBlob((blob) => {
+                    clearTimeout(timer);
+                    blob ? resolve(blob) : reject(new Error('Image compression failed.'));
+                }, 'image/jpeg', 0.75);
             });
 
             URL.revokeObjectURL(objectUrl);
