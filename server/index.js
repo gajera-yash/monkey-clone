@@ -31,6 +31,7 @@ const { createClient } = require('@supabase/supabase-js');
 
 const coinsRoutes = require('./routes/coins');
 const subscriptionsRoutes = require('./routes/subscriptions');
+const authRoutes = require('./routes/auth');
 
 const app = express();
 
@@ -82,6 +83,9 @@ const supabase = getSupabaseAdmin();
 if (!supabase) {
     console.error('Critical Error: Supabase Admin client failed to initialize. RLS bypass will not work.');
 }
+
+// Authentication Routes
+app.use('/api/auth', authRoutes);
 
 // Monetization Routes
 app.use('/api/coins', coinsRoutes);
