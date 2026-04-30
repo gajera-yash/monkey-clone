@@ -32,6 +32,7 @@ const { createClient } = require('@supabase/supabase-js');
 const coinsRoutes = require('./routes/coins');
 const subscriptionsRoutes = require('./routes/subscriptions');
 const authRoutes = require('./routes/auth');
+const userRoutes = require('./routes/user');
 
 const app = express();
 
@@ -86,6 +87,9 @@ if (!supabase) {
 
 // Authentication Routes
 app.use('/api/auth', authRoutes);
+
+// User & Profile Routes
+app.use('/api/user', userRoutes);
 
 // Monetization Routes
 app.use('/api/coins', coinsRoutes);

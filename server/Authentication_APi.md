@@ -35,7 +35,7 @@ Authorization: Bearer <access_token>
 
 ## 1. 📝 SIGNUP — New Account Create Karo
 
-**Endpoint:** `POST /api/auth/signup`
+**Endpoint:** `POST https://api.strangy.in/api/auth/signup`
 
 ### Request Body (JSON):
 ```json
@@ -90,7 +90,7 @@ Authorization: Bearer <access_token>
 
 ### 📸 Postman Screenshot Steps:
 1. Method: `POST`
-2. URL: `http://localhost:3000/api/auth/signup`
+2. URL: `https://api.strangy.in/api/auth/signup`
 3. Body tab → `raw` → `JSON`
 4. Paste the request body above
 5. Click **Send**
@@ -99,7 +99,7 @@ Authorization: Bearer <access_token>
 
 ## 2. 🔓 LOGIN — Email/Password thi Login
 
-**Endpoint:** `POST /api/auth/login`
+**Endpoint:** `POST https://api.strangy.in/api/auth/login`
 
 ### Request Body (JSON):
 ```json
@@ -218,7 +218,7 @@ Authorization: Bearer <access_token>
 
 | Field | Type | Required | Description |
 |-------|------|:--------:|-------------|
-| refresh_token | string | ✅ | Login response ma thi malelo refresh token |
+| refresh_token | string | ✅ | Login response ma thi refresh token Malshe |
 
 ### ✅ Success Response (200):
 ```json
@@ -254,7 +254,7 @@ if (response.statusCode == 401) {
 
 ## 5. 🚪 LOGOUT — User ne Logout Karo
 
-**Endpoint:** `POST /api/auth/logout`
+**Endpoint:** `POST https://api.strangy.in/api/auth/logout`
 
 ### Headers:
 ```
