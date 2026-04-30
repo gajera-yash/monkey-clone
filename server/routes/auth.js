@@ -43,6 +43,11 @@ router.post('/signup', async (req, res) => {
       return res.status(400).json({ error: authError.message });
     }
 
+    if (!authData || !authData.user) {
+      console.error('[Auth Signup] User creation succeeded but no user data returned');
+      return res.status(500).json({ error: 'Auth service returned empty user data' });
+    }
+
     const userId = authData.user.id;
 
     // 2. Create profile in profiles table
@@ -86,9 +91,9 @@ router.post('/signup', async (req, res) => {
       password
     });
 
-    if (sessionError) {
+    if (sessionError || !sessionData || !sessionData.session) {
       // User created but session failed - they can login manually
-      console.warn('[Auth Signup] Auto-login failed:', sessionError.message);
+      console.warn('[Auth Signup] Auto-login failed:', sessionError?.message || 'No session returned');
       return res.status(201).json({
         success: true,
         message: 'Account created successfully. Please login.',
@@ -120,7 +125,11 @@ router.post('/signup', async (req, res) => {
 
   } catch (error) {
     console.error('[Auth Signup] Server error:', error);
-    res.status(500).json({ error: 'Failed to create account. Please try again.' });
+    res.status(500).json({ 
+      error: 'Failed to create account. Please try again.',
+      details: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 });
 
@@ -211,7 +220,10 @@ router.post('/login', async (req, res) => {
 
   } catch (error) {
     console.error('[Auth Login] Server error:', error);
-    res.status(500).json({ error: 'Login failed. Please try again.' });
+    res.status(500).json({ 
+      error: 'Login failed. Please try again.',
+      details: error.message 
+    });
   }
 });
 
@@ -288,7 +300,10 @@ router.post('/guest', async (req, res) => {
 
   } catch (error) {
     console.error('[Auth Guest] Server error:', error);
-    res.status(500).json({ error: 'Failed to create guest account' });
+    res.status(500).json({ 
+      error: 'Failed to create guest account',
+      details: error.message 
+    });
   }
 });
 
@@ -450,7 +465,10 @@ router.get('/me', async (req, res) => {
 
   } catch (error) {
     console.error('[Auth Me] Server error:', error);
-    res.status(500).json({ error: 'Failed to fetch user data' });
+    res.status(500).json({ 
+      error: 'Failed to fetch user data',
+      details: error.message 
+    });
   }
 });
 
