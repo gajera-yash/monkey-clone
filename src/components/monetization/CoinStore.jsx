@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Coins, X } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { load } from '@cashfreepayments/cashfree-js';
+import { loadRazorpay } from '../../utils/loadRazorpay';
 
 export default function CoinStore({ userId, onClose }) {
   const [packages, setPackages] = useState([]);
@@ -50,49 +50,69 @@ export default function CoinStore({ userId, onClose }) {
       
       const orderData = await orderRes.json();
       
-      if (!orderData.paymentSessionId) {
+      if (!orderData.order_id) {
           throw new Error(orderData.error || "Failed to create order");
       }
 
-      const cashfree = await load({
-          mode: "sandbox" // Change to "production" when going live
-      });
+      const resLoad = await loadRazorpay();
+      if (!resLoad) {
+          throw new Error('Razorpay SDK failed to load. Are you online?');
+      }
 
-      let checkoutOptions = {
-          paymentSessionId: orderData.paymentSessionId,
-          redirectTarget: "_modal"
+      const options = {
+          key: process.env.REACT_APP_RAZORPAY_KEY_ID,
+          amount: orderData.amount,
+          currency: orderData.currency,
+          name: "Strangy",
+          description: `Purchase of ${packageItem.coins} Coins`,
+          order_id: orderData.order_id,
+          theme: {
+              color: "#8b5cf6"
+          },
+          handler: async function (response) {
+              try {
+                  const verifyRes = await fetch('/api/coins/purchase/verify', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                          razorpay_order_id: response.razorpay_order_id,
+                          razorpay_payment_id: response.razorpay_payment_id,
+                          razorpay_signature: response.razorpay_signature,
+                          userId: userId,
+                          packageId: packageItem.id
+                      })
+                  });
+                  
+                  const verifyData = await verifyRes.json();
+                  
+                  if (verifyData.success) {
+                      toast.success(`Successfully added ${verifyData.coinsAdded} coins!`);
+                      fetchUserCoins();
+                      if (onClose) onClose();
+                  } else {
+                      toast.error("Payment verification failed");
+                  }
+              } catch (verifyErr) {
+                  console.error('Verification Error:', verifyErr);
+                  toast.error("Payment verification failed");
+              } finally {
+                  setLoading(false);
+              }
+          },
+          modal: {
+              ondismiss: function() {
+                  toast.error("Payment cancelled");
+                  setLoading(false);
+              }
+          }
       };
 
-      const result = await cashfree.checkout(checkoutOptions);
-      
-      if (result?.error) {
-          console.error("Cashfree Checkout Error:", result.error);
-          toast.error(result.error.message || "Payment cancelled or failed");
+      const paymentObject = new window.Razorpay(options);
+      paymentObject.on('payment.failed', function (response) {
+          toast.error(response.error.description || "Payment failed");
           setLoading(false);
-          return;
-      }
-
-      // Verify payment with our server (Using relative path)
-      const verifyRes = await fetch('/api/coins/purchase/verify', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-              orderId: orderData.orderId,
-              userId: userId,
-              packageId: packageItem.id
-          })
       });
-      
-      const verifyData = await verifyRes.json();
-      
-      if (verifyData.success) {
-          toast.success(`Successfully added ${verifyData.coinsAdded} coins!`);
-          fetchUserCoins();
-          if (onClose) onClose();
-      } else {
-          toast.error("Payment verification failed");
-          setLoading(false);
-      }
+      paymentObject.open();
       
     } catch (error) {
       console.error('Error purchasing coins:', error);
@@ -200,7 +220,7 @@ export default function CoinStore({ userId, onClose }) {
               </div>
             </div>
             <div className="flex gap-4 opacity-50 grayscale hover:grayscale-0 transition-all">
-                <span className="font-black text-xs uppercase tracking-widest text-slate-400">CASHFREE PAYMENTS</span>
+                <span className="font-black text-xs uppercase tracking-widest text-slate-400">RAZORPAY SECURE</span>
                 <span className="font-black text-xs uppercase tracking-widest text-slate-400">SSL</span>
                 <span className="font-black text-xs uppercase tracking-widest text-slate-400">256-BIT</span>
             </div>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Check, Crown, X } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { load } from '@cashfreepayments/cashfree-js';
+import { loadRazorpay } from '../../utils/loadRazorpay';
 
 export default function SubscriptionPlans({ userId, onClose }) {
   const [plans, setPlans] = useState([]);
@@ -39,46 +39,71 @@ export default function SubscriptionPlans({ userId, onClose }) {
       
       const orderData = await orderRes.json();
       
-      if (!orderData.paymentSessionId) throw new Error("Failed to create order");
+      if (!orderData.orderId) throw new Error("Failed to create order");
       
-      const cashfree = await load({
-          mode: "sandbox" // Change to "production" when going live
-      });
+      const resLoad = await loadRazorpay();
+      if (!resLoad) {
+          throw new Error('Razorpay SDK failed to load. Are you online?');
+      }
 
-      let checkoutOptions = {
-          paymentSessionId: orderData.paymentSessionId,
-          redirectTarget: "_modal"
+      const options = {
+          key: process.env.REACT_APP_RAZORPAY_KEY_ID,
+          amount: orderData.amount * 100, // assuming backend sent amount in INR, but wait, let's verify what backend sends
+          // Actually, backend sends amount in INR. Razorpay expects paise in options.amount but order is already created with paise.
+          // In coins.js we passed orderData.amount which was in Paise. Wait, let's check what backend sends.
+          // The backend sends: amount: amount (which is in INR).
+          // We must pass amount * 100 to Razorpay options if it's not strictly necessary since order_id binds the amount.
+          currency: orderData.currency,
+          name: "Strangy",
+          description: `Subscription: ${plan.name}`,
+          order_id: orderData.orderId,
+          theme: {
+              color: "#8b5cf6"
+          },
+          handler: async function (response) {
+              try {
+                  const verifyRes = await fetch('/api/subscriptions/subscribe/verify', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                          razorpay_order_id: response.razorpay_order_id,
+                          razorpay_payment_id: response.razorpay_payment_id,
+                          razorpay_signature: response.razorpay_signature,
+                          userId: userId,
+                          planId: plan.id,
+                          billingPeriod: billingPeriod
+                      })
+                  });
+                  
+                  const verifyData = await verifyRes.json();
+                  
+                  if (verifyData.success) {
+                      toast.success(`Welcome to ${plan.name}!`);
+                      if (onClose) onClose();
+                  } else {
+                      toast.error("Subscription verification failed");
+                  }
+              } catch (verifyErr) {
+                  console.error('Verification Error:', verifyErr);
+                  toast.error("Subscription verification failed");
+              } finally {
+                  setLoading(false);
+              }
+          },
+          modal: {
+              ondismiss: function() {
+                  toast.error("Subscription cancelled");
+                  setLoading(false);
+              }
+          }
       };
 
-      const result = await cashfree.checkout(checkoutOptions);
-
-      if (result?.error) {
-          console.error("Cashfree Checkout Error:", result.error);
-          toast.error(result.error.message || "Subscription cancelled or failed");
+      const paymentObject = new window.Razorpay(options);
+      paymentObject.on('payment.failed', function (response) {
+          toast.error(response.error.description || "Payment failed");
           setLoading(false);
-          return;
-      }
-
-      const verifyRes = await fetch('/api/subscriptions/subscribe/verify', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-              orderId: orderData.orderId,
-              userId: userId,
-              planId: plan.id,
-              billingPeriod: billingPeriod
-          })
       });
-      
-      const verifyData = await verifyRes.json();
-      
-      if (verifyData.success) {
-          toast.success(`Welcome to ${plan.name}!`);
-          if (onClose) onClose();
-      } else {
-          toast.error("Subscription verification failed");
-          setLoading(false);
-      }
+      paymentObject.open();
       
     } catch (error) {
       console.error('Error subscribing:', error);
@@ -202,7 +227,7 @@ export default function SubscriptionPlans({ userId, onClose }) {
           <div className="mt-16 text-center">
             <p className="text-xs font-black text-slate-400 uppercase tracking-[4px]">Verified Security</p>
             <div className="flex items-center justify-center gap-8 mt-6 opacity-30 grayscale hover:opacity-100 hover:grayscale-0 transition-all cursor-default">
-              <span className="font-black text-sm tracking-tighter">CASHFREE</span>
+              <span className="font-black text-sm tracking-tighter">RAZORPAY</span>
               <span className="font-black text-sm tracking-tighter">MASTERCARD</span>
               <span className="font-black text-sm tracking-tighter">VISA</span>
               <span className="font-black text-sm tracking-tighter">UPI</span>

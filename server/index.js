@@ -99,16 +99,15 @@ app.use('/api/subscriptions', subscriptionsRoutes);
 // Visit https://strangy.in/api/payment-debug to check if variables are set
 app.get('/api/payment-debug', (req, res) => {
     const config = {
-        CASHFREE_APP_ID: {
-            exists: !!process.env.CASHFREE_APP_ID,
-            prefix: process.env.CASHFREE_APP_ID ? process.env.CASHFREE_APP_ID.substring(0, 4) : null,
-            length: process.env.CASHFREE_APP_ID ? process.env.CASHFREE_APP_ID.length : 0
+        RAZORPAY_KEY_ID: {
+            exists: !!process.env.RAZORPAY_KEY_ID,
+            prefix: process.env.RAZORPAY_KEY_ID ? process.env.RAZORPAY_KEY_ID.substring(0, 8) : null,
+            length: process.env.RAZORPAY_KEY_ID ? process.env.RAZORPAY_KEY_ID.length : 0
         },
-        CASHFREE_SECRET_KEY: {
-            exists: !!process.env.CASHFREE_SECRET_KEY,
-            length: process.env.CASHFREE_SECRET_KEY ? process.env.CASHFREE_SECRET_KEY.length : 0
+        RAZORPAY_KEY_SECRET: {
+            exists: !!process.env.RAZORPAY_KEY_SECRET,
+            length: process.env.RAZORPAY_KEY_SECRET ? process.env.RAZORPAY_KEY_SECRET.length : 0
         },
-        CASHFREE_ENV: process.env.CASHFREE_ENV || 'Not Set (Default: SANDBOX)',
         SUPABASE_URL: !!process.env.SUPABASE_URL,
         NODE_ENV: process.env.NODE_ENV || 'development',
         PORT: process.env.PORT || '3000'

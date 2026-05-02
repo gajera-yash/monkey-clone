@@ -84,7 +84,7 @@ const TermsOfService = () => {
             subsections: [
                 {
                     subtitle: "5.1 Virtual Currency",
-                    text: "Strangy uses a virtual currency system called \"Coins\" which can be purchased using real money through our payment processor (Cashfree Payments)."
+                    text: "Strangy uses a virtual currency system called \"Coins\" which can be purchased using real money through our payment processor (Razorpay)."
                 },
                 {
                     subtitle: "5.2 Coin Packages",
@@ -222,7 +222,7 @@ const TermsOfService = () => {
             subsections: [
                 {
                     subtitle: "11.1 Payment Processing",
-                    text: "We use Cashfree Payments. By purchasing, you agree to Cashfree's terms and privacy policy."
+                    text: "We use Razorpay. By purchasing, you agree to Razorpay's terms and privacy policy."
                 },
                 {
                     subtitle: "11.2 Analytics",

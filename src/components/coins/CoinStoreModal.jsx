@@ -95,7 +95,7 @@ const CoinStoreModal = ({ isOpen, onClose }) => {
         
         try {
             // 1. Create order on backend
-            const orderRes = await fetch('/api/coins/purchase/create-order-razorpay', {
+            const orderRes = await fetch('/api/coins/purchase/create-order', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -145,7 +145,7 @@ const CoinStoreModal = ({ isOpen, onClose }) => {
                 handler: async function (response) {
                     try {
                         // 4. Verify on backend
-                        const verifyRes = await fetch('/api/coins/purchase/verify-razorpay', {
+                        const verifyRes = await fetch('/api/coins/purchase/verify', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({

@@ -20,7 +20,7 @@ const PrivacyPolicy = () => {
             subsections: [
                 {
                     subtitle: "1.1 Information You Provide Directly",
-                    text: "**Account Info:** Email, Display name, DOB, Profile photo, Gender, Location. **Creator Info:** Full legal name, ID verification, Face/Voice samples, Bank details, PAN (India). **Payments:** Processed by Cashfree Payments; we only receive confirmations."
+                    text: "**Account Info:** Email, Display name, DOB, Profile photo, Gender, Location. **Creator Info:** Full legal name, ID verification, Face/Voice samples, Bank details, PAN (India). **Payments:** Processed by Razorpay; we only receive confirmations."
                 },
                 {
                     subtitle: "1.2 Information Collected Automatically",
@@ -66,7 +66,7 @@ const PrivacyPolicy = () => {
                 },
                 {
                     subtitle: "3.2 With Service Providers",
-                    text: "Cashfree Payments (Payments), Supabase (Storage), Google Analytics (Statistics)."
+                    text: "Razorpay (Payments), Supabase (Storage), Google Analytics (Statistics)."
                 },
                 {
                     subtitle: "3.3 Legal and Business",

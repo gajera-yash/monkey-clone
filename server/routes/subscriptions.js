@@ -7,38 +7,8 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_KEY
 );
 
-// ============ CASHFREE CONFIG ============
-const getCashfreeConfig = () => {
-    const appId = (process.env.CASHFREE_APP_ID || '').trim();
-    const secretKey = (process.env.CASHFREE_SECRET_KEY || '').trim();
-    const env = (process.env.CASHFREE_ENV || 'SANDBOX').trim().toUpperCase();
-
-    const isConfigured = Boolean(appId && secretKey);
-    const isTestAppId = appId.startsWith('TEST');
-    
-    // Safety check: Don't allow PRODUCTION mode with a TEST App ID
-    const mode = (env === 'PRODUCTION' && !isTestAppId) ? 'production' : 'sandbox';
-    
-    if (!isConfigured) {
-        console.error('[Cashfree Config] Error: Keys are missing in process.env!');
-    }
-
-    const baseUrl = mode === 'production'
-        ? 'https://api.cashfree.com/pg/orders'
-        : 'https://sandbox.cashfree.com/pg/orders';
-
-    return { appId, secretKey, env, mode, isConfigured, baseUrl };
-};
-
-const getCashfreeHeaders = (cashfreeConfig) => {
-    return {
-        'x-client-id': cashfreeConfig.appId,
-        'x-client-secret': cashfreeConfig.secretKey,
-        'x-api-version': '2023-08-01',
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-    };
-};
+const Razorpay = require('razorpay');
+const crypto = require('crypto');
 
 // Get all subscription plans
 router.get('/plans', async (req, res) => {
@@ -61,11 +31,10 @@ router.get('/plans', async (req, res) => {
 // Create subscription order
 router.post('/subscribe/create-order', async (req, res) => {
   try {
-    const cashfreeConfig = getCashfreeConfig();
-    if (!cashfreeConfig.isConfigured) {
+    if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
         return res.status(500).json({
             error: 'Payment gateway not configured',
-            message: 'CASHFREE_APP_ID and CASHFREE_SECRET_KEY are required on server.'
+            message: 'RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET are required on server.'
         });
     }
 
@@ -80,49 +49,29 @@ router.post('/subscribe/create-order', async (req, res) => {
     if (!plan) return res.status(404).json({ error: 'Plan not found' });
     
     const amount = billingPeriod === 'yearly' ? plan.price_yearly_inr : plan.price_monthly_inr;
-    
-    const { data: user } = await supabase
-      .from('profiles')
-      .select('email, phone, username')
-      .eq('id', userId)
-      .single();
+    const amountInPaise = Math.round(amount * 100);
 
-    const orderId = `sub_${Date.now()}_${userId.substring(0, 6)}`;
-    
-    const requestBody = {
-        order_amount: amount,
-        order_currency: "INR",
-        order_id: orderId,
-        customer_details: {
-            customer_id: userId,
-            customer_phone: user?.phone || "9999999999",
-            customer_email: user?.email || "customer@strangy.in",
-            customer_name: user?.username || "Strangy User"
-        },
-        order_meta: {
-            return_url: "https://strangy.in/chat?order_id={order_id}"
-        }
-    };
-
-    const response = await fetch(cashfreeConfig.baseUrl, {
-        method: 'POST',
-        headers: getCashfreeHeaders(cashfreeConfig),
-        body: JSON.stringify(requestBody)
-    });
-
-    const data = await response.json();
-    
-    if (!response.ok) {
-        console.error("Cashfree Order Error:", data);
-        return res.status(500).json({ error: 'Payment gateway error', details: data });
+    if (amountInPaise < 100) {
+        return res.status(400).json({ error: 'Amount must be at least 100 paise' });
     }
 
+    const razorpayInstance = new Razorpay({
+      key_id: process.env.RAZORPAY_KEY_ID,
+      key_secret: process.env.RAZORPAY_KEY_SECRET,
+    });
+
+    const receipt = `sub_${Date.now()}_${userId.substring(0, 6)}`;
+    
+    const order = await razorpayInstance.orders.create({
+      amount: amountInPaise,
+      currency: "INR",
+      receipt: receipt
+    });
+
     res.json({
-        orderId: data.order_id,
-        paymentSessionId: data.payment_session_id,
+        orderId: order.id,
         amount: amount,
-        currency: "INR",
-        cashfreeMode: cashfreeConfig.mode
+        currency: "INR"
     });
 
   } catch (error) {
@@ -134,33 +83,29 @@ router.post('/subscribe/create-order', async (req, res) => {
 // Verify subscription payment and activate
 router.post('/subscribe/verify', async (req, res) => {
   try {
-    const { orderId, userId, planId, billingPeriod } = req.body;
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, userId, planId, billingPeriod } = req.body;
 
-    const cashfreeConfig = getCashfreeConfig();
-    if (!cashfreeConfig.isConfigured) {
+    if (!process.env.RAZORPAY_KEY_SECRET) {
         return res.status(500).json({
             success: false,
             error: 'Payment gateway not configured',
-            message: 'CASHFREE_APP_ID and CASHFREE_SECRET_KEY are required on server.'
+            message: 'RAZORPAY_KEY_SECRET is required on server.'
         });
     }
     
-    const response = await fetch(`${cashfreeConfig.baseUrl}/${orderId}`, {
-        method: 'GET',
-        headers: getCashfreeHeaders(cashfreeConfig)
-    });
-    
-    const orderStat = await response.json();
-    
-    if (orderStat.order_status !== 'PAID') {
-        return res.status(400).json({ success: false, error: 'Payment not successful' });
+    const hmac = crypto.createHmac('sha256', process.env.RAZORPAY_KEY_SECRET);
+    hmac.update(razorpay_order_id + "|" + razorpay_payment_id);
+    const generatedSignature = hmac.digest('hex');
+
+    if (generatedSignature !== razorpay_signature) {
+        return res.status(400).json({ success: false, error: 'Signature mismatch' });
     }
     
     // Prevent double processing
     const { data: existingTx } = await supabase
         .from('transactions')
         .select('*')
-        .eq('metadata->>order_id', orderId)
+        .eq('metadata->>order_id', razorpay_order_id)
         .single();
         
     if (existingTx) {
@@ -203,8 +148,9 @@ router.post('/subscribe/verify', async (req, res) => {
             type: 'subscription',
             amount: amount,
             metadata: {
-                payment_gateway: 'cashfree',
-                order_id: orderId,
+                payment_gateway: 'razorpay',
+                order_id: razorpay_order_id,
+                payment_id: razorpay_payment_id,
                 plan: plan.name,
                 billing: billingPeriod
             }

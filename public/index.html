@@ -8,15 +8,13 @@
    <meta http-equiv="Content-Security-Policy" content="
   default-src 'self';
   script-src 'self' 'unsafe-inline' 'unsafe-eval'
-    https://sdk.cashfree.com
+    https://checkout.razorpay.com
     https://cdn.jsdelivr.net
     https://cdn.onesignal.com
     https://www.googletagmanager.com;
   connect-src 'self'
     https://*.supabase.co wss://*.supabase.co
-    https://api.cashfree.com
-    https://sandbox.cashfree.com
-    https://sdk.cashfree.com
+    https://api.razorpay.com
     https://onesignal.com https://*.onesignal.com
     https://strangy-production-56d4.up.railway.app
     wss://strangy-production-56d4.up.railway.app
@@ -40,8 +38,8 @@
   font-src 'self'
     https://fonts.gstatic.com;
   frame-src
-    https://sdk.cashfree.com
-    https://sandbox.cashfree.com
+    https://api.razorpay.com
+    https://checkout.razorpay.com
     https://www.googletagmanager.com;
   worker-src 'self' blob:;
 ">
@@ -72,7 +70,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Syne:wght@400;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&display=swap" rel="stylesheet" />
 
-    <!-- Cashfree Script is loaded dynamically by the SDK in components -->
+    <!-- Razorpay Script is loaded dynamically by the SDK in components -->
     
 
     <!-- OneSignal Push Notifications -->
