@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import SEO from '../SEO';
+
 import { supabase } from '../../supabase';
 import toast from 'react-hot-toast';
 
@@ -37,6 +39,13 @@ const ContactUs = () => {
 
     return (
         <div className="min-h-screen bg-dark-900 text-white pt-24 pb-12 px-4 md:px-8">
+            <SEO
+                title="Contact Strangy — Support, Partnerships & Creator Help"
+                description="Contact the Strangy team for support, creator inquiries, partnerships or media. We typically respond within 24 hours. Reach us at support.strangy@gmail.com."
+                canonical="https://strangy.in/contact"
+                ogImage="https://strangy.in/og-contact.jpg"
+            />
+
             <div className="max-w-4xl mx-auto">
                 <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-pink-400 to-purple-600 mb-8 text-center text-gradient">
                     Contact Us

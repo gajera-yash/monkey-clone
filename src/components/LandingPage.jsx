@@ -1,6 +1,38 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
+import SEO from './SEO';
 import '../styles/LandingPage.css';
+
+const homepageSchema = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebSite",
+      "name": "Strangy",
+      "url": "https://strangy.in",
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": "https://strangy.in/?q={search_term_string}",
+        "query-input": "required name=search_term_string"
+      }
+    },
+    {
+      "@type": "Organization",
+      "name": "Strangy",
+      "url": "https://strangy.in",
+      "logo": "https://strangy.in/logo.png",
+      "description": "India's creator-first random video chat platform — connect with strangers via live video calls.",
+      "areaServed": "IN",
+      "foundingLocation": "Surat, Gujarat, India",
+      "contactPoint": {
+        "@type": "ContactPoint",
+        "email": "support.strangy@gmail.com",
+        "contactType": "customer support",
+        "areaServed": "IN"
+      }
+    }
+  ]
+};
 
 
 const LandingPage = ({ onStartChat }) => {
@@ -134,6 +166,13 @@ const LandingPage = ({ onStartChat }) => {
 
   return (
     <div className="landing-page-wrapper">
+      <SEO
+        title="Strangy — Random Video Chat with Strangers in India"
+        description="Join Strangy for live random video chat with strangers in India. Talk to girls, meet new people & connect instantly. Free to start — sign up now!"
+        canonical="https://strangy.in"
+        ogImage="https://strangy.in/og-home.jpg"
+        schema={homepageSchema}
+      />
       <div className="cur" ref={curRef}></div>
       <div className="cur-ring" ref={curRingRef}></div>
 

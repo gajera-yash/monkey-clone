@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import SEO from '../SEO';
 import { 
     Shield, Eye, Database, Lock, UserPlus, ChevronLeft, 
     User, HardDrive, CreditCard, Mail, Globe, Settings, 
@@ -7,6 +8,7 @@ import {
     RefreshCw, Scale
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+
 
 const PrivacyPolicy = () => {
     const navigate = useNavigate();
@@ -235,7 +237,14 @@ const PrivacyPolicy = () => {
 
     return (
         <div className="min-h-screen bg-[#0a0a0c] text-white font-sans selection:bg-blue-500/30">
+            <SEO
+                title="Privacy Policy — Strangy"
+                description="Read Strangy's privacy policy to understand how we collect, use and protect your data."
+                canonical="https://strangy.in/privacy"
+                noindex={true}
+            />
             {/* Background Decorations */}
+
             <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
                 <div className="absolute top-[-10%] right-[-10%] w-[50%] h-[50%] bg-blue-600/10 rounded-full blur-[120px]" />
                 <div className="absolute bottom-[-10%] left-[-10%] w-[50%] h-[50%] bg-indigo-600/10 rounded-full blur-[120px]" />

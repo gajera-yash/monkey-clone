@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Helmet } from 'react-helmet-async';
+import SEO from '../SEO';
 import { supabase } from '../../supabase';
+
 import { Calendar, ChevronRight, Tag, BookOpen, Clock } from 'lucide-react';
 
 const BlogList = () => {
@@ -43,12 +44,12 @@ const BlogList = () => {
 
     return (
         <div className="min-h-screen bg-dark-900 pt-32 pb-32 px-6 relative overflow-hidden">
-            <Helmet>
-                <title>Blog | Discovery, Safety & Tips | Strangy</title>
-                <meta name="description" content="Explore the latest updates, safety tips, and guides for the best video chat experience on Strangy. Grow your global connections today!" />
-                <meta name="keywords" content="video chat blog, stranger chat tips, online safety, strangy updates, global communication" />
-                <link rel="canonical" href={window.location.origin + "/blog"} />
-            </Helmet>
+            <SEO
+                title="Strangy Blog — Tips, Guides & News for Video Chat India"
+                description="Read Strangy's blog for tips on random video chat, creator earnings, online safety & more. India's live chat community resource hub."
+                canonical="https://strangy.in/blog"
+                ogImage="https://strangy.in/og-blog.jpg"
+            />
 
             {/* Premium Background Effects */}
             <div className="absolute top-0 inset-x-0 h-[50vh] bg-gradient-to-b from-accent-purple/10 via-accent-purple/5 to-transparent pointer-events-none" />

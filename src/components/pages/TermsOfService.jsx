@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import SEO from '../SEO';
+
 import { 
     Shield, Scale, UserCheck, AlertTriangle, FileText, ChevronLeft, 
     Calendar, Key, UserPlus, Ban, Coins, Crown, Camera, 
@@ -430,7 +432,14 @@ const TermsOfService = () => {
 
     return (
         <div className="min-h-screen bg-[#0d0d0d] text-white font-sans selection:bg-purple-500/30">
+            <SEO
+                title="Terms of Service — Strangy"
+                description="Read Strangy's terms of service to understand the rules and guidelines for using our platform."
+                canonical="https://strangy.in/terms"
+                noindex={true}
+            />
             {/* Background Decorations */}
+
             <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
                 <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-purple-600/10 rounded-full blur-[120px]" />
                 <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-blue-600/10 rounded-full blur-[120px]" />

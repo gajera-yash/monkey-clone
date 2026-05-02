@@ -1,4 +1,6 @@
 import React from 'react';
+import SEO from '../SEO';
+
 
 const Community = () => {
     const rules = [
@@ -26,6 +28,13 @@ const Community = () => {
 
     return (
         <div className="min-h-screen bg-dark-900 text-white pt-24 pb-12 px-4 md:px-8">
+            <SEO
+                title="Strangy Community — Connect, Chat & Meet People in India"
+                description="Join the Strangy community — thousands of users across India connect, chat and build real friendships through live video calls daily. Join us today!"
+                canonical="https://strangy.in/community"
+                ogImage="https://strangy.in/og-community.jpg"
+            />
+
             <div className="max-w-4xl mx-auto">
                 <header className="text-center mb-16">
                     <h1 className="text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-violet-400 to-fuchsia-600 mb-6 text-gradient">

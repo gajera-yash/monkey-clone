@@ -1,4 +1,20 @@
 import React from 'react';
+import SEO from '../SEO';
+
+const helpSchema = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    { "@type": "Question", "name": "How do I start a chat on Strangy?", "acceptedAnswer": { "@type": "Answer", "text": "Click the 'Start Chatting' button on the home page. You'll be connected to a random user instantly via live video chat." } },
+    { "@type": "Question", "name": "Is Strangy free to use?", "acceptedAnswer": { "@type": "Answer", "text": "Yes, signing up is free. Coins are required for live video calls with creators and to send virtual gifts." } },
+    { "@type": "Question", "name": "How do I buy Strangy coins?", "acceptedAnswer": { "@type": "Answer", "text": "Go to the Coins page, choose a package and pay securely via UPI, debit card or netbanking using Razorpay." } },
+    { "@type": "Question", "name": "How do I report a user on Strangy?", "acceptedAnswer": { "@type": "Answer", "text": "During a chat, tap the Report button. Our moderation team reviews all reports within 24 hours." } },
+    { "@type": "Question", "name": "Can I use Strangy on mobile?", "acceptedAnswer": { "@type": "Answer", "text": "Yes! Strangy is fully responsive and works on both iOS and Android browsers." } },
+    { "@type": "Question", "name": "How do creators get paid on Strangy?", "acceptedAnswer": { "@type": "Answer", "text": "Creators earn coins from video calls and gifts, which are converted to INR and paid out via UPI or bank transfer." } }
+  ]
+};
+
+
 
 const HelpCenter = () => {
     const faqs = [
@@ -22,6 +38,14 @@ const HelpCenter = () => {
 
     return (
         <div className="min-h-screen bg-dark-900 text-white pt-24 pb-12 px-4 md:px-8">
+            <SEO
+                title="Strangy Help Center — FAQs, Support & How-To Guides"
+                description="Find answers to common Strangy questions — coins, creator accounts, video chat issues, payments & more. Get instant help from Strangy's support center."
+                canonical="https://strangy.in/help"
+                ogImage="https://strangy.in/og-help.jpg"
+                schema={helpSchema}
+            />
+
             <div className="max-w-4xl mx-auto">
                 <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-orange-400 to-yellow-600 mb-8">
                     Help Center

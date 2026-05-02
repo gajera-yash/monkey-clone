@@ -1,8 +1,30 @@
 import React from 'react';
+import SEO from '../SEO';
+
+const aboutSchema = {
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  "name": "Strangy",
+  "url": "https://strangy.in",
+  "description": "India's creator-first random video chat platform with verified creators and transparent coin earnings.",
+  "foundingLocation": "Surat, Gujarat, India",
+  "areaServed": "IN",
+  "logo": "https://strangy.in/logo.png",
+  "contactPoint": { "@type": "ContactPoint", "email": "support.strangy@gmail.com", "contactType": "customer support" }
+};
+
 
 const About = () => {
     return (
         <div className="min-h-screen bg-dark-900 text-white pt-24 pb-12 px-4 md:px-8">
+            <SEO
+                title="About Strangy — India's Creator-First Video Chat Platform"
+                description="Learn about Strangy — India's safest random video chat platform built for real connections and fair creator earnings. Discover our mission, values & team."
+                canonical="https://strangy.in/about"
+                ogImage="https://strangy.in/og-about.jpg"
+                schema={aboutSchema}
+            />
+
             <div className="max-w-4xl mx-auto">
                 <h1 className="text-5xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-purple-400 via-pink-500 to-red-500 mb-8 animate-fade-in">
                     About Strangy
