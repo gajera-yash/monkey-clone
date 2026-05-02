@@ -3,7 +3,7 @@ import { useCoins } from '../../context/CoinsContext';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../supabase';
 import toast from 'react-hot-toast';
-import { load } from '@cashfreepayments/cashfree-js';
+import { loadRazorpay } from '../../utils/loadRazorpay';
 import { API_BASE_URL } from '../../utils/socket';
 
 
@@ -94,8 +94,8 @@ const CoinStoreModal = ({ isOpen, onClose }) => {
         setProcessing(true);
         
         try {
-            // 1. Create order on backend (Using relative path for Vercel proxy)
-            const orderRes = await fetch('/api/coins/purchase/create-order', {
+            // 1. Create order on backend
+            const orderRes = await fetch('/api/coins/purchase/create-order-razorpay', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -104,84 +104,105 @@ const CoinStoreModal = ({ isOpen, onClose }) => {
                 })
             });
             
-            // Check for non-OK response before parsing JSON
             if (!orderRes.ok) {
                 let errorMsg = `Server Error (${orderRes.status})`;
                 try {
                     const errorData = await orderRes.json();
                     errorMsg = errorData.message || errorData.error || errorMsg;
-                    console.error("Server Error Details:", errorData);
                 } catch (e) {
-                    const text = await orderRes.text();
-                    console.error("Server Error:", text);
                 }
                 throw new Error(errorMsg);
             }
 
             const orderData = await orderRes.json();
             
-            if (!orderData.paymentSessionId) {
-                throw new Error(orderData.error || "Failed to create payment session");
+            if (!orderData.order_id) {
+                throw new Error("Failed to create payment session");
             }
 
-            // 2. Load Cashfree Checkout - use dynamic mode from server
-            const cashfreeMode = orderData.cashfreeMode || "sandbox";
-            console.log("[CoinStore] Loading Cashfree in mode:", cashfreeMode);
-            
-            const cashfree = await load({
-                mode: cashfreeMode
-            });
-
-            const result = await cashfree.checkout({
-                paymentSessionId: orderData.paymentSessionId,
-                redirectTarget: "_modal"
-            });
-
-            if (result?.error) {
-                toast.error(result.error.message || "Payment cancelled");
-                setProcessing(false);
-                return;
+            // 2. Load Razorpay SDK
+            const res = await loadRazorpay();
+            if (!res) {
+                throw new Error('Razorpay SDK failed to load. Are you online?');
             }
 
-            // 3. Verify on backend (Using relative path for Vercel proxy)
-            const verifyRes = await fetch('/api/coins/purchase/verify', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    orderId: orderData.orderId,
-                    userId: currentUser?.uid || currentUser?.id,
-                    packageId: selectedPkg.id
-                })
-            });
-            
-            if (!verifyRes.ok) {
-                let verifyErrorMsg = "Verification failed";
-                try {
-                    const verifyErrorData = await verifyRes.json();
-                    verifyErrorMsg = verifyErrorData.message || verifyErrorData.error || verifyErrorMsg;
-                } catch (e) {}
-                throw new Error(verifyErrorMsg);
-            }
+            // 3. Open Razorpay Checkout Modal
+            const options = {
+                key: process.env.REACT_APP_RAZORPAY_KEY_ID,
+                amount: orderData.amount,
+                currency: orderData.currency,
+                name: "Strangy",
+                description: `Purchase of ${selectedPkg.coins} Coins`,
+                order_id: orderData.order_id,
+                prefill: {
+                    name: currentUser?.username || currentUser?.displayName || "Strangy User",
+                    email: currentUser?.email || "customer@strangy.in",
+                    contact: currentUser?.phone || "9999999999"
+                },
+                theme: {
+                    color: "#8b5cf6" // accent-purple
+                },
+                handler: async function (response) {
+                    try {
+                        // 4. Verify on backend
+                        const verifyRes = await fetch('/api/coins/purchase/verify-razorpay', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                razorpay_order_id: response.razorpay_order_id,
+                                razorpay_payment_id: response.razorpay_payment_id,
+                                razorpay_signature: response.razorpay_signature,
+                                userId: currentUser?.uid || currentUser?.id,
+                                packageId: selectedPkg.id
+                            })
+                        });
+                        
+                        if (!verifyRes.ok) {
+                            let verifyErrorMsg = "Verification failed";
+                            try {
+                                const verifyErrorData = await verifyRes.json();
+                                verifyErrorMsg = verifyErrorData.message || verifyErrorData.error || verifyErrorMsg;
+                            } catch (e) {}
+                            throw new Error(verifyErrorMsg);
+                        }
 
-            const verifyData = await verifyRes.json();
-            
-            if (verifyData.success) {
-                // Success state first to clear the loader/processing screen
-                setStep('success');
-                
-                // Refresh coins from database (source of truth)
-                try {
-                    await refreshCoins();
-                } catch (refreshError) {
-                    console.warn("[CoinStore] Balance refresh failed, user may need to reload:", refreshError);
+                        const verifyData = await verifyRes.json();
+                        
+                        if (verifyData.success) {
+                            setStep('success');
+                            try {
+                                await refreshCoins();
+                            } catch (refreshError) {
+                                console.warn("[CoinStore] Balance refresh failed:", refreshError);
+                            }
+                        } else {
+                            toast.error(verifyData.message || "Payment verification failed");
+                        }
+                    } catch (verifyErr) {
+                        console.error("Verification Error:", verifyErr);
+                        toast.error(verifyErr.message || "Payment verification failed");
+                    } finally {
+                        setProcessing(false);
+                    }
+                },
+                modal: {
+                    ondismiss: function() {
+                        toast.error("Payment cancelled");
+                        setProcessing(false);
+                    }
                 }
-            } else {
-                toast.error(verifyData.message || "Payment verification failed");
-            }
+            };
+
+            const paymentObject = new window.Razorpay(options);
+            paymentObject.on('payment.failed', function (response) {
+                toast.error(response.error.description || "Payment failed");
+                setProcessing(false);
+            });
+            paymentObject.open();
+
         } catch (error) {
             console.error("Payment Error:", error);
             toast.error(error.message || "Payment failed");
-        } finally {
             setProcessing(false);
         }
     };
@@ -300,7 +321,7 @@ const CoinStoreModal = ({ isOpen, onClose }) => {
                             <div className="flex items-center justify-between">
                                 <div>
                                     <h2 className="text-xl font-black text-white">Secure Checkout</h2>
-                                    <p className="text-white/40 text-sm">Powered by Cashfree</p>
+                                    <p className="text-white/40 text-sm">Powered by Razorpay</p>
                                 </div>
                                 <div className="text-right">
                                     <div className="text-yellow-400 font-black text-lg">{selectedPkg?.coins.toLocaleString()} 🪙</div>
