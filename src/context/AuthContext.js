@@ -510,9 +510,15 @@ export const AuthProvider = ({ children }) => {
         // Auth State Listener
         useEffect(() => {
             let mounted = true;
+            let initialSessionHandled = false;
     
             const handleAuthState = async (event, session) => {
             console.log("[AuthContext] Auth state change event:", event);
+
+            if (event === 'INITIAL_SESSION') {
+                if (initialSessionHandled) return;
+                initialSessionHandled = true;
+            }
 
             if (!mounted) return;
             try {
@@ -737,13 +743,19 @@ export const AuthProvider = ({ children }) => {
 
         // Explicitly check for session on mount to ensure we don't wait for onAuthStateChange
         // which can sometimes be delayed or miss initial state on some browsers/caches
-        supabase.auth.getSession().then(({ data: { session } }) => {
-            if (session) {
-                handleAuthState('INITIAL_SESSION', session);
-            } else {
-                setLoading(false);
-            }
-        });
+        supabase.auth.getSession()
+            .then(({ data: { session }, error }) => {
+                if (error) throw error;
+                if (session) {
+                    handleAuthState('INITIAL_SESSION', session);
+                } else {
+                    if (mounted) setLoading(false);
+                }
+            })
+            .catch(err => {
+                console.error("getSession error:", err);
+                if (mounted) setLoading(false);
+            });
 
         return () => {
             mounted = false;
