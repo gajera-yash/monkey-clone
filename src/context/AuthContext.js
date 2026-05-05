@@ -757,8 +757,18 @@ export const AuthProvider = ({ children }) => {
                 if (mounted) setLoading(false);
             });
 
+        // FAILSAFE: If auth state hasn't resolved within 6 seconds, force loading=false
+        // This prevents the infinite loader bug on slow networks or stale Supabase caches
+        const loadingTimeout = setTimeout(() => {
+            if (mounted) {
+                console.warn('[AuthContext] Auth initialization timeout (6s) — forcing loading=false');
+                setLoading(false);
+            }
+        }, 6000);
+
         return () => {
             mounted = false;
+            clearTimeout(loadingTimeout);
             if (subscription) subscription.unsubscribe();
         };
     }, [isGuest]);

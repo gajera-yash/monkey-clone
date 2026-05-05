@@ -1088,9 +1088,14 @@ const VideoChat = ({ onEndChat }) => {
       hasEmittedJoin.current = false;
       setStatus('Searching for partner...');
       
-      // Use the ref to avoid stale closure where stream might be null
-      if (performJoinRef.current) {
-          performJoinRef.current();
+      // CRITICAL: Only auto-rejoin if user hasn't cancelled the session
+      if (userInitiatedJoin.current) {
+        // Use the ref to avoid stale closure where stream might be null
+        if (performJoinRef.current) {
+            performJoinRef.current();
+        }
+      } else {
+        setStatus('Idle');
       }
     };
 
@@ -1651,13 +1656,43 @@ const VideoChat = ({ onEndChat }) => {
 
                   <button
                     onClick={() => {
+                      // CRITICAL: Set flags FIRST to prevent race condition with partner-disconnected
+                      userInitiatedJoin.current = false;
+                      hasEmittedJoin.current = false;
+                      
+                      // Leave the server waiting queue so we don't get matched
+                      socket.emit('leave-waiting');
+                      
+                      // Close any existing peer connection from previous call
+                      if (peerConnection.current) {
+                        peerConnection.current.ontrack = null;
+                        peerConnection.current.onicecandidate = null;
+                        peerConnection.current.onconnectionstatechange = null;
+                        peerConnection.current.oniceconnectionstatechange = null;
+                        try { peerConnection.current.close(); } catch(e) {}
+                        peerConnection.current = null;
+                      }
+                      
+                      // Leave any active room
+                      if (roomIdRef.current) {
+                        socket.emit('leave-room', { roomId: roomIdRef.current });
+                        roomIdRef.current = null;
+                      }
+                      
+                      // Reset all state
                       setStatus('Idle');
                       setPartnerName(null);
                       setPartnerLocation(null);
                       setPartnerIsPremium(false);
+                      setPartnerGender(null);
+                      setPartnerAge(null);
+                      setRemoteStream(null);
+                      setMessages([]);
+                      setChatTimer(0);
+                      setIsPartnerTyping(false);
                       pendingFilterCharge.current = null;
-                      userInitiatedJoin.current = false;
-                      hasEmittedJoin.current = false;
+                      pendingIceCandidates.current = [];
+                      partnerIdRef.current = null;
                     }}
                     className="px-8 py-2.5 border border-white/20 rounded-full text-sm hover:bg-white/10 transition-colors text-gray-300"
                   >
@@ -1849,7 +1884,7 @@ const VideoChat = ({ onEndChat }) => {
 
       {/* Right Panel - Chat Interface (Desktop Only) */}
       {status === 'Connected' && (
-        <div className={`hidden md:flex w-full md:w-[350px] h-full md:h-auto md:max-h-[70vh] md:min-h-[480px] bg-[#5c545e]/80 backdrop-blur-2xl md:rounded-[24px] border border-white/10 flex-col z-[200] absolute inset-0 md:inset-auto md:right-8 md:top-1/2 md:-translate-y-1/2 md:translate-x-0 ${showChat ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0 pointer-events-none'} transition-all duration-300 transform shadow-[0_15px_40px_rgba(0,0,0,0.5)] overflow-hidden`}>
+        <div className={`hidden md:flex w-full md:w-[350px] h-full md:h-auto md:max-h-[70vh] md:min-h-[480px] bg-[#5c545e]/80 backdrop-blur-2xl md:rounded-[24px] border border-white/10 flex-col z-[200] absolute inset-0 md:inset-auto md:right-8 md:top-1/2 md:-translate-y-1/2 md:translate-x-0 transition-all duration-300 transform shadow-[0_15px_40px_rgba(0,0,0,0.5)] overflow-hidden`}>
           {/* Chat Header */}
           <div className="px-6 py-5 border-b border-white/10 flex items-center justify-between bg-black/10">
             <div className="flex items-center gap-2">

@@ -495,10 +495,18 @@ const CreatorDashboard = () => {
 
                 {/* 5. QUICK ACTIONS & TRANSACTIONS */}
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-                    <button onClick={() => navigate('/creator/withdraw')} className="bg-dark-800 hover:bg-white/5 transition-colors p-6 rounded-3xl border border-white/5 flex flex-col items-center justify-center gap-3 text-center group">
-                        <div className="w-12 h-12 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center text-xl group-hover:scale-110 transition-transform">🏦</div>
-                        <span className="font-semibold text-sm">Withdraw Funds</span>
-                    </button>
+                    {currentUser?.gender === 'Female' ? (
+                        <button onClick={() => toast('💸 Withdrawal feature coming soon! Stay tuned.', { icon: '🚀', duration: 3000 })} className="bg-dark-800 hover:bg-white/5 transition-colors p-6 rounded-3xl border border-white/5 flex flex-col items-center justify-center gap-3 text-center group relative overflow-hidden">
+                            <div className="absolute top-2 right-2 bg-yellow-500/20 text-yellow-400 text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider border border-yellow-500/30">Coming Soon</div>
+                            <div className="w-12 h-12 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center text-xl group-hover:scale-110 transition-transform opacity-50">🏦</div>
+                            <span className="font-semibold text-sm text-gray-500">Withdraw Funds</span>
+                        </button>
+                    ) : (
+                        <button onClick={() => navigate('/creator/withdraw')} className="bg-dark-800 hover:bg-white/5 transition-colors p-6 rounded-3xl border border-white/5 flex flex-col items-center justify-center gap-3 text-center group">
+                            <div className="w-12 h-12 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center text-xl group-hover:scale-110 transition-transform">🏦</div>
+                            <span className="font-semibold text-sm">Withdraw Funds</span>
+                        </button>
+                    )}
                     <button 
                         onClick={() => {
                             setShowGifts(true);

@@ -90,27 +90,46 @@ const Dashboard = () => {
     };
 
     const fetchChartData = async () => {
-        // Fetch last 7 days of user growth
+        // OPTIMIZED: Fetch all data for the last 7 days in just 2 queries (instead of 14)
         const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-        const data = [];
         const now = new Date();
+        const sevenDaysAgo = new Date(now);
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+        sevenDaysAgo.setHours(0, 0, 0, 0);
+        const startDate = sevenDaysAgo.toISOString();
 
-        for (let i = 6; i >= 0; i--) {
-            const d = new Date(now);
-            d.setDate(d.getDate() - i);
-            const start = new Date(d.setHours(0, 0, 0, 0)).toISOString();
-            const end = new Date(d.setHours(23, 59, 59, 999)).toISOString();
+        try {
+            const [usersRes, chatsRes] = await Promise.all([
+                supabase.from('profiles').select('created_at').gte('created_at', startDate),
+                supabase.from('chat_logs').select('start_time').gte('start_time', startDate)
+            ]);
 
-            const { count: uCount } = await supabase.from('profiles').select('*', { count: 'exact', head: true }).gte('created_at', start).lte('created_at', end);
-            const { count: cCount } = await supabase.from('chat_logs').select('*', { count: 'exact', head: true }).gte('start_time', start).lte('start_time', end);
+            // Initialize daily buckets
+            const dailyData = {};
+            for (let i = 6; i >= 0; i--) {
+                const d = new Date(now);
+                d.setDate(d.getDate() - i);
+                const dateKey = d.toISOString().split('T')[0]; // YYYY-MM-DD
+                const dayName = days[d.getDay()];
+                dailyData[dateKey] = { name: dayName, users: 0, chats: 0 };
+            }
 
-            data.push({
-                name: days[new Date(start).getDay()],
-                users: uCount || 0,
-                chats: cCount || 0
+            // Count users per day
+            (usersRes.data || []).forEach(u => {
+                const dateKey = new Date(u.created_at).toISOString().split('T')[0];
+                if (dailyData[dateKey]) dailyData[dateKey].users++;
             });
+
+            // Count chats per day
+            (chatsRes.data || []).forEach(c => {
+                const dateKey = new Date(c.start_time).toISOString().split('T')[0];
+                if (dailyData[dateKey]) dailyData[dateKey].chats++;
+            });
+
+            setChartData(Object.values(dailyData));
+        } catch (err) {
+            console.error("Chart data fetch error:", err);
         }
-        setChartData(data);
     };
 
     const fetchRecentActivities = async () => {
