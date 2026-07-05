@@ -54,3 +54,22 @@ FOR EACH ROW EXECUTE FUNCTION check_profile_update();
 --    (storage.foldername(name))[1] = auth.uid()::text AND
 --    (lower(storage.extension(name)) = 'jpg' OR lower(storage.extension(name)) = 'png' OR lower(storage.extension(name)) = 'jpeg')
 -- );
+
+-- 4. Admin Team Members Security (EXTREME SECURITY)
+-- Prevent any normal user from making themselves an admin
+ALTER TABLE public.admin_team_members ENABLE ROW LEVEL SECURITY;
+
+-- Admins can view other admins, normal users cannot see the admin list
+DROP POLICY IF EXISTS "Admins can view admin list" ON public.admin_team_members;
+CREATE POLICY "Admins can view admin list" ON public.admin_team_members 
+FOR SELECT USING (
+    auth.uid() IN (SELECT user_id FROM public.admin_team_members WHERE role = 'admin')
+);
+
+-- NO ONE can insert or update the admin_team_members table from the frontend API
+-- Only the backend Node.js server (using SUPABASE_SERVICE_KEY) can add/remove admins
+DROP POLICY IF EXISTS "Block frontend insert for admins" ON public.admin_team_members;
+CREATE POLICY "Block frontend insert for admins" ON public.admin_team_members FOR INSERT WITH CHECK (false);
+
+DROP POLICY IF EXISTS "Block frontend update for admins" ON public.admin_team_members;
+CREATE POLICY "Block frontend update for admins" ON public.admin_team_members FOR UPDATE USING (false);

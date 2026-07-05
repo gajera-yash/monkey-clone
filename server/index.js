@@ -107,6 +107,13 @@ const authLimiter = rateLimit({
     message: { error: 'Too many authentication attempts, please try again later.' }
 });
 
+// Specific Rate Limiter for Admin Routes (Extreme Security)
+const adminLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 100, // Limit each IP to 100 admin requests per 15 mins
+    message: { error: 'Too many admin requests, please try again later.' }
+});
+app.use('/api/admin', adminLimiter);
 
 // CORS: Allow Vercel frontend in production
 const FRONTEND_URL = process.env.FRONTEND_URL || '*';
