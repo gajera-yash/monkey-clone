@@ -1,0 +1,15 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 30
+    },
+    "auditLog": "E:\\2026 Challange\\monkey-clone\\server\\logs\\.0fdd2262c00072557d84160c3087bdac85771f69-audit.json",
+    "files": [
+        {
+            "date": 1783257239588,
+            "name": "E:\\2026 Challange\\monkey-clone\\server\\logs\\error-2026-07-05.log",
+            "hash": "a0179ac30d813e6387b20c78d999948435c36c36f2f7395764ebb9a0bed130aa"
+        }
+    ],
+    "hashType": "sha256"
+}

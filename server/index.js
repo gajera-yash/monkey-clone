@@ -12,11 +12,10 @@ const requiredEnvVars = ['SUPABASE_URL', 'SUPABASE_SERVICE_KEY'];
 const missingEnvVars = requiredEnvVars.filter(envVar => !process.env[envVar] && !process.env[`REACT_APP_${envVar}`]);
 if (missingEnvVars.length > 0) {
     console.error('========================================');
-    console.error('CRITICAL ERROR: Missing required environment variables:');
+    console.error('WARNING: Missing recommended environment variables:');
     console.error(missingEnvVars.join(', '));
-    console.error('Server will not start securely without these variables.');
+    console.error('Some backend features like Admin roles or RLS bypass might fail.');
     console.error('========================================');
-    process.exit(1);
 }
 
 // Global Exception Handlers
@@ -55,6 +54,7 @@ const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/user');
 
 const app = express();
+app.set('trust proxy', 1); // Required for rate limiting behind Vercel/Railway proxies
 
 // Initialize Sentry
 if (process.env.SENTRY_DSN) {
