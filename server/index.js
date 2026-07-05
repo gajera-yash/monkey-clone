@@ -83,7 +83,8 @@ app.use(helmet({
             frameSrc: ["'self'", "https://checkout.razorpay.com"]
         }
     },
-    crossOriginEmbedderPolicy: false // Needed for some external assets
+    crossOriginEmbedderPolicy: false, // Needed for some external assets
+    crossOriginResourcePolicy: false, // CRITICAL: Allows cross-origin Socket.IO polling from frontend
 }));
 app.disable('x-powered-by');
 
