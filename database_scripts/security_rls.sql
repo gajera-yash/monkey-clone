@@ -59,14 +59,16 @@ FOR EACH ROW EXECUTE FUNCTION check_profile_update();
 -- Prevent any normal user from making themselves an admin
 ALTER TABLE public.admin_team_members ENABLE ROW LEVEL SECURITY;
 
--- Admins can view other admins, normal users cannot see the admin list
+-- 3. Extreme Security: Admin Team Members Table
+-- ONLY the backend service key can insert/update. Frontend cannot.
 DROP POLICY IF EXISTS "Admins can view admin list" ON public.admin_team_members;
-CREATE POLICY "Admins can view admin list" ON public.admin_team_members 
+DROP POLICY IF EXISTS "Users can view own admin role" ON public.admin_team_members;
+CREATE POLICY "Users can view own admin role" ON public.admin_team_members 
 FOR SELECT USING (
-    auth.uid() IN (SELECT user_id FROM public.admin_team_members WHERE role = 'admin')
+    auth.uid() = user_id
 );
 
--- NO ONE can insert or update the admin_team_members table from the frontend API
+-- Absolutely NO inserts or updates from the frontend (Extreme Security)s table from the frontend API
 -- Only the backend Node.js server (using SUPABASE_SERVICE_KEY) can add/remove admins
 DROP POLICY IF EXISTS "Block frontend insert for admins" ON public.admin_team_members;
 CREATE POLICY "Block frontend insert for admins" ON public.admin_team_members FOR INSERT WITH CHECK (false);

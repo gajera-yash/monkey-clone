@@ -69,23 +69,24 @@ if (process.env.SENTRY_DSN) {
 }
 
 // HTTP Security Headers (Helmet)
-app.use(helmet({
-    contentSecurityPolicy: {
-        directives: {
-            defaultSrc: ["'self'"],
-            scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://checkout.razorpay.com"],
-            styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-            imgSrc: ["'self'", "data:", "https://*"],
-            connectSrc: ["'self'", "wss:", "https://*", "stun:", "turn:", "turns:"],
-            fontSrc: ["'self'", "https://fonts.gstatic.com"],
-            objectSrc: ["'none'"],
-            mediaSrc: ["'self'", "blob:", "data:", "https://*"],
-            frameSrc: ["'self'", "https://checkout.razorpay.com"]
-        }
-    },
-    crossOriginEmbedderPolicy: false, // Needed for some external assets
-    crossOriginResourcePolicy: false, // CRITICAL: Allows cross-origin Socket.IO polling from frontend
-}));
+// TEMPORARILY DISABLED FOR DEBUGGING NETWORK BLOCKS
+// app.use(helmet({
+//     contentSecurityPolicy: {
+//         directives: {
+//             defaultSrc: ["'self'"],
+//             scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://checkout.razorpay.com"],
+//             styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+//             imgSrc: ["'self'", "data:", "https://*"],
+//             connectSrc: ["'self'", "wss:", "https://*", "stun:", "turn:", "turns:"],
+//             fontSrc: ["'self'", "https://fonts.gstatic.com"],
+//             objectSrc: ["'none'"],
+//             mediaSrc: ["'self'", "blob:", "data:", "https://*"],
+//             frameSrc: ["'self'", "https://checkout.razorpay.com"]
+//         }
+//     },
+//     crossOriginEmbedderPolicy: false, // Needed for some external assets
+//     crossOriginResourcePolicy: false, // CRITICAL: Allows cross-origin Socket.IO polling from frontend
+// }));
 app.disable('x-powered-by');
 
 // Request Logging

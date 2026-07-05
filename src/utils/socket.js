@@ -9,33 +9,32 @@ const isLocalhost = hostname === 'localhost' || hostname.startsWith('192.168.');
 
 // URL Configuration
 // For local development, point directly to the local backend.
-// For production, we use an EMPTY string. This forces Socket.IO to connect to the current domain (e.g., strangy.in).
-// Vercel serverless functions will then catch the '/s/' path and proxy it to the Railway backend.
-let SOCKET_URL = isLocalhost ? `http://${hostname}:3001` : '';
+// For production, we point directly to the Railway backend to avoid Vercel Proxy 404 issues.
+const RAILWAY_URL = 'https://strangy-production-9664.up.railway.app';
+let SOCKET_URL = isLocalhost ? `http://${hostname}:3001` : RAILWAY_URL;
 
 // Direct Railway Fallback (if Vercel proxy fails)
-let FALLBACK_URL = 'https://strangy-production-9664.up.railway.app';
+let FALLBACK_URL = RAILWAY_URL;
 
-console.log("[Socket] Init via Vercel Proxy Strategy | Localhost:", isLocalhost);
+console.log("[Socket] Init via Strategy | Localhost:", isLocalhost);
 
 // --- Create Socket ---
 // CRITICAL: Custom path '/s/' bypasses Jio DPI. Vercel vercel.json routes this to the backend.
 const socket = io(SOCKET_URL, {
     autoConnect: false,
     reconnection: true,
-    reconnectionAttempts: 7,  // Try primary (Vercel proxy) 7 times before fallback
+    reconnectionAttempts: Infinity,
     reconnectionDelay: 1000,
     reconnectionDelayMax: 8000,
     randomizationFactor: 0.5,
     timeout: 20000,
-    // CRITICAL: Vercel does NOT support WebSockets through rewrites/proxies.
-    // We MUST force 'polling' only for production. It has slight delay but 100% bypasses Jio firewall.
-    transports: isLocalhost ? ['polling', 'websocket'] : ['polling'],
-    upgrade: isLocalhost, // Disable upgrade attempt on production proxy
+    // Use both polling and websocket to ensure maximum compatibility
+    transports: ['polling', 'websocket'],
+    upgrade: true, 
     secure: true,
     withCredentials: false,
     perMessageDeflate: false,
-    path: '/s/'   // Client requests /s/ -> Vercel proxies to Railway /s/
+    path: '/s/' 
 });
 
 // --- Fallback Logic ---
