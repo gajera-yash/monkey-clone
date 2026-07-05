@@ -8,7 +8,7 @@ import {
     LayoutDashboard, Users as UsersIcon, MessageSquare, ShieldAlert,
     CreditCard, BarChart3, Palette, Settings,
     Lock, Bell, LifeBuoy, Menu, X, ChevronRight, LogOut, Coins, ShieldCheck, Wallet,
-    FileText, Zap, Globe, ClipboardList, Receipt
+    FileText, Zap, Globe, ClipboardList, Receipt, Activity
 } from 'lucide-react';
 
 // Real Section Imports
@@ -31,6 +31,7 @@ import GeoBlocking from './sections/GeoBlocking';
 import AdminActionLog from './sections/AdminActionLog';
 import Transactions from './sections/Transactions';
 import Withdrawals from './sections/Withdrawals';
+import SystemHealth from './sections/SystemHealth';
 
 import Analytics from './sections/Analytics';
 import AdminUsers from './sections/AdminUsers';
@@ -216,6 +217,7 @@ const AdminLayout = () => {
                 { name: 'Content', path: '/admin/content', id: 'content', icon: <Palette size={18} /> },
                 { name: 'Blogs', path: '/admin/blogs', id: 'content', icon: <FileText size={18} /> },
                 { name: 'Settings', path: '/admin/settings', id: 'settings', icon: <Settings size={18} /> },
+                { name: 'System Health', path: '/admin/health', id: 'settings', icon: <Activity size={18} /> },
                 { name: 'Admins', path: '/admin/roles', id: 'settings', icon: <Lock size={18} /> },
                 { name: 'Geo Blocking', path: '/admin/geo-blocking', id: 'settings', icon: <Globe size={18} /> },
                 { name: 'Action Log', path: '/admin/action-log', id: 'settings', icon: <ClipboardList size={18} /> },
@@ -425,6 +427,7 @@ const AdminLayout = () => {
                         <Route path="transactions" element={<Transactions />} />
                         <Route path="withdrawals" element={<Withdrawals />} />
                         <Route path="settings" element={<SystemSettings />} />
+                        <Route path="health" element={<SystemHealth />} />
                         <Route path="roles" element={<AdminUsers />} />
                         <Route path="alerts" element={<Notifications />} />
                         <Route path="support" element={<Support />} />
