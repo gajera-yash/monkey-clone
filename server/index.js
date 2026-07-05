@@ -7,6 +7,18 @@ if (fs.existsSync(path.join(__dirname, '.env'))) {
     require('dotenv').config({ path: path.join(__dirname, '.env') });
 }
 
+// Environment Variable Validation (Phase 9)
+const requiredEnvVars = ['SUPABASE_URL', 'SUPABASE_SERVICE_KEY'];
+const missingEnvVars = requiredEnvVars.filter(envVar => !process.env[envVar] && !process.env[`REACT_APP_${envVar}`]);
+if (missingEnvVars.length > 0) {
+    console.error('========================================');
+    console.error('CRITICAL ERROR: Missing required environment variables:');
+    console.error(missingEnvVars.join(', '));
+    console.error('Server will not start securely without these variables.');
+    console.error('========================================');
+    process.exit(1);
+}
+
 // Global Exception Handlers
 process.on('uncaughtException', (err) => {
     console.error('========================================');
@@ -27,7 +39,15 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
+const os = require('os');
 const { createClient } = require('@supabase/supabase-js');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
+const hpp = require('hpp');
+const Sentry = require('@sentry/node');
+const { nodeProfilingIntegration } = require('@sentry/profiling-node');
+const logger = require('./utils/logger');
+const morgan = require('morgan');
 
 const coinsRoutes = require('./routes/coins');
 const subscriptionsRoutes = require('./routes/subscriptions');
@@ -35,6 +55,58 @@ const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/user');
 
 const app = express();
+
+// Initialize Sentry
+if (process.env.SENTRY_DSN) {
+    Sentry.init({
+        dsn: process.env.SENTRY_DSN,
+        integrations: [
+            nodeProfilingIntegration(),
+        ],
+        tracesSampleRate: 1.0, 
+        profilesSampleRate: 1.0,
+    });
+}
+
+// HTTP Security Headers (Helmet)
+app.use(helmet({
+    contentSecurityPolicy: {
+        directives: {
+            defaultSrc: ["'self'"],
+            scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://checkout.razorpay.com"],
+            styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+            imgSrc: ["'self'", "data:", "https://*"],
+            connectSrc: ["'self'", "wss:", "https://*"],
+            fontSrc: ["'self'", "https://fonts.gstatic.com"],
+            objectSrc: ["'none'"],
+            mediaSrc: ["'self'"],
+            frameSrc: ["'self'", "https://checkout.razorpay.com"]
+        }
+    },
+    crossOriginEmbedderPolicy: false // Needed for some external assets
+}));
+app.disable('x-powered-by');
+
+// Request Logging
+app.use(morgan('combined', { stream: { write: message => logger.info(message.trim()) } }));
+
+// Global Rate Limiting
+const globalLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 1000, // Limit each IP to 1000 requests per windowMs
+    message: { error: 'Too many requests, please try again later.' },
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+app.use('/api', globalLimiter);
+
+// Specific Rate Limiter for Auth
+const authLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000, // 1 hour
+    max: 50, // Limit each IP to 50 auth requests per hour
+    message: { error: 'Too many authentication attempts, please try again later.' }
+});
+
 
 // CORS: Allow Vercel frontend in production
 const FRONTEND_URL = process.env.FRONTEND_URL || '*';
@@ -61,7 +133,8 @@ app.use(cors({
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     credentials: false
 }));
-app.use(express.json());
+app.use(express.json({ limit: '10kb' })); // Restrict payload size
+app.use(hpp()); // Prevent HTTP Parameter Pollution
 
 // Health Check Endpoint
 app.get('/health', (req, res) => {
@@ -86,7 +159,7 @@ if (!supabase) {
 }
 
 // Authentication Routes
-app.use('/api/auth', authRoutes);
+app.use('/api/auth', authLimiter, authRoutes);
 
 // User & Profile Routes
 app.use('/api/user', userRoutes);
@@ -144,6 +217,30 @@ const io = new Server(server, {
     maxHttpBufferSize: 1e6, // 1MB — handle large ICE candidate payloads
     httpCompression: false, // Disable compression to avoid mobile network issues
     perMessageDeflate: false // Prevent WebSocket compression issues on Jio/mobile
+});
+
+// Socket.IO Connection Rate Limiter (Prevent Connection Flooding)
+const connectionLimits = new Map(); // ip -> { count, lastReset }
+io.use((socket, next) => {
+    const ip = socket.handshake.headers['x-forwarded-for'] || socket.handshake.address;
+    const now = Date.now();
+    
+    if (!connectionLimits.has(ip)) {
+        connectionLimits.set(ip, { count: 1, lastReset: now });
+    } else {
+        const limitData = connectionLimits.get(ip);
+        if (now - limitData.lastReset > 60000) { // reset every minute
+            limitData.count = 1;
+            limitData.lastReset = now;
+        } else {
+            limitData.count++;
+            if (limitData.count > 30) { // Max 30 connections per minute per IP
+                logger.warn(`[Socket Security] Connection flood blocked from IP: ${ip}`);
+                return next(new Error('Connection rate limit exceeded'));
+            }
+        }
+    }
+    next();
 });
 
 // Queue for users waiting to be matched [{id, name}]
@@ -256,6 +353,29 @@ const verifyAdmin = async (req) => {
         return { error: 'Verification failed' };
     }
 };
+
+// System Health Endpoint for Admin Dashboard
+app.get('/api/admin/system-health', async (req, res) => {
+    const { user: requester, error: verifyError } = await verifyAdmin(req);
+    if (verifyError) return res.status(403).json({ error: verifyError });
+
+    const health = {
+        uptime: process.uptime(),
+        message: 'OK',
+        timestamp: Date.now(),
+        cpuUsage: process.cpuUsage(),
+        memoryUsage: process.memoryUsage(),
+        osLoadavg: os.loadavg(),
+        osFreeMem: os.freemem(),
+        osTotalMem: os.totalmem(),
+        socketStats: {
+            totalConnections: io.engine.clientsCount,
+            waitingCount: waitingUsers.length,
+            activeRooms: socketRooms.size / 2,
+        }
+    };
+    res.json(health);
+});
 
 // Fetch all revenue metrics for Admin Panel (Bypass client-side RLS)
 app.get('/api/admin/revenue-data', async (req, res) => {
@@ -1082,6 +1202,25 @@ if (fs.existsSync(buildPath)) {
         res.sendFile(path.join(buildPath, 'index.html'));
     });
 }
+
+// Sentry Error Handler (must be before any other error middleware)
+if (process.env.SENTRY_DSN) {
+    Sentry.setupExpressErrorHandler(app);
+}
+
+// Centralized Error Handling Middleware
+app.use((err, req, res, next) => {
+    logger.error(`[Express Error] ${err.message}`, { stack: err.stack, url: req.originalUrl, method: req.method });
+    
+    // Do not leak stack traces to client in production
+    const isProd = process.env.NODE_ENV === 'production';
+    const errorResponse = {
+        error: isProd ? 'Internal Server Error' : err.message,
+        ...(isProd ? {} : { stack: err.stack })
+    };
+    
+    res.status(err.status || 500).json(errorResponse);
+});
 
 const PORT = process.env.PORT || 3001;
 server.listen(PORT, '0.0.0.0', () => {
