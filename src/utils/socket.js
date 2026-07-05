@@ -9,8 +9,8 @@ const isLocalhost = hostname === 'localhost' || hostname.startsWith('192.168.');
 
 // URL Configuration
 // For local development, point directly to the local backend.
-// For production, we point directly to the Railway backend to avoid Vercel Proxy 404 issues.
-const RAILWAY_URL = 'https://strangy-production-9664.up.railway.app';
+// For production, we point directly to the backend domain to avoid Vercel Proxy 404 issues.
+const RAILWAY_URL = 'https://backend.strangy.in';
 let SOCKET_URL = isLocalhost ? `http://${hostname}:3001` : RAILWAY_URL;
 
 // Direct Railway Fallback (if Vercel proxy fails)
@@ -109,5 +109,5 @@ socket.on('disconnect', (reason) => {
 // --- Exports ---
 export { SOCKET_URL };
 // For API calls (like flag-report), always use direct Railway API to avoid Vercel timeouts/payload limits on large uploads
-export const API_BASE_URL = 'https://api.strangy.in';
+export const API_BASE_URL = 'https://backend.strangy.in';
 export default socket;
